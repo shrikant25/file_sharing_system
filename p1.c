@@ -11,7 +11,6 @@ typedef struct idata{
     int msgtype;
     int msgid;
     int substrid;
-    char *val;
 }idata;
 
 typedef struct mdata{
@@ -25,8 +24,8 @@ typedef struct mupdate{
     int total;
 }mupdate;
 
-
-
+int rows;
+char bytes[BLOCK_SIZE];
 idata idataobj[1160];
 mdata mdataobj[9];
 mupdate mupdateobj[9];
@@ -40,7 +39,7 @@ void do_exit(PGconn *conn) {
 
 void get_data(){
 
-    int i,j,rows;
+    int i,j;
     char query[100];
     char id[10];
 
@@ -96,6 +95,74 @@ void get_data(){
 }
 
 
+void randomize(){
+
+	int i;
+	idata temp;
+	for(i = 0; i<rows/2; i++){
+		memcpy(temp, idataobj[i], sizeof(idata));
+		memcpy(idataobj[i], idataobj[i+3], sizeof(idata));
+		memcpy(idataobj[i+3], temp, sizeof(idata));
+	}
+	
+	mupdate temp2;
+	memcpy(temp2, mupdateobj[5], sizeof(mupdate));
+	memcpy(mupdateobj[5], mupdateobj[2],sizeof(mupdate));
+	memcpy(mupdateobj[2], temp2, sizeof(mupdate));
+	
+}
+
+
+void get_string(int id, int substrid){
+	
+	 int i,j;
+    char query[100];
+    char mid[10];
+    char msubid[10];
+
+    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
+
+    if (PQstatus(connection) == CONNECTION_BAD) {
+
+        fprintf(stderr, "Connection to database failed: %s\n",
+            PQerrorMessage(connection));
+        do_exit(connection);
+    }
+
+    
+	
+	sprintf(mid, "%d", id);
+	sprintf(msubid, "%d", substrid);
+	
+	
+	strcpy(query, "select substring from substrings where msgid = ");
+	strcat(query, mid);
+	strcat(query, "and substrid = ");
+	strcat(query, msubid);
+	
+	 
+        PGresult *result = PQexec(connection, query);
+	
+	rows = PQntuples(result);
+
+        if (PQresultStatus(result) != PGRES_TUPLES_OK) {
+
+		printf("No data retrieved\n");
+		PQclear(result);
+		do_exit(connection);
+       }
+
+	
+	strcpy(PQgetvalue(result, 0, 0));
+ 	
+	
+	PQclear(result);
+     
+
+    PQfinish(connection);
+}
+
+
 int main(void){
 
  
@@ -106,18 +173,34 @@ int main(void){
         return -1;
     }
 
+	get_data();
 
-//    strncpy(block,, BLOCK_SIZE);
-    get_data();
-       for(i=0; i<9; i++){
-       		printf(" insert in substrings table : msgid : %d, substrid : %d, msgtype : %d\n", idataobj[i*9].msgid, idataobj[i*9].substrid, idataobj[i*9].msgtype);
-       		printf(" update in parts table      : msgid : %d, total    : %d, msgtype : %d\n", mupdateobj[i].msgid, mupdateobj[i].total, mupdateobj[i].msgtype);
-       		printf(" insert in parts table      : msgid : %d, msgtype  : %d\n", mdataobj[i].msgid, mdataobj[i].msgtype);
-       		printf("\n");
+	for(i = 0; i<9; i++){
+		memcpy(block, mdataobj[i].msgtype, 4);
+		memcpy(block+4, mdataobj[i].msgid, 4);
+	}
+	
+
+       for(i=0; i<rows; i++){
+       		memcpy(block, idataobj[i].msgtype, 4);
+       		memcpy(block+4, idataobj[i].msgid, 4);
+       		memcpy(block+8, idataobj[i].substrid, 4);
+       		get_string(idataobj[i].msgid, idataobj[i].substrid);
+       		memcpy(block+12, bytes, BLOCK_SIZE);
+       		
+       		
+       		if(j<9 && i%30){
+       			memcpy(block, mupdate[j].msgtype, 4);
+       			memcpy(block+4, mupdate[j].msgid, 4);
+       			memcpy(block+8, mupdate[j].msgtotal, 4);
+       			j++;
+       		}
+       		
        }
     
     
     
     detach_memory_block(block);
+    
     return 0;
 }
