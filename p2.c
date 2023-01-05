@@ -56,11 +56,10 @@ void get_sinsert_query(){
 
     idata d;
 
-    memcpy(d.substrid, block+4, 4);
-    memcpy(d.msgid, block+8, 4);
+    memcpy(d.msgid, block+4, 4);
+    memcpy(d.substrid, block+8, 4);
     memcpy(d.val, block+12, BLOCK_SIZE);
     
-
     memset(query, 0, 100);
     sprintf(msgid, "%d", d.msgid);
     sprintf(substrid, "%d", d.substrid);
