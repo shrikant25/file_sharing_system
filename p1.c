@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "shared_memory.h"
+#include "partition.h"
+#include "bitmap.h"
 #include <libpq-fe.h>
 
 #define BUFSIZE 50000
@@ -154,40 +156,76 @@ void get_string(int id, int substrid){
     PQfinish(connection);
 }
 
-
-int main(void){
+//int work(int sockfd){
+int work(){
 
  
     int i, j = 0;
+	int empty_partition_position = -1;
+	//char buffer[256];
     char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
-    if(block == NULL) {
-        printf("unable to create block");
+    char *blkptr = NULL;
+	
+	if(block == NULL) {
+        printf("unable to create a shared block");
         return -1;
     }
 
+    unset_all_bits(block);
+
 	get_data();
 
-	for(i = 0; i<9; i++){
-		memcpy(block, mdataobj[i].msgtype, 4);
-		memcpy(block+4, mdataobj[i].msgid, 4);
+	//memset(buffer, 0, 256);
+	//strcpy(buffer, "1");
+	//n = write(sockfd,buffer,strlen(buffer));
+	//if (n < 0) error("ERROR writing to socket");
+
+	for(i = 0; i<9;){
+		
+		empty_partition_position = get_partition(block, 0);
+		if(empty_partition_position >= 0){
+			
+			blkptr = block +(empty_partition_position*PARTITION_SIZE);
+			memcpy(blkptr, mdataobj[i].msgtype, 4);
+			memcpy(blkptr+4, mdataobj[i].msgid, 4);
+			toggle_bit(empty_partition_position, block);
+			i++;
+		}
+		else
+			printf("no partition available");
+
 	}
 	
-
-	for(i=0; i<rows; i++){
-		memcpy(block, idataobj[i].msgtype, 4);
-		memcpy(block+4, idataobj[i].msgid, 4);
-		memcpy(block+8, idataobj[i].substrid, 4);
-		get_string(idataobj[i].msgid, idataobj[i].substrid);
-			
-		if(j<9 && !(i%30)){
-			memcpy(block, mupdate[j].msgtype, 4);
-			memcpy(block+4, mupdate[j].msgid, 4);
-			memcpy(block+8, mupdate[j].msgtotal, 4);
-			j++;
-		}
+	for(i=0; i<rows; ){
 		
+		empty_partition_position = get_partition();
+		if(empty_partition_position >= 0){
+						
+			blkptr = block +(empty_partition_position*PARTITION_SIZE);
+				
+			if(j<9 && !(i%30)){
+				
+				memcpy(blkptr, mupdate[j].msgtype, 4);
+				memcpy(blkptr+4, mupdate[j].msgid, 4);
+				memcpy(blkptr+8, mupdate[j].msgtotal, 4);
+				j++;
+
+			}else{
+				
+				memcpy(blkptr, idataobj[i].msgtype, 4);
+				memcpy(blkptr+4, idataobj[i].msgid, 4);
+				memcpy(blkptr+8, idataobj[i].substrid, 4);
+				get_string(idataobj[i].msgid, idataobj[i].substrid);
+				i++;
+			}
+
+			toggle_bit(empty_partition_position, block);
+		
+		}
+		else
+			printf("no partition available");
+
 	}
-    
     
     detach_memory_block(block);
     

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "shared_memory.h"
+#include "bitmap.h"
+#include "partition.h"
 #include <libpq-fe.h>
 #define BUFSIZE 50000
 
@@ -31,34 +33,14 @@ void do_exit(PGconn *conn) {
     exit(1);
 }
 
-void write_data(char *block){
 
-
-    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
-
-    if (PQstatus(connection) == CONNECTION_BAD) {
-
-        fprintf(stderr, "Connection to database failed: %s\n",
-            PQerrorMessage(connection));
-        do_exit(connection);
-    }
-
-    PQexec(connection, query);
-
-    PQclear(result);
-    PQfinish(connection);
-   
-  
-}
-
-
-void get_sinsert_query(){
+void get_sinsert_query(char *blkptr){
 
     idata d;
 
-    memcpy(d.msgid, block+4, 4);
-    memcpy(d.substrid, block+8, 4);
-    memcpy(d.val, block+12, BLOCK_SIZE);
+    memcpy(d.msgid, blkptr+4, 4);
+    memcpy(d.substrid, blkptr+8, 4);
+    memcpy(d.val, blkptr+12, BLOCK_SIZE);
     
     memset(query, 0, 100);
     sprintf(msgid, "%d", d.msgid);
@@ -75,10 +57,10 @@ void get_sinsert_query(){
 }
 
 
-void get_minsert_query(){
+void get_minsert_query(char *blkptr){
     
     mdata m;
-    memcpy(m.msgid, block+4, 4);
+    memcpy(m.msgid, blkptr+4, 4);
 
     memset(query, 0, 100);
     memset(msgid, 0 , 10);
@@ -97,8 +79,8 @@ void get_mupdate_query(){
 
     mupdate u;
 
-    memcpy(u.msgid, block+4, 4);
-    memcpy(u.total, block+8, 4);
+    memcpy(u.msgid, blkptr+4, 4);
+    memcpy(u.total, blkptr+8, 4);
 
     memset(query, 0, 100);
     memset(msgid, 0, 10);
@@ -115,7 +97,6 @@ void get_mupdate_query(){
 }
 
 
-
 int main(void){
     
     char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
@@ -126,19 +107,45 @@ int main(void){
     }
     
     int querytype;
+    int filled_partition_position = -1;
+	
+    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
-    memcpy(querytype, block, 4);
+    if (PQstatus(connection) == CONNECTION_BAD) {
+
+        fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        do_exit(connection);
+    }
+
+    while(1){
     
-    if(querytype == 1);
-        get_sinsert_query();
-    else if(querytype == 2)
-        get_minsert_query();
-    else 
-        get_mupdate_query();
+        filled_partition_position = get_partition(block, 1);
+		if(empty_partition >= 0){
+         
+            blkptr = block +(filled_partition_position*PARTITION_SIZE);
+            
+            memcpy(querytype, blkptr, 4);
 
-    write_data();
+            if(querytype == 1);
+                get_sinsert_query(blkptr);
+            else if(querytype == 2)
+                get_minsert_query(blkptr);
+            else 
+                get_mupdate_query(blkptr);
 
+            PQexec(connection, query);
+   
+            blkptr = NULL;
+            empty_partition = -1;
+            toggle_bit(filled_partition_position, block);
+		
+        }
+        else
+            printf("No data in shared space");
+    }
+
+    PQfinish(connection);
     detach_memory_block(block);
-
+        
     return 0;
 }
