@@ -1,4 +1,8 @@
 
+drop table psubstrings;
+drop table psubparts;
+drop table pmerged_msg;
+
 create table psubstrings (
    substrid serial, substring bytea,
    msgid int);
@@ -17,7 +21,7 @@ end;
 '
 language 'plpgsql';
 
-create trigger tusub after insert into psubstrings for each row execute usub; 
+create trigger tusub after insert on psubstrings for each row execute function usub(); 
 
 
 create or replace function msub()
@@ -31,7 +35,7 @@ begin
 	if ftotal > 0 then
 		if fcur = ftotal then
 			insert into pmerged_msg (msgid, msg)
-			select s.msgid,lo_from_bytea(msgid + 1000,string_agg(s.fsubstring, '')) as merged_string
+			select s.msgid,lo_from_bytea(msgid + 1000,string_agg(s.fsubstring, '''')) as merged_string
 			from psubstrings s
 			where s.msgid = new.msgid; 
 		end if;
@@ -42,7 +46,7 @@ end;
 language 'plpgsql';
 
 
-create trigger tmsub after update on psubparts for each row execute msub;
+create trigger tmsub after update on psubparts for each row execute function msub();
 	
 
 

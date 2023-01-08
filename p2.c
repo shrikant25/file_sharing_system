@@ -1,17 +1,20 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <semaphore.h>
 #include "shared_memory.h"
 #include "bitmap.h"
 #include "partition.h"
 #include <libpq-fe.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #define BUFSIZE 50000
 
 
 typedef struct idata{
     int msgid;
     int substrid;
-    char val[BLOCK_SIZE];
+    char val[1024*1024];
 }idata;
 
 typedef struct mdata{
@@ -39,18 +42,18 @@ void get_sinsert_query(char *blkptr){
 
     idata d;
 
-    memcpy(d.msgid, blkptr+4, 4);
-    memcpy(d.substrid, blkptr+8, 4);
-    memcpy(d.val, blkptr+12, BLOCK_SIZE);
-    
+    memcpy(&d.msgid, blkptr+4, 4);
+    memcpy(&d.substrid, blkptr+8, 4);
+    memcpy(&d.val, blkptr+12, (1024*1024));
     memset(query, 0, 100);
+    
     sprintf(msgid, "%d", d.msgid);
     sprintf(substrid, "%d", d.substrid);
 
     strcpy(query, "insert into psubstrings values( ");
     strcat(query, substrid);
     strcat(query, " , ' ");
-    strcat(d.val); 
+    strcat(query, d.val); 
     strcat(query, " ' , ");
     strcat(query, msgid);
     strcat(query, " ) ");
@@ -61,7 +64,7 @@ void get_sinsert_query(char *blkptr){
 void get_minsert_query(char *blkptr){
     
     mdata m;
-    memcpy(m.msgid, blkptr+4, 4);
+    memcpy(&m.msgid, blkptr+4, 4);
 
     memset(query, 0, 100);
     memset(msgid, 0 , 10);
@@ -76,12 +79,12 @@ void get_minsert_query(char *blkptr){
 }
 
 
-void get_mupdate_query(){
+void get_mupdate_query(char *blkptr){
 
     mupdate u;
 
-    memcpy(u.msgid, blkptr+4, 4);
-    memcpy(u.total, blkptr+8, 4);
+    memcpy(&u.msgid, blkptr+4, 4);
+    memcpy(&u.total, blkptr+8, 4);
 
     memset(query, 0, 100);
     memset(msgid, 0, 10);
@@ -92,7 +95,7 @@ void get_mupdate_query(){
 
     strcpy(query, "update psubparts set total = ");
     strcat(query, total);
-    strcat(query, " where msgid = ")
+    strcat(query, " where msgid = ");
     strcat(query, msgid);
 
 }
@@ -100,15 +103,15 @@ void get_mupdate_query(){
 
 int main(void){
     
+    int querytype;
+    int filled_partition_position = -1;
+    char *blkptr = NULL;
     char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
   
     if(block == NULL) {
         printf("failed to get block");
         return -1;
     }
-    
-    int querytype;
-    int filled_partition_position = -1;
 
     PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
     if (PQstatus(connection) == CONNECTION_BAD) {
@@ -117,8 +120,8 @@ int main(void){
         do_exit(connection);
     }
 
-	sem_t *semptr = sem_open(SEM_SHM_LOCK, IPC_CREAT, 0777, 0);
-	if(semptr == NULL){
+	sem_t *semptr = sem_open(SEM_SHM_LOCK, O_CREAT, 0777, 0);
+	if(semptr == SEM_FAILED){
 		printf("unable to create a p1 lock");
 		return -1;
 	}
@@ -127,13 +130,13 @@ int main(void){
         
         sem_wait(semptr);
         filled_partition_position = get_partition(block, 1);
-		if(empty_partition >= 0){
+		if(filled_partition_position >= 0){
          
             blkptr = block +(filled_partition_position*PARTITION_SIZE);
             
-            memcpy(querytype, blkptr, 4);
-
-            if(querytype == 1);
+            memcpy(&querytype, blkptr, 4);
+            printf("%d\n", querytype);
+            if(querytype == 1)
                 get_sinsert_query(blkptr);
             else if(querytype == 2)
                 get_minsert_query(blkptr);
@@ -143,8 +146,8 @@ int main(void){
             PQexec(connection, query);
    
             blkptr = NULL;
-            empty_partition = -1;
             toggle_bit(filled_partition_position, block);
+            filled_partition_position = -1;
 		
         }
         else

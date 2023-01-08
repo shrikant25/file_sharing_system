@@ -3,7 +3,6 @@
 
 int main(int argc, char *argv[]) {
 
-
     if(destroy_memory_block(FILENAME)) {
         printf("Destroyed block  %s\n", FILENAME);
     }
