@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <semaphore.h>
 #include "shared_memory.h"
 #include "bitmap.h"
 #include "partition.h"
@@ -108,17 +109,23 @@ int main(void){
     
     int querytype;
     int filled_partition_position = -1;
-	
-    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
+    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
     if (PQstatus(connection) == CONNECTION_BAD) {
 
         fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
         do_exit(connection);
     }
 
+	sem_t *semptr = sem_open(SEM_SHM_LOCK, IPC_CREAT, 0777, 0);
+	if(semptr == NULL){
+		printf("unable to create a p1 lock");
+		return -1;
+	}
+
     while(1){
-    
+        
+        sem_wait(semptr);
         filled_partition_position = get_partition(block, 1);
 		if(empty_partition >= 0){
          
@@ -142,8 +149,10 @@ int main(void){
         }
         else
             printf("No data in shared space");
+        sem_post(semptr);
     }
 
+    sem_close(semptr);
     PQfinish(connection);
     detach_memory_block(block);
         

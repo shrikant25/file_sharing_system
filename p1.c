@@ -3,6 +3,7 @@
 #include <string.h>
 #include "shared_memory.h"
 #include "partition.h"
+#include <semaphore.h>
 #include "bitmap.h"
 #include <libpq-fe.h>
 
@@ -157,21 +158,25 @@ void get_string(int id, int substrid){
 }
 
 //int work(int sockfd){
-int work(){
+int main(void){
 
- 
     int i, j = 0;
 	int empty_partition_position = -1;
 	//char buffer[256];
-    char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
     char *blkptr = NULL;
-	
+    char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
 	if(block == NULL) {
         printf("unable to create a shared block");
         return -1;
     }
 
-    unset_all_bits(block);
+	sem_unlink(SEM_SHM_LOCK);
+
+	sem_t *semptr = sem_open((SEM_SHM_LOCK), IPC_CREAT, 0777, 1);
+	if(semptr == NULL){
+		printf("unable to create semphore pointer");
+		return -1;
+	}
 
 	get_data();
 
@@ -180,8 +185,13 @@ int work(){
 	//n = write(sockfd,buffer,strlen(buffer));
 	//if (n < 0) error("ERROR writing to socket");
 
+	sem_wait(semptr);
+	unset_all_bits(block);
+	sem_post(semptr);
+
 	for(i = 0; i<9;){
 		
+		sem_wait(semptr);
 		empty_partition_position = get_partition(block, 0);
 		if(empty_partition_position >= 0){
 			
@@ -193,21 +203,23 @@ int work(){
 		}
 		else
 			printf("no partition available");
-
+		sem_post(semptr);
 	}
 	
 	for(i=0; i<rows; ){
-		
+
+		sem_wait(semptr);		
 		empty_partition_position = get_partition();
+
 		if(empty_partition_position >= 0){
 						
 			blkptr = block +(empty_partition_position*PARTITION_SIZE);
 				
 			if(j<9 && !(i%30)){
 				
-				memcpy(blkptr, mupdate[j].msgtype, 4);
-				memcpy(blkptr+4, mupdate[j].msgid, 4);
-				memcpy(blkptr+8, mupdate[j].msgtotal, 4);
+				memcpy(blkptr, mupdateobj[j].msgtype, 4);
+				memcpy(blkptr+4, mupdateobj[j].msgid, 4);
+				memcpy(blkptr+8, mupdateobj[j].msgtotal, 4);
 				j++;
 
 			}else{
@@ -224,9 +236,10 @@ int work(){
 		}
 		else
 			printf("no partition available");
-
+		sem_post(semptr);
 	}
-    
+
+	sem_close(semptr);
     detach_memory_block(block);
     
     return 0;
