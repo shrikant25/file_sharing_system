@@ -3,13 +3,15 @@
 #include <string.h>
 #include "shared_memory.h"
 #include "partition.h"
-#include <semaphore.h>
+#include <pthread.h>
 #include "bitmap.h"
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <libpq-fe.h>
 
 #define BUFSIZE 50000
+
 
 typedef struct idata{
     int msgtype;
@@ -33,6 +35,7 @@ idata idataobj[1160];
 mdata mdataobj[9];
 mupdate mupdateobj[9];
 
+
 void do_exit(PGconn *conn) {
 
     PQfinish(conn);
@@ -45,6 +48,7 @@ void get_data(){
     int i,j,k = 0;
     char query[100];
     char id[10];
+	
 
     PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
@@ -65,7 +69,7 @@ void get_data(){
 		strcat(query, id);
 			
 		PGresult *result = PQexec(connection, query);
-
+		printf("query : %s\n", query);
 		rows = PQntuples(result);
 
 		if (PQresultStatus(result) != PGRES_TUPLES_OK) {
@@ -124,6 +128,7 @@ void get_string(int id, int substrid, char *blkptr){
     char query[100];
     char mid[10];
     char msubid[10];
+	char *value = NULL;
 
     PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
@@ -144,8 +149,8 @@ void get_string(int id, int substrid, char *blkptr){
 	
 	 
     PGresult *result = PQexec(connection, query);
-	
-	rows = PQntuples(result);
+	printf("query : %s\n", query);
+	//rows = PQntuples(result);
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK) {
 
@@ -154,7 +159,9 @@ void get_string(int id, int substrid, char *blkptr){
 		do_exit(connection);
     }
 
-	strcpy(blkptr+12, PQgetvalue(result, 0, 0));
+	value =  PQgetvalue(result, 0, 0);
+	printf("len %ld\n", strlen(value));
+	strncpy(blkptr+12, value, strlen(value));
 	
 	PQclear(result);
     PQfinish(connection);
@@ -164,33 +171,37 @@ void get_string(int id, int substrid, char *blkptr){
 int main(void){
 
     int i, j = 0;
+	int start_pos = 0;
 	int empty_partition_position = -1;
     char *blkptr = NULL;
-
+	
     char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
 	if(block == NULL) {
         printf("unable to create a shared block");
         return -1;
     }
 
-	sem_unlink(SEM_SHM_LOCK);
-
-	sem_t *semptr = sem_open(SEM_SHM_LOCK, O_CREAT, 0777, 1);
-	if(semptr == SEM_FAILED){
-		printf("unable to create semphore pointer");
-		return -1;
-	}
-
+	
 	get_data();
-
-	sem_wait(semptr);
+	
+	pthread_mutex_t *mutex = (pthread_mutex_t *)block;
+	if(mutex == NULL){
+		 printf("unable to create lock");
+        return -1;
+	}
+	pthread_mutex_lock(mutex);
 	unset_all_bits(block);
-	sem_post(semptr);
-
+	pthread_mutex_unlock(mutex);
+	
+	start_pos = -1;
 	for(i = 0; i<9;){
+		printf("....");
+		pthread_mutex_lock(mutex);
 		
-		sem_wait(semptr);
-		empty_partition_position = get_partition(block, 0);
+		empty_partition_position = get_partition(block, 0, start_pos);
+		start_pos = empty_partition_position;
+    	printf("partion no p1 %d\n", empty_partition_position);
+	
 		if(empty_partition_position >= 0){
 			
 			blkptr = block + (empty_partition_position*PARTITION_SIZE);
@@ -198,46 +209,58 @@ int main(void){
 			memcpy(blkptr+4, &mdataobj[i].msgid, 4);
 			toggle_bit(empty_partition_position, block);
 			i++;
+			printf("i : %d\n", i);
 		}
-		else
-			printf("no partition available");
-		sem_post(semptr);
+		empty_partition_position = -1;
+		
+		pthread_mutex_unlock(mutex);
+		sleep(5);
 	}
+	
+	blkptr = NULL;
+	int flag = 0;
+	start_pos = -1;
 	
 	for(i=0; i<rows; ){
 
-		sem_wait(semptr);		
-		empty_partition_position = get_partition(block, 0);
-
+		pthread_mutex_lock(mutex);
+		
+		empty_partition_position = get_partition(block, 0, start_pos);
+		start_pos = empty_partition_position;
+		printf("partion no p1 %d\n", empty_partition_position);
 		if(empty_partition_position >= 0){
-						
+			
 			blkptr = block +(empty_partition_position*PARTITION_SIZE);
 				
-			if(j<9 && !(i%30)){
-				
+			if(j<9 && (i%30==0) && !flag){
+				flag  = 1;
+				printf("oyeee");
 				memcpy(blkptr, &mupdateobj[j].msgtype, 4);
 				memcpy(blkptr+4, &mupdateobj[j].msgid, 4);
 				memcpy(blkptr+8, &mupdateobj[j].total, 4);
 				j++;
 
 			}else{
-				
+				printf("else");
 				memcpy(blkptr, &idataobj[i].msgtype, 4);
 				memcpy(blkptr+4, &idataobj[i].msgid, 4);
 				memcpy(blkptr+8, &idataobj[i].substrid, 4);
 				get_string(idataobj[i].msgid, idataobj[i].substrid, blkptr);
+				flag = 0;
 				i++;
 			}
 
 			toggle_bit(empty_partition_position, block);
-			empty_partition_position = -1;
+		printf("i : %d\n", i);
 		}
-		else
-			printf("no partition available");
-		sem_post(semptr);
+		blkptr = NULL;
+		empty_partition_position = -1;
+		
+		pthread_mutex_unlock(mutex);
+		sleep(5);
+		
 	}
 
-	sem_close(semptr);
     detach_memory_block(block);
     
     return 0;

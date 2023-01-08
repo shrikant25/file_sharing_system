@@ -15,7 +15,7 @@
 
 #ifndef GT_PTNS
 #define GT_PTNS
-int get_partition(char *, int);
+int get_partition(char *, int, int);
 #endif
 
 #endif

@@ -1,11 +1,14 @@
 #include <string.h>
+#include <stdio.h>
 #include "partition.h"
 
 void toggle_bit(int i, char *block){
     
     short int bmap = 0;
     memcpy(&bmap, block+(BLOCK_SIZE-3), 2); // retrive bitmap
+    printf(" prev %hx\n", bmap);
     bmap ^= 1<<i;  // toggle bit
+    printf("after %hx\n", bmap);
     memcpy(block+(BLOCK_SIZE-3), &bmap,2);  // store bitmap  
 
 }
