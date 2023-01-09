@@ -3,7 +3,7 @@
 #include <string.h>
 #include "shared_memory.h"
 #include "partition.h"
-#include <pthread.h>
+#include <semaphore.h>
 #include "bitmap.h"
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -30,7 +30,7 @@ typedef struct mupdate{
     int total;
 }mupdate;
 
-int rows;
+
 idata idataobj[1160];
 mdata mdataobj[9];
 mupdate mupdateobj[9];
@@ -45,10 +45,10 @@ void do_exit(PGconn *conn) {
 
 void get_data(){
 
-    int i,j,k = 0;
+    int j,k = 0;
     char query[100];
     char id[10];
-	
+	int rows;
 
     PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
@@ -59,17 +59,16 @@ void get_data(){
         do_exit(connection);
     }
 
-    for(i=0; i<9; i++){
 
+	for(int i =0; i<9; i++){
 		memset(query, 0, 100);
 		memset(id, 0, 10);
-
+		
 		strcpy(query, "select * from substrings where msgid = ");
 		sprintf(id, "%d", i+1);
 		strcat(query, id);
 			
 		PGresult *result = PQexec(connection, query);
-		printf("query : %s\n", query);
 		rows = PQntuples(result);
 
 		if (PQresultStatus(result) != PGRES_TUPLES_OK) {
@@ -92,12 +91,12 @@ void get_data(){
 			idataobj[k].msgtype = 1;
 			idataobj[k].substrid = atoi(PQgetvalue(result, j, 0));
 			k++;
-		}
-
+    	}
+	
 		PQclear(result);
-			
-    }
-
+		printf("%d\n",i);
+	}
+	
     PQfinish(connection);
    
 }
@@ -108,7 +107,7 @@ void randomize(){
 	int i;
 	idata temp;
 	
-	for(i = 0; i<rows/2; i++){
+	for(i = 0; i<1160/2; i++){
 		memcpy(&temp, &idataobj[i], sizeof(idata));
 		memcpy(&idataobj[i], &idataobj[i+3], sizeof(idata));
 		memcpy(&idataobj[i+3], &temp, sizeof(idata));
@@ -149,8 +148,6 @@ void get_string(int id, int substrid, char *blkptr){
 	
 	 
     PGresult *result = PQexec(connection, query);
-	printf("query : %s\n", query);
-	//rows = PQntuples(result);
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK) {
 
@@ -160,8 +157,7 @@ void get_string(int id, int substrid, char *blkptr){
     }
 
 	value =  PQgetvalue(result, 0, 0);
-	printf("len %ld\n", strlen(value));
-	strncpy(blkptr+12, value, strlen(value));
+	strncpy(blkptr+12, value, 1024*1024);
 	
 	PQclear(result);
     PQfinish(connection);
@@ -180,68 +176,63 @@ int main(void){
         printf("unable to create a shared block");
         return -1;
     }
-
 	
+
 	get_data();
 	
-	pthread_mutex_t *mutex = (pthread_mutex_t *)block;
-	if(mutex == NULL){
-		 printf("unable to create lock");
+	sem_t *sem = sem_open(SEM_LOCK, O_CREAT, 0777, 1);
+	if(sem ==  SEM_FAILED){
+        printf("unable to create a semaphore");
         return -1;
-	}
-	pthread_mutex_lock(mutex);
-	unset_all_bits(block);
-	pthread_mutex_unlock(mutex);
+    }
 	
+	sem_wait(sem);
+	unset_all_bits(block);
+	sem_post(sem);
+printf("offf");
 	start_pos = -1;
 	for(i = 0; i<9;){
-		printf("....");
-		pthread_mutex_lock(mutex);
 		
+		sem_wait(sem);
 		empty_partition_position = get_partition(block, 0, start_pos);
-		start_pos = empty_partition_position;
-    	printf("partion no p1 %d\n", empty_partition_position);
 	
 		if(empty_partition_position >= 0){
-			
+			start_pos = empty_partition_position;
 			blkptr = block + (empty_partition_position*PARTITION_SIZE);
 			memcpy(blkptr, &mdataobj[i].msgtype, 4);
 			memcpy(blkptr+4, &mdataobj[i].msgid, 4);
 			toggle_bit(empty_partition_position, block);
 			i++;
-			printf("i : %d\n", i);
+			
 		}
 		empty_partition_position = -1;
-		
-		pthread_mutex_unlock(mutex);
-		sleep(5);
+		sem_post(sem);
 	}
 	
 	blkptr = NULL;
 	int flag = 0;
 	start_pos = -1;
 	
-	for(i=0; i<rows; ){
-
-		pthread_mutex_lock(mutex);
-		
+	for(i=0; i<1160; ){
+	
+	sem_wait(sem);
 		empty_partition_position = get_partition(block, 0, start_pos);
-		start_pos = empty_partition_position;
-		printf("partion no p1 %d\n", empty_partition_position);
+		
+	
 		if(empty_partition_position >= 0){
-			
+			start_pos = empty_partition_position;
 			blkptr = block +(empty_partition_position*PARTITION_SIZE);
 				
-			if(j<9 && (i%30==0) && !flag){
+			if(j<9 && (i%10==0) && !flag){
 				flag  = 1;
-				printf("oyeee");
+				
 				memcpy(blkptr, &mupdateobj[j].msgtype, 4);
 				memcpy(blkptr+4, &mupdateobj[j].msgid, 4);
 				memcpy(blkptr+8, &mupdateobj[j].total, 4);
 				j++;
 
 			}else{
-				printf("else");
+				
 				memcpy(blkptr, &idataobj[i].msgtype, 4);
 				memcpy(blkptr+4, &idataobj[i].msgid, 4);
 				memcpy(blkptr+8, &idataobj[i].substrid, 4);
@@ -251,16 +242,14 @@ int main(void){
 			}
 
 			toggle_bit(empty_partition_position, block);
-		printf("i : %d\n", i);
+		
 		}
 		blkptr = NULL;
 		empty_partition_position = -1;
-		
-		pthread_mutex_unlock(mutex);
-		sleep(5);
+		sem_post(sem);
 		
 	}
-
+	
     detach_memory_block(block);
     
     return 0;

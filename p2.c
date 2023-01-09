@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
+#include <semaphore.h>
 #include "shared_memory.h"
 #include "bitmap.h"
 #include "partition.h"
@@ -60,7 +60,7 @@ void get_sinsert_query(char *blkptr){
     strcat(query, " ' , ");
     strcat(query, msgid);
     strcat(query, " ) ");
-    
+    printf("%s\n", query);
 }
 
 
@@ -78,7 +78,7 @@ void get_minsert_query(char *blkptr){
     strcat(query, " , ");
     strcat(query, " 0 , ");
     strcat(query, " 0 )");    
-
+    
 }
 
 
@@ -124,40 +124,36 @@ int main(void){
         do_exit(connection);
     }
 
-    pthread_mutex_t *mutex = (pthread_mutex_t *)block;
-if(mutex == NULL){
-		 printf("unable to create lock");
-        return -1;
-	}
+   sem_t *sem = sem_open(SEM_LOCK, 0);
     
     
     start_pos = -1;
 
     while(1){
+     
+       sem_wait(sem);         
         
-        pthread_mutex_lock(mutex);          
-        printf("lock");
         filled_partition_position = get_partition(block, 1, start_pos);
-        start_pos = filled_partition_position;
-
         
-        printf("p2 partion no  %d\n", filled_partition_position);
+        
+      
 		if(filled_partition_position >= 0){
-           
+           start_pos = filled_partition_position;
+
             blkptr = block +(filled_partition_position*PARTITION_SIZE);
             
             memcpy(&querytype, blkptr, 4);
-            printf("%d\n", querytype);
+           
             if(querytype == 1)
                 get_sinsert_query(blkptr);
             else if(querytype == 2)
                 get_minsert_query(blkptr);
             else 
                 get_mupdate_query(blkptr);
-
+            
             PQexec(connection, query);
-           
-            memset(blkptr, 0, PARTITION_SIZE);
+             
+                memset(blkptr, 0, PARTITION_SIZE);
             blkptr = NULL;
             toggle_bit(filled_partition_position, block);
             
@@ -165,8 +161,7 @@ if(mutex == NULL){
         }
         filled_partition_position = -1;
        
-        pthread_mutex_unlock(mutex);
-        sleep(2);
+        sem_post(sem);
     }
 
     PQfinish(connection);
