@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <libpq-fe.h>
 
-#define BUFSIZE 50000
+#define BUFSIZE 1024*1024*2
 
 
 typedef struct idata{
@@ -94,30 +94,11 @@ void get_data(){
     	}
 	
 		PQclear(result);
-		printf("%d\n",i);
+		printf("%d\n",i); 
 	}
 	
     PQfinish(connection);
    
-}
-
-
-void randomize(){
-
-	int i;
-	idata temp;
-	
-	for(i = 0; i<1160/2; i++){
-		memcpy(&temp, &idataobj[i], sizeof(idata));
-		memcpy(&idataobj[i], &idataobj[i+3], sizeof(idata));
-		memcpy(&idataobj[i+3], &temp, sizeof(idata));
-	}
-	
-	mupdate temp2;
-	memcpy(&temp2, &mupdateobj[5], sizeof(mupdate));
-	memcpy(&mupdateobj[5], &mupdateobj[2],sizeof(mupdate));
-	memcpy(&mupdateobj[2], &temp2, sizeof(mupdate));
-	
 }
 
 
@@ -157,29 +138,22 @@ void get_string(int id, int substrid, char *blkptr){
     }
 
 	value =  PQgetvalue(result, 0, 0);
-	strncpy(blkptr+12, value, 1024*1024);
+	strncpy(blkptr+12, value, strlen(value));
 	
 	PQclear(result);
     PQfinish(connection);
 }
 
+int do_job(char * block){
 
-int main(void){
 
     int i, j = 0;
 	int start_pos = 0;
 	int empty_partition_position = -1;
     char *blkptr = NULL;
-	
-    char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
-	if(block == NULL) {
-        printf("unable to create a shared block");
-        return -1;
-    }
-	
 
-	get_data();
-	
+	sem_unlink(SEM_LOCK);
+
 	sem_t *sem = sem_open(SEM_LOCK, O_CREAT, 0777, 1);
 	if(sem ==  SEM_FAILED){
         printf("unable to create a semaphore");
@@ -189,7 +163,6 @@ int main(void){
 	sem_wait(sem);
 	unset_all_bits(block);
 	sem_post(sem);
-printf("offf");
 	start_pos = -1;
 	for(i = 0; i<9;){
 		
@@ -250,7 +223,28 @@ printf("offf");
 		
 	}
 	
-    detach_memory_block(block);
+	sem_close(sem); // closes the named semaphore referred to by sem,
+       			    // allowing any resources that the system has allocated to the
+       				// calling process for this semaphore to be freed.
+	
+	sem_unlink(SEM_LOCK);  //removes the named semaphore referred to by name.
+      					   // The semaphore name is removed immediately.  The semaphore is
+                           // destroyed once all other processes that have the semaphore open
+                           // close it.
+}
+
+
+int main(void){
+
+    char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
+	if(block == NULL) {
+        printf("unable to create a shared block");
+        return -1;
+    }
+	
+	get_data();
+	do_job(block);
+	detach_memory_block(block);
     
     return 0;
 }
