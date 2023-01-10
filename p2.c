@@ -47,7 +47,7 @@ int get_sinsert_query(char *blkptr, PGconn *conn){
 
     memcpy(&d.msgid, blkptr+4, 4);
     memcpy(&d.substrid, blkptr+8, 4);
-    strncpy(d.val, blkptr+12, (1024*1024));
+    strncpy(d.val, blkptr+12, 2*1024*1024);
     
     sprintf(msgid, "%d", d.msgid);
     sprintf(substrid, "%d", d.substrid);
@@ -57,13 +57,7 @@ int get_sinsert_query(char *blkptr, PGconn *conn){
     // Execute the INSERT statement
     res = PQexecPrepared(conn, "insert_stmt", 3, paramValues, NULL, NULL, 0);
 
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(conn));
-        PQclear(res);
-        PQfinish(conn);
-        return 1;
-    }
-
+    
     // Clear the result set and close the connection
     PQclear(res);
     return 0;
@@ -89,12 +83,7 @@ int get_minsert_query(char *blkptr, PGconn *conn){
     // Execute the INSERT statement
     res = PQexecPrepared(conn, "insert_stmt2", 3, paramValues, NULL, NULL, 0);
 
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(conn));
-        PQclear(res);
-        PQfinish(conn);
-        return 1;
-    }
+    
 
     // Clear the result set and close the connection
     PQclear(res);
@@ -120,12 +109,7 @@ int get_mupdate_query(char *blkptr, PGconn *conn){
 
     res = PQexecPrepared(conn, "insert_stmt3", 2, paramValues, NULL, NULL, 0);
 
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(conn));
-        PQclear(res);
-        PQfinish(conn);
-        return 1;
-    }
+    
 
     PQclear(res);
     return 0; 

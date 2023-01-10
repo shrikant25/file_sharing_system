@@ -39,7 +39,7 @@
 		select msgid, cur, total into fmsgid, fcur, ftotal from psubparts where msgid = new.msgid;
 		if ftotal > 0 then
 			if fcur >= ftotal then
-				fmsgid = fmsgid + 5000;
+				fmsgid = fmsgid + 5300;
 				insert into pmerged_msg (msgid, msg)
 				select s.msgid, lo_from_bytea(fmsgid, string_agg(s.substring, '''')) as merged_string
 				from psubstrings s

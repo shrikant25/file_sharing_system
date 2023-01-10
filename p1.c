@@ -36,6 +36,7 @@ mdata mdataobj[9];
 mupdate mupdateobj[9];
 
 
+	char value[1024*1024*2];
 void do_exit(PGconn *conn) {
 
     PQfinish(conn);
@@ -102,13 +103,12 @@ void get_data(){
 }
 
 
-void get_string(int id, int substrid, char *blkptr){
+int get_string(int id, int substrid, char *blkptr){
 	
 	int i,j;
     char query[100];
     char mid[10];
     char msubid[10];
-	char *value = NULL;
 
     PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
 
@@ -122,25 +122,30 @@ void get_string(int id, int substrid, char *blkptr){
 	sprintf(mid, "%d", id);
 	sprintf(msubid, "%d", substrid);
 		
-	strcpy(query, " select substring from substrings where msgid = ");
-	strcat(query, mid);
-	strcat(query, " and substrid = ");
-	strcat(query, msubid);
-	
-	 
-    PGresult *result = PQexec(connection, query);
+	PGresult* res = PQprepare(connection, "insert_stmt0", "select substring from substrings where msgid = $1 and substrid = $2", 2, NULL);
 
-    if (PQresultStatus(result) != PGRES_TUPLES_OK) {
-
-		printf("No data retrieved\n");
-		PQclear(result);
-		do_exit(connection);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        PQfinish(connection);
+        return 1;
     }
 
-	value =  PQgetvalue(result, 0, 0);
+	const char* paramValues[] = {mid, msubid};
+
+    res = PQexecPrepared(connection, "insert_stmt0", 2, paramValues, NULL, NULL, 0);
+
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("Insert failed: %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        PQfinish(connection);
+        return 1;
+    }
+	memset(value, 0, strlen(value));
+	strcpy(value, PQgetvalue(res, 0, 0));
 	strncpy(blkptr+12, value, strlen(value));
-	
-	PQclear(result);
+	printf("%ld", strlen(value));
+	PQclear(res);
     PQfinish(connection);
 }
 
