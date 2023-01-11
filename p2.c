@@ -57,7 +57,14 @@ int get_sinsert_query(char *blkptr, PGconn *conn){
     // Execute the INSERT statement
     res = PQexecPrepared(conn, "insert_stmt", 3, paramValues, NULL, NULL, 0);
 
-    
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("msgid %d\n", d.msgid);
+        printf("substrid %d\n", d.substrid);
+        printf("Preparation of statement failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        PQfinish(conn);
+        return 1;
+    }
     // Clear the result set and close the connection
     PQclear(res);
     return 0;

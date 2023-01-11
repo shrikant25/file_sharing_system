@@ -141,6 +141,7 @@ int get_string(int id, int substrid, char *blkptr){
         PQfinish(connection);
         return 1;
     }
+	printf("id :%s subid : %s\n",mid, msubid);
 	memset(value, 0, strlen(value));
 	strcpy(value, PQgetvalue(res, 0, 0));
 	strncpy(blkptr+12, value, strlen(value));
