@@ -1,0 +1,228 @@
+ msg 
+id, destination,    type,   priority,    data
+ 8    4             4bits       4bits    1gb - 8+4+1 bytes
+
+now data can be
+
+    //from user
+
+    if type is 1
+    0000000011 hello world
+    size,   data
+    4byte   1gb - 13 + 4
+
+
+
+
+    //from other system
+    // here id represents of which message it is chunk of, if there is only one chunk the overall id and this id will be same
+
+    if type is 2
+    00000000000000000002 0000000001 0000000011 world hello
+    id, subid,  size,    data
+    8   4byte   4byte    1gb -13 - 16 
+
+
+
+
+
+    //from other system
+    // here id represents of which message it is info about
+
+    if type 3
+    info of some other message
+    00000000000000011111 00000000005 0000000043 00011
+    id , totalparts, totalsize, ttw 
+    8         4           4      2 
+
+
+
+
+    // here id represents of which message it is info about
+
+    type 4
+    status about reception
+    00000000000000000005 005
+    id, status, size,  data 
+    8     2      4    1gb -13 - 14
+
+
+
+create table rawdata (sid serial primary key, 
+                    time timestamptz, 
+                    data bytea);
+
+
+create table internal_scheduler (id serial primary key, 
+                                sid bigint foreign key references rawdata(sid) on delete cascade, 
+                                status smallint);
+
+
+create table extract (id serial primary key,
+                        sid bigint foreign key references internal_scheduler(sid) on delete cascade);
+
+
+create table senddata (id bigint primary key, 
+                        destination int,
+                        priority smallint);
+
+
+create table other_systems (id serial primary key, 
+                            system_name varchar(60), 
+                            system_address int);
+
+
+create table send (id serial primary key, 
+                    sid bigint foreign key references internal_scheduler(sid) on delete cascade, 
+                    status smallint, 
+                    priority smallint, 
+                    destination integer, 
+                    attempts smallint, 
+                    cooldown_time smallint, 
+                    time timestamptz);
+
+
+create table message_chunks (msgid bigint primary key, 
+                            subid bigint, 
+                            sid bigint foreign key references internal_scheduler(sid) on delete cascade);
+
+
+create table message_info (id serial primary key, 
+                            msgid bigint, 
+                            recived_chunks, 
+                            total_chunks, 
+                            received_size int, 
+                            total_size int, 
+                            ttw timestamptz,
+                            sid bigint foreign key references internal_scheduler(sid) on delete cascade);
+
+
+create table merged_msg (msgid bigint primary key,
+                        msg_size int, 
+                        data bytea);
+
+
+-- launch every second
+SELECT pgcron.schedule('* * * * * *', 'copy_message_ids;');
+
+
+
+CREATE OR REPLACE FUNCTION copy_message_ids() RETURNS VOID AS
+''
+BEGIN
+    select id into internal_scheduler 
+    FROM rawdata 
+    WHERE id NOT IN (SELECT id FROM internal_scheduler);
+END;
+'' LANGUAGE 'plpgsql';
+	
+
+create trigger tr_intr_schld after insert on internal_scheduler for each row execute dispatch()
+
+
+create or replace function dispatch() return void as
+''
+BEGIN
+    select id into extract
+    from internal_scheduler
+    where status = 'extract'
+
+    select id into external_scheduler //todo
+END;
+''LANGUAGE 'plpgsql';
+
+
+create trigger tr_extract_info after insert on extract for each row execute extract_info()
+
+
+create or replace function extract_info() returns void as
+''
+DECLARE
+    id bigint;
+    destination char(4);
+    temp int;
+    type smallint;   
+    priority integer;
+    byte_array bytea;
+
+BEGIN 
+    
+    select data into byte_array from rawdata where rawdata.id = new.id;
+    
+    id := select get_byte(byte_array, 7)<<56 + get_byte(byte_array, 6)<<48 + get_byte(byte_array, 5)<<40 +
+                 get_byte(byte_array, 4)<<32 + get_byte(byte_array, 3)<<24 + get_byte(byte_array, 2)<<16 +
+                 get_byte(byte_array, 1)<<8 + get_byte(byte_array, 0);
+
+    destination := select convert_from(substring(byte_array, from 8 for 4));
+    
+    temp := select get_byte(byte_array, 15)<<24 + get_byte(byte_array, 14)<<16 + get_byte(byte_array, 13)<<8 +
+             get_byte(byte_array, 12);
+    
+    type := temp & 0xF;
+    priority := (temp >> 2) & 0XF;
+
+END;
+'' LANGUAGE 'plpgsql';
+
+
+
+
+create or replace function handover_to_external_scheduler() returns void as
+''
+BEGIN
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION read_byte_array() RETURNS VOID AS $$
+DECLARE
+    byte_array BYTEA;
+    id INTEGER;
+    my_int SMALLINT;
+BEGIN
+    -- Get the byte array from the source table
+    SELECT byte_column INTO byte_array FROM source_table LIMIT 1;
+
+    -- Extract the 4-byte ID and 1-byte value from the byte array
+    id := (byte_array >> 32) & 0xFFFFFFFF;
+    my_int := (byte_array >> 8) & 0xFF;
+
+    -- Insert the extracted data into the target table
+    INSERT INTO target_table (id, my_int) VALUES (id, my_int);
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION main_function() returns void as
+''
+BEGIN
+   
+	perform copy_message_ids();
+
+
+END;
+''
+LANGUAGE 'plpgsql';
