@@ -8,22 +8,24 @@
 
 #define IPC_RESULT_ERROR (-1)
 
-static int get_shared_block(char *filename, int size){
+static int get_shared_block(char *filename, int size, unsigned char project_id) {
+
     key_t key;
 
-    key = ftok(filename, 0);
-    if(key == IPC_RESULT_ERROR){
+    key = ftok(filename, project_id);
+    if (key == IPC_RESULT_ERROR){
         return IPC_RESULT_ERROR;
     }
 
     return shmget(key, size, 0644 | IPC_CREAT);
 }
 
-char *attach_memory_block(char *filename, int size) {
-    int shared_block_id = get_shared_block(filename, size);
+char *attach_memory_block(char *filename, int size, unsigned char project_id) {
+ 
+    int shared_block_id = get_shared_block(filename, size, project_id);
     char *result;
 
-    if(shared_block_id == IPC_RESULT_ERROR) {
+    if (shared_block_id == IPC_RESULT_ERROR) {
         return NULL;
     }
 
@@ -41,6 +43,7 @@ int detach_memory_block(char *block) {
 }
 
 int destroy_memory_block(char *filename) {
+
     int shared_block_id = get_shared_block(filename, 0);
 
     if (shared_block_id == IPC_RESULT_ERROR) {

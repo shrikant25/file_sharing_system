@@ -1,73 +1,93 @@
-#include <stdio.h>
-#include <sys/types.h> 
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include<stdio.h>
+#include<string.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<unistd.h>
 
-void error(char *msg)
-{
-    perror(msg);
-    exit(1);
+
+short SocketCreate(void){
+
+    short hSocket;
+    
+    printf("Create the socket\n");
+    hSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
+    return hSocket;
+}
+
+int BindCreatedSocket(int hSocket){
+
+    int iRetval=-1;
+    int ClientPort = 90190;
+    struct sockaddr_in  remote= {0};
+
+    remote.sin_family = AF_INET;
+    remote.sin_addr.s_addr = htonl(INADDR_ANY);
+    remote.sin_port = htons(ClientPort); /* Local port */
+    iRetval = bind(hSocket,(struct sockaddr *)&remote,sizeof(remote));
+    
+    return iRetval;
 }
 
 
-int set_server(int argc, char *argv[]){
-
-    int sockfd, newsockfd, portno, clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    int n;
-
-    if (argc < 2) {
-        fprintf(stderr,"ERROR, no port provided\n");
-        exit(1);
+int main(int argc, char *argv[]){
+    
+    int socket_desc, sock, clientLen, read_size;
+    struct sockaddr_in server, client;
+    char client_message[200]= {0};
+    char message[100] = {0};
+    const char *pMessage = "hello";
+    
+    socket_desc = SocketCreate();
+    
+    if (socket_desc == -1){
+        printf("Could not create socket");
+        return 1;
     }
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);   //create a socket
-
-    if (sockfd < 0) error("ERROR opening socket");
-
-    memset((char *) &serv_addr, 0, sizeof(serv_addr));
-    portno = atoi(argv[1]);                     
+    printf("Socket created\n");
+    //Bind
+    if( BindCreatedSocket(socket_desc) < 0){
+        //print the error message
+        perror("bind failed.");
+        return 1;
+    }
+    printf("bind done\n");
     
-    serv_addr.sin_family = AF_UNIX;         // set connection type
-    serv_addr.sin_addr.s_addr = INADDR_ANY; //set IP address of machine 
-    serv_addr.sin_port = htons(portno); // convert portno from host byte order to network byte order
+    listen(socket_desc, 3);
     
-    if ( bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr) ) < 0) // bind socket to a address 
-        error("ERROR on binding");
-    
-    listen(sockfd,5);               //keep listening
-    
-    clilen = sizeof(cli_addr);      
-
-
     while(1){
-            
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);  
-        //once a connection is formed, use the returned file descriptor
-    
-        if (newsockfd < 0) error("ERROR on accept");
-    
-        int pid = fork();
-        
-        if (pid < 0) error("Failed to fork");
 
-        if (pid == 0) {
-            close(sockfd);
-            work(newsockfd);
-            exit(0);
+        printf("Waiting for incoming connections...\n");
+        clientLen = sizeof(struct sockaddr_in);
+       
+        sock = accept(socket_desc,(struct sockaddr *)&client,(socklen_t*)&clientLen);
+        if (sock < 0){
+            perror("accept failed");
+            return 1;
         }
+        
+        printf("Connection accepted\n");
+        memset(client_message, '\0', sizeof client_message);
+        memset(message, '\0', sizeof message);
+
+        if( recv(sock, client_message, 200, 0) < 0){
+            printf("recv failed");
+            break;
+        }
+
+        printf("Client reply : %s\n",client_message);
+        if(strcmp(pMessage,client_message)==0)
+            strcpy(message,"Hi there !");
         else
-            close(newsockfd);
+            strcpy(message,"Invalid Message !");
+        
 
+        if( send(sock, message, strlen(message), 0) < 0){
+            printf("Send failed");
+            return 1;
+        }
+        close(sock);
+        sleep(1);
     }
-
-    // put following lines in work func
-    
-    
-    /*
-    n = write(newsockfd,"I got your message",18);
-    if (n < 0) error("ERROR writing to socket");
-    */
-
-    return 0; 
+    return 0;
 }

@@ -1,224 +1,296 @@
 #include <stdio.h>
-#include <string.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <semaphore.h>
-#include "shared_memory.h"
-#include "bitmap.h"
-#include "partition.h"
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <sys/epoll.h>
+#include <string.h>
 #include <unistd.h>
-#include <libpq-fe.h>
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <stdint.h>
+#include <netinet/in.h>
+
+#include <libpq-fe.h>
+#include <libpq/libpq-fs.h>
+
+typedef struct server_info{
+    unsigned short int port;
+    unsigned int maxevents;
+    unsigned int servsoc_fd;
+    unsigned int epoll_fd;
+}server_info;
+
+server_info s_info;
+
+static void make_nonblocking(int);
+static void create_socket();
+static void create_epoll();
+static void add_to_list(int);
+static void remove_from_list(int); 
+static void accept_connection(); 
+static void read_socket(struct epoll_event);
+static void monitor(); 
+
+int *tbl;
+
+int run_status = 1;
 
 
-#define BUFSIZE 2*1024*1024
+void add(char *p[]){
 
 
-typedef struct idata{
-    int msgid;
-    int substrid;
-    char val[BUFSIZE];
-}idata;
+     PGconn *conn = PQconnectdb("user=shrikant dbname=shrikant");
 
-typedef struct mdata{
-    int msgid;
-}mdata;
+                if (PQstatus(conn) == CONNECTION_BAD) {
 
-typedef struct mupdate{
-    int msgid;
-    int total;
-}mupdate;
+                    fprintf(stderr, "Connection to database failed: %s\n",
+                        PQerrorMessage(conn));
+                    
+                }
+                int         lobj_fd;
+                char        buf[1024];
+                int         nbytes= 0;
+                int tmp;         
+                int         fd;
+                
+                ///tmp/outimage.jpg
+                const char* paramValues[2];
+                paramValues[0] = p[0];
+                paramValues[1] = p[1];
+                PGresult* res = PQprepare(conn, "insert_stmt0", "insert into dump values($1,$2)", 2, NULL);
 
-char total[10];
-char cur[10];
-char msgid[10];
-char substrid[10];
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    printf("Preparation of statement failed: %s\n", PQerrorMessage(conn));
+                    PQclear(res);
+                    PQfinish(conn);
+                    return;
+                }
 
-void do_exit(PGconn *conn) {
-
-    PQfinish(conn);
-    exit(1);
-}
-
-
-int get_sinsert_query(char *blkptr, PGconn *conn){
- PGresult* res;
-    idata d;
-
-    memcpy(&d.msgid, blkptr+4, 4);
-    memcpy(&d.substrid, blkptr+8, 4);
-    strncpy(d.val, blkptr+12, 2*1024*1024);
-    
-    sprintf(msgid, "%d", d.msgid);
-    sprintf(substrid, "%d", d.substrid);
-
-    const char* paramValues[] = {substrid, d.val, msgid};
-    
-    // Execute the INSERT statement
-    res = PQexecPrepared(conn, "insert_stmt", 3, paramValues, NULL, NULL, 0);
-
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("msgid %d\n", d.msgid);
-        printf("substrid %d\n", d.substrid);
-        printf("Preparation of statement failed: %s\n", PQerrorMessage(conn));
-        PQclear(res);
-        PQfinish(conn);
-        return 1;
-    }
-    // Clear the result set and close the connection
-    PQclear(res);
-    return 0;
-}
-
-
-int get_minsert_query(char *blkptr, PGconn *conn){
-     PGresult* res;
-    mdata m;
-
-    memset(msgid, 0 , 10);
-    memset(cur, 0, 10);
-    memset(total, 0, 10);
-
-    memcpy(&m.msgid, blkptr+4, 4);    
-    sprintf(msgid, "%d", m.msgid);
-    sprintf(cur, "%d", 0);
-    sprintf(total, "%d", 0);
-
-    const char* paramValues[] = {msgid, cur, total};
-    
-
-    // Execute the INSERT statement
-    res = PQexecPrepared(conn, "insert_stmt2", 3, paramValues, NULL, NULL, 0);
-
-    
-
-    // Clear the result set and close the connection
-    PQclear(res);
-    return 0;    
-}
-
-
-int get_mupdate_query(char *blkptr, PGconn *conn){
- PGresult* res;
-    mupdate u;
-
-    memcpy(&u.msgid, blkptr+4, 4);
-    memcpy(&u.total, blkptr+8, 4);
-
-    memset(msgid, 0, 10);
-    memset(total, 0, 10);
-
-    sprintf(msgid, "%d", u.msgid);
-    sprintf(total, "%d", u.total);
-
-    const char* paramValues[] = {msgid, total};
-    
-
-    res = PQexecPrepared(conn, "insert_stmt3", 2, paramValues, NULL, NULL, 0);
-
-    
-
-    PQclear(res);
-    return 0; 
-
-}
-
-
-int main(void){
-    
-    int querytype;
-    int filled_partition_position = -1;
-    char *blkptr = NULL;
-    char *block = attach_memory_block(FILENAME, BLOCK_SIZE);
-    int start_pos = 0;
-   
-    if(block == NULL) {
-        printf("failed to get block");
-        return -1;
-    }
-
-    PGconn *connection = PQconnectdb("user=shrikant dbname=shrikant");
-    if (PQstatus(connection) == CONNECTION_BAD) {
-
-        fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
-        do_exit(connection);
-    }
-
-   sem_t *sem = sem_open(SEM_LOCK, 0);
-   if(sem ==  SEM_FAILED){
-        printf("unable to create a semaphore");
-        return -1;
-    }
-    
-    start_pos = -1;
-
-    PGresult* res1 = PQprepare(connection, "insert_stmt", "INSERT INTO psubstrings VALUES ($1, $2, $3)", 3, NULL);
-
-    if (PQresultStatus(res1) != PGRES_COMMAND_OK) {
-        printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
-        PQclear(res1);
-        PQfinish(connection);
-        return 1;
-    }
-
-    PGresult* res2 = PQprepare(connection, "insert_stmt2", "INSERT INTO psubparts VALUES ($1, $2, $3)", 3, NULL);
-
-    if (PQresultStatus(res2) != PGRES_COMMAND_OK) {
-        printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
-        PQclear(res2);
-        PQfinish(connection);
-        return 1;
-    }
-
-
-    PGresult* res3 = PQprepare(connection, "insert_stmt3", "update psubparts set total = $2 where msgid = $1", 2, NULL);
-
-    if (PQresultStatus(res3) != PGRES_COMMAND_OK) {
-        printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
-        PQclear(res3);
-        PQfinish(connection);
-        return 1;
-    }
-
-
-    while(1){
-     
-       sem_wait(sem);         
-        
-        filled_partition_position = get_partition(block, 1, start_pos);
-        
-        
-      
-		if(filled_partition_position >= 0){
-           start_pos = filled_partition_position;
-
-            blkptr = block +(filled_partition_position*PARTITION_SIZE);
+                res = PQexecPrepared(conn, "insert_stmt0", 2, paramValues, NULL, NULL, 0);
+                  
+                close(fd);
             
-            memcpy(&querytype, blkptr, 4);
-          
-            if(querytype == 1)
-                get_sinsert_query(blkptr, connection);
-            else if(querytype == 2)
-                get_minsert_query(blkptr, connection);
-            else 
-                get_mupdate_query(blkptr, connection);
+                PQclear(res);
+                PQfinish(conn);
+}
+
+
+
+static void make_nonblocking(int active_fd) {
+
+    int flags = fcntl(active_fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("failed to get file descriptor flags");
+        return;
+    }
+
+    if( fcntl(active_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("failed to set file descriptor flags");
+        return;
+    }
+
+}
+
+
+static void create_socket() {
+
+    int optval;
+    struct sockaddr_in servaddr;
+    
+    s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (s_info.servsoc_fd == -1) {
+        perror("socket error");
+        exit(1);
+    }
+
+    // if incase the process dies, then after restart if the socket is already in use
+    // then bind to that socket
+    optval = 1;
+    if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+        perror("setsokopt");
+        return;
+    }
+
+    if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0) { 
+        perror("setsockopt(SO_REUSEPORT) failed");
+        return;
+    }
+    
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(s_info.port);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
+        perror("bind error");
+        exit(1);
+    }
+
+}
+
+
+static void create_epoll() {
+
+    s_info.epoll_fd = epoll_create1(0);
+    if (s_info.epoll_fd == -2) {
+        perror("failed to create epoll instance");
+        return;
+    }
+    
+}
+
+
+static void add_to_list(int active_fd) {
+
+    struct epoll_event event;
+ 
+    memset(&event, 0, sizeof(event));
+    event.data.fd = active_fd;
+    event.events = EPOLLIN | EPOLLET;
+ 
+    if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_ADD, active_fd, &event) == -1) {
+        perror("error adding");
+        return;
+    }
+
+}
+
+static void remove_from_list(int active_fd) {
+
+    struct epoll_event event;
+
+    memset(&event, 0, sizeof(event));
+    event.data.fd = active_fd;
+    event.events = -1;
+    
+    if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_DEL, active_fd, &event) == -1) {
+        perror("error removing");
+        return;
+    }
+}
+
+
+void accept_connection() {
+    
+    int client_fd = -1;
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len;
+
+    while (1) { // keep accepting connections as long as there are connections in queue
+    
+        client_addr_len = sizeof(client_addr);
         
-             
-                memset(blkptr, 0, PARTITION_SIZE);
-            blkptr = NULL;
-            toggle_bit(filled_partition_position, block);
-            
-		
-        }
-        filled_partition_position = -1;
+        client_fd = accept(s_info.servsoc_fd, (struct sockaddr *)&client_addr, &client_addr_len);
        
-        sem_post(sem);
+        if (client_fd < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) // no connections are present
+                return;
+            else {
+                perror("error while acceping client connection"); // some other error occured
+                return;
+            }
+        }
+        else{
+            make_nonblocking(client_fd);
+            tbl[client_fd] = client_addr.sin_addr.s_addr;
+            add_to_list(client_fd);
+        }
+
+    }
+}
+
+
+static void read_socket(struct epoll_event event) {
+
+    char buffer[4028];
+    ssize_t bytes_read = 0;
+
+    while (1) {
+        bytes_read = read(event.data.fd, buffer, sizeof(buffer));
+        if (bytes_read <=0) 
+            return;
+            //remove_from_list(event.data.fd);
+            //printf("nothing to read");
+        else {
+        
+            printf(" %d %s", tbl[event.data.fd],buffer);
+
+            char v1[100];
+            sprintf(v1, "%d", tbl[event.data.fd]);
+            char *p[] = {v1, buffer};
+            add(p);
+            
+            memset(buffer, 0, 4028);
+        }
     }
 
-    sem_close(sem);
+}
 
-    PQfinish(connection);
-    detach_memory_block(block);
+
+static void monitor() {
+
+    int i;
+    int act_events_cnt = -1;
+    struct epoll_event events[s_info.maxevents];
+
+    while (run_status) {
         
+        act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
+        if (act_events_cnt == -1) {
+            perror("epoll wait failed");
+            return;
+        }
+
+        char v[100];
+        sprintf(v, "%d", act_events_cnt);
+        char *p[] = {"69", v};
+        add(p);
+        for (i = 0; i<act_events_cnt; i++) {
+            
+            // error or hangup
+            if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
+                perror("removing from list");
+                remove_from_list(events[i].data.fd);
+                continue;
+            }
+            else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) {
+                accept_connection();
+            }
+            else if (events[i].events & EPOLLIN){
+                read_socket(events[i]);
+            }
+        }
+
+    }
+}
+
+
+int main() {
+ 
+    s_info.maxevents = 100000;
+    s_info.port = 7000;
+
+    tbl = (int *)malloc(sizeof(int) * s_info.maxevents);
+ 
+    create_socket();
+    make_nonblocking(s_info.servsoc_fd);
+ 
+    // somaxconn is defined in socket.h
+    if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) {
+        perror("failed to listen on port");
+        return 1;
+    }
+ 
+    create_epoll();
+    add_to_list(s_info.servsoc_fd);
+ 
+    monitor();
+ 
+    close(s_info.epoll_fd);
+    shutdown(s_info.servsoc_fd, 2);
+ 
     return 0;
+
 }

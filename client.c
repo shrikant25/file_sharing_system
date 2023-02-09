@@ -1,74 +1,75 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> 
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<unistd.h>
 
-void error(char *msg)
-{
-    perror(msg);
-    exit(0);
+
+short SocketCreate(void){
+    
+    short hSocket;
+    
+    printf("Create the socket\n");
+    hSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
+    return hSocket;
 }
+
+int SocketConnect(int hSocket){
+    
+    int iRetval=-1;
+    int ServerPort = 7000;
+    struct sockaddr_in remote= {0};
+    
+    remote.sin_addr.s_addr = INADDR_ANY; //Local Host
+    remote.sin_family = AF_INET;
+    remote.sin_port = htons(ServerPort);
+    iRetval = connect(hSocket,(struct sockaddr *)&remote,sizeof(struct sockaddr_in));
+    
+    return iRetval;
+}
+
+int SocketSend(int hSocket,char* Rqst,short lenRqst){
+    
+    int shortRetval = -1;
+   
+
+    shortRetval = send(hSocket, Rqst, lenRqst, 0);
+    
+    return shortRetval;
+}
+
 
 int main(int argc, char *argv[])
 {
-    int sockfd, portno, n;
-
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
-
-    char buffer[256];
-
-    if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
-       exit(0);
-    }
-
-    portno = atoi(argv[2]);
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sockfd < 0) 
-        error("ERROR opening socket");
-
-    server = gethostbyname(argv[1]); // name = localhost
-
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        exit(0);
-    }
-
-    memset((char *)&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_UNIX;
-
-    memcpy((char *)server->h_add), (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    int hSocket, read_size;
+    struct sockaddr_in server;
+    char SendToServer[100] = {0};
     
-    serv_addr.sin_port = htons(portno);
+    hSocket = SocketCreate();
+    if(hSocket == -1){
+        printf("Could not create socket\n");
+        return 1;
+    }
+    printf("Socket is created\n");
+   
 
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
-
-
-    // put following work in diff lines
-
-    printf("Please enter the message: ");
-
-
-
-
-    memset(buffer, 0,256);
-    fgets(buffer,255,stdin);
-
-    n = write(sockfd,buffer,strlen(buffer));
-    if (n < 0) 
-         error("ERROR writing to socket");
-
-    memset(buffer, 0, 256);
+    if (SocketConnect(hSocket) == -1){
+        perror("connect failed.\n");
+        return 1;
+    }
     
-    /*n = read(sockfd,buffer,255);
-
-    if (n < 0) 
-         error("ERROR reading from socket");
-    printf("%s\n",buffer);
-    */
+    printf("Sucessfully conected with server\n");
+   
+        printf("Enter the Message: ");
+        scanf("%s", SendToServer);
+        
+        SocketSend(hSocket, SendToServer, strlen(SendToServer));
+   
+    close(hSocket);
+    
+    shutdown(hSocket,2);
+    
     return 0;
 }
