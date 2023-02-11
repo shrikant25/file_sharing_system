@@ -16,13 +16,7 @@ int process_status = 1
 
 int run_process(char *block) {
 
-    sem_unlink(SEM_LOCK);
-
-	sem_t *sem = sem_open(SEM_LOCK, O_CREAT, 0777, 1);
-	if (sem ==  SEM_FAILED) {
-        printf("unable to create a semaphore");
-        return -1;
-    }
+    
 
     while (process_status) {
         sem_wait(sem);         
@@ -30,7 +24,7 @@ int run_process(char *block) {
         sem_post(sem);
     }
 
-    sem_close(sem);
+    
 }
 
 
@@ -94,19 +88,74 @@ int close_sem_locks() {
 }
 
 
+int get_shared_memory() {
+
+    datar_block = attach_memory_block(FILENAME, BLOCK_SIZE, PROJECT_ID_DATAR);
+    if (datar_block == NULL) {
+        printf("unable to create datar_block");
+        return -1;
+    };
+
+    commr_block = attach_memory_block(FILENAME, BLOCK_SIZE, PROJECT_ID_COMMR);
+    if (commr_block == NULL) {
+        printf("unable to create commr_block");
+        return -1;
+    };
+
+    datas_block = attach_memory_block(FILENAME, BLOCK_SIZE, PROJECT_ID_DATAS);
+    if (datas_block == NULL) {
+        printf("unable to create datas_block");
+        return -1;
+    };
+
+    comms_block = attach_memory_block(FILENAME, BLOCK_SIZE, PROJECT_ID_COMMS);
+    if (datar_block == NULL) {
+        printf("unable to create comms_block");
+        return -1;
+    };
+
+    return 0;
+
+}
+
+
+int detach_shared_memory() {
+
+    detach_memory_block(datar_block);
+    if (datar_block == NULL) {
+        printf("unable to create datar_block");
+        return -1;
+    };
+
+    detach_memory_block(commr_block);
+    if (commr_block == NULL) {
+        printf("unable to create commr_block");
+        return -1;
+    };
+
+    detach_memory_block(datas_block);
+    if (datas_block == NULL) {
+        printf("unable to create datas_block");
+        return -1;
+    };
+
+    detach_memory_block(comms_block);
+    if (comms_block == NULL) {
+        printf("unable to create comms_block");
+        return -1;
+    };
+
+    return 0;
+}
+
 
 int main(void) {
 
-    char *block = attach_memory_block(FILENAME, BLOCK_SIZE,);
-    if (block == NULL) {
-        printf("unable to create block");
-        return -1;
-    }
-
+    get_shared_memory();
     open_sem_lock();
-    run_process(block);    
+    run_process();    
     close_sem_lock();   
-    detach_memory_block(block);
-        
+    detach_shared_memory();
+
     return 0;
 }
