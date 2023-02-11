@@ -1,27 +1,98 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "shared_memory.h"
-#include "partition.h"
 #include <unistd.h>
 #include <libpq-fe.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
 #include <sys/shm.h>
+#include <string.h>
+#include "shared_memory.h"
+#include "partition.h"
+#include "bitmap.h"
 #include "processor.h"
 
 int process_status = 1
 
-int run_process(char *block) {
+int run_process() {
 
-    
-
+    int parition_positon = -1;
+    int drstart_pos = -1; //to keep track of last position
+    int dsstart_pos = -1;
+    int csstart_pos = -1;
+    int crstart_pos = -1;
+    char *blkptr = NULL;
+    char data[PARTITION_SIZE];
+   
     while (process_status) {
-        sem_wait(sem);         
+        
+        sleep(1);
+        sem_wait(sem_lock_datar);         
+        partition_position = get_partition(datar_block , 1, drstart_pos);
+        
+		if(partition_position >= 0) {
 
-        sem_post(sem);
+            drstart_pos = partition_position;
+            blkptr = datar_block +(partition_position*PARTITION_SIZE);
+            memset(data, 0, PARTITION_SIZE);
+
+            memcpy(data, blkptr, PARTITION_SIZE); 
+            store_in_database(data);
+    
+            memset(data, 0, PARTITION_SIZE);
+            blkptr = NULL;
+            toggle_bit(partition_position, datar_block);
+        
+        }
+       
+        partition_position = -1;
+        sem_post(sem_lock_datar);
+
+
+        sem_wait(sem_lock_datas);         
+        partition_position = get_partition(datas_block , 0, dsstart_pos);
+        
+		if(partition_position >= 0) {
+
+            dsstart_pos = partition_position;
+            blkptr = datas_block +(partition_position*PARTITION_SIZE);
+            memset(data, 0, PARTITION_SIZE);
+            
+            read_from_database(data);
+            memcpy(blkptr, data, PARTITION_SIZE);
+            
+            memset(data, 0, PARTITION_SIZE);  
+            blkptr = NULL;
+            toggle_bit(filled_partition_position, datas_block);
+        
+        }
+
+        sem_post(sem_lock_datas);
+        filled_partition_position = -1;
+
+
+        sem_wait(sem_lock_commr);         
+        partition_position = get_partition(commr_block , 1, crstart_pos);
+        
+		if(partition_position >= 0) {
+
+            crstart_pos = partition_position;
+            blkptr = commr_block +(partition_position*PARTITION_SIZE);
+            memset(data, 0, PARTITION_SIZE);
+            
+            memcpy(data, blkptr, PARTITION_SIZE);
+            
+            memset(data, 0, PARTITION_SIZE);  
+            blkptr = NULL;
+            toggle_bit(filled_partition_position, datas_block);
+        
+        }
+
+        sem_post(sem_lock_commr);
+        filled_partition_position = -1;
+       
+    
     }
 
     
@@ -62,6 +133,7 @@ int open_sem_locks() {
 
     return 0;
 }
+
 
 int close_sem_locks() {
 

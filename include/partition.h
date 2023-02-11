@@ -1,13 +1,12 @@
 #ifndef _PARTN_H
 #define _PARTN_H
 
-#define TOTAL_PARTITIONS 10
-#define PARTITION_SIZE 2097168
-#define BLOCK_SIZE 20971682
+#define TOTAL_PARTITIONS 80
+#define PARTITION_SIZE 131072  
+#define BLOCK_SIZE 10485760 + 3
                    
-// 1024 * 1024 * 10 + 160 + 2
-// (keeping 16 bytes extra for every partition, assuming there are 10 partations)
-// 2 bytes extra for bitmap   __
+// 1024 * 128 * 10 + 3
+// 3 bytes extra for bitmap   __
 //                           ('')
 //                         _/|__|\_
 //                           |  |                        
