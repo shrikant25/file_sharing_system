@@ -269,7 +269,7 @@ static void monitor() {
 
 int main() {
  
-    s_info.maxevents = 100000;
+    s_info.maxevents = 1000;
     s_info.port = 7000;
 
     tbl = (int *)malloc(sizeof(int) * s_info.maxevents);

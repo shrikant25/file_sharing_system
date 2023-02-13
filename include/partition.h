@@ -3,8 +3,9 @@
 
 #define TOTAL_PARTITIONS 80
 #define PARTITION_SIZE 131072  
-#define BLOCK_SIZE 10485760 + 3
-                   
+#define DATA_BLOCK_SIZE 10485760 + 3
+#define COMM_BLOCK_SIZE 10485760 + 6
+
 // 1024 * 128 * 10 + 3
 // 3 bytes extra for bitmap   __
 //                           ('')
