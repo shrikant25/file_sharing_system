@@ -31,7 +31,7 @@ typedef struct database_info{
                         "INSERT INTO raw_data (data) values($1)";
                         "SELECT FD, DATA FROM send_data limit 10";
                         "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)";
-                        "INSERT INTO  senders_comm (omsgid, status) VALUES($1, $2)";
+                        "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)";
                         "SELECT FD FROM for_sender";
                         "SELECT FD FROM for_reciever";
                         }; 
