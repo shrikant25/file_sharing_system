@@ -2,14 +2,18 @@
 #include <stdlib.h>
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets
 #include <sys/types.h>  // contains various types required to create a socket   
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <netinet/in.h> // contains structures to store address information
 #include "sender.h"
 #include "partition.h"
 #include "shared_memory.h"
+#include <string.h>
+#include <unistd.h>
 
-datablocks dblks;
+datablocks dablks;
 semlocks smlks;
-int process_status = 1;
+int sender_status = 1;
 
 int create_connection(unsigned short int port_number, unsigned int ip_address) 
 {    
@@ -68,12 +72,12 @@ int close_connection(unsigned int network_sokcet)
 }
 
 
-int get_shared_memory()
+static int get_shared_memory()
 {
-    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
+    dablks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
+    dablks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
 
-    if (!(dblks.datas_block && dblks.comms_block)) 
+    if (!(dablks.datas_block && dablks.comms_block)) 
         return -1; 
     return 0;
 }
@@ -83,8 +87,8 @@ int detach_memory()
 {
     int status = 0;
     
-    status = detach_memory_block(dblks.data_block);
-    status = detach_memory_block(dblks.data_block);
+    status = detach_memory_block(dablks.datas_block);
+    status = detach_memory_block(dablks.comms_block);
 
     if (status == -1) return -1;
     
@@ -99,7 +103,7 @@ int initialize_locks()
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
-    if (slks.sem_lock_datar == SEM_FAILED || slks.sem_lock_commr == SEM_FAILED || slks.sem_lock_datas == SEM_FAILED || slks.sem_lock_comms = SEM_FAILED)
+    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
         status = -1;
 
     return status;
@@ -115,20 +119,20 @@ int uninitialize_locks()
 
 int evaluate_and_take_action(char *data)
 {
-    int msg_status = -1
+    int msg_status = -1;
     unsigned char *ptr = data;
     unsigned int port_number = -1;
     unsigned int ipaddress = -1;
     int connection_socket = -1;
-    int cid = -1;
+    char cid[16];
 
     if (*ptr == 1) {
         // ippaddres
         // in this case create a connection
-        *ptr++;
-        cid = *(int *)ptr;
-
-        ptr += 4;
+        ptr++;
+        memcpy(cid, ptr, 16);
+        
+        ptr += 16;
         port_number = *(int *)ptr;
        
         ptr += 4;
@@ -143,10 +147,11 @@ int evaluate_and_take_action(char *data)
     else if (*ptr == 2) {
         
         ptr++;
-
-        cid = *(int *)ptr;
+        memcpy(cid, ptr, 16);
+        
+        ptr += 16; //internal cid
         connection_socket = *(int *)ptr;
-        ptr += 4;
+        ptr += 4;// now points to data
         
         msg_status = send_data_over_network(connection_socket, ptr);
         send_message(cid, msg_status);
@@ -154,61 +159,76 @@ int evaluate_and_take_action(char *data)
     }
 
 } 
-
+// this is wrong
 int read_message(char *data, int *dsstart_pos) 
 {
 
     int subblock_position = -1;
     char *blkptr = NULL;
-    char data[PARTITION_SIZE];
-
+    
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dblks.datas_block , 1, dsstart_pos);
+    subblock_position = get_subblock(dablks.datas_block , 1, *dsstart_pos);
     
     if(subblock_position >= 0) {
 
-        dsstart_pos = subblock_position;
-        blkptr = dblks.datas_block +(subblock_position*PARTITION_SIZE);
+        *dsstart_pos = subblock_position;
+        blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
         
         memcpy(data, blkptr, PARTITION_SIZE);
         evaluate_and_take_action(data);
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datas_block, 2);
+        toggle_bit(subblock_position, dablks.datas_block, 1);
     
     }
 
-    sem_post(slks.sem_lock_datas);
+    sem_post(smlks.sem_lock_datas);
 
 }
 
+int get_data_from_processor(int id, char *data)
+{
+    printf("unimplemented get_data_from_processor in sender.c");
+}
+
+
+int send_data_over_network(unsigned int socketid, char *data) 
+{
+        printf("unimplemented send_data_over_network in sender.c");
+}
+
+
+int send_message(char *cid, int connection_socket) 
+{
+    printf("unimplemented send_message in sender.c");
+}
 
 int run_sender() 
 {
     int dsstart_pos = -1;
     int csstart_pos1 = -1;
-    int crstart_pos2 = -1;
+    int csstart_pos2 = -1;
     int fd = 0;
     char data[PARTITION_SIZE];
 
-    while (process_status) {
+    while (sender_status) {
 
-        read_message(data);
+        read_message(data, &csstart_pos1);
         get_data_from_processor(fd, data);
-        send_data();
+        send_data_over_network(fd, data);
 
     }
 }
 
 
-int main(void) 
+int sender(void) 
 {
     initialize_locks();
     get_shared_memory();
     run_sender();
     uninitialize_locks();
-    detach_memeory();   
+    detach_memory();   
 
     return 0;
 }

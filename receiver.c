@@ -112,11 +112,7 @@ static void create_socket() {
         return;
     }
 
-    if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0) { 
-        perror("setsockopt(SO_REUSEPORT) failed");
-        return;
-    }
-    
+   
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
@@ -267,7 +263,7 @@ static void monitor() {
 }
 
 
-int main() {
+int receiver() {
  
     s_info.maxevents = 1000;
     s_info.port = 7000;

@@ -16,7 +16,8 @@
 // 1024 * 64 * 40 + 2 
 
 
-int get_partition(char *, int, int);
+int get_subblock(char *, int, int);
+int get_subblock2(char *, int, int, int);
 void toggle_bit(int, char *, int);
 void set_all_bits(char *, int); 
 void unset_all_bits(char *, int); 

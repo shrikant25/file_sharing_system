@@ -43,9 +43,9 @@ int detach_memory_block(char *block) {
 }
 
 
-int destroy_memory_block(char *filename) {
+int destroy_memory_block(char *filename, unsigned char project_id) {
 
-    int shared_block_id = get_shared_block(filename, 0);
+    int shared_block_id = get_shared_block(filename, 0, project_id);
 
     if (shared_block_id == -1) {
         return -1;
