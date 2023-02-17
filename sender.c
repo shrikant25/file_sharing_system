@@ -55,6 +55,7 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
     connection_status = connect(network_socket, (struct sockaddr *)&server_address, sizeof(server_address));
     if (connection_status == -1) {
         printf("Error connecting to server\n");
+        return -1;
     }
 
     return network_socket;
@@ -112,29 +113,102 @@ int uninitialize_locks()
 }
 
 
+int evaluate_and_take_action(char *data)
+{
+    int msg_status = -1
+    unsigned char *ptr = data;
+    unsigned int port_number = -1;
+    unsigned int ipaddress = -1;
+    int connection_socket = -1;
+    int cid = -1;
+
+    if (*ptr == 1) {
+        // ippaddres
+        // in this case create a connection
+        *ptr++;
+        cid = *(int *)ptr;
+
+        ptr += 4;
+        port_number = *(int *)ptr;
+       
+        ptr += 4;
+        ipaddress = *(int *)ptr;
+       
+        connection_socket = create_connection(port_number, ipaddress);
+        
+        // communicate to database
+        send_message(cid, connection_socket);
+
+    }
+    else if (*ptr == 2) {
+        
+        ptr++;
+
+        cid = *(int *)ptr;
+        connection_socket = *(int *)ptr;
+        ptr += 4;
+        
+        msg_status = send_data_over_network(connection_socket, ptr);
+        send_message(cid, msg_status);
+        
+    }
+
+} 
+
+int read_message(char *data, int *dsstart_pos) 
+{
+
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    char data[PARTITION_SIZE];
+
+    sem_wait(smlks.sem_lock_datas);         
+    subblock_position = get_subblock(dblks.datas_block , 1, dsstart_pos);
+    
+    if(subblock_position >= 0) {
+
+        dsstart_pos = subblock_position;
+        blkptr = dblks.datas_block +(subblock_position*PARTITION_SIZE);
+        memset(data, 0, PARTITION_SIZE);
+        
+        memcpy(data, blkptr, PARTITION_SIZE);
+        evaluate_and_take_action(data);
+
+        blkptr = NULL;
+        toggle_bit(subblock_position, dblks.datas_block, 2);
+    
+    }
+
+    sem_post(slks.sem_lock_datas);
+
+}
+
+
 int run_sender() 
 {
+    int dsstart_pos = -1;
+    int csstart_pos1 = -1;
+    int crstart_pos2 = -1;
+    int fd = 0;
+    char data[PARTITION_SIZE];
+
     while (process_status) {
 
-        initialize_locks();
-        get_shared_memory();
-        read_data();
-        uninitialize_locks();
-        detach_memeory();
+        read_message(data);
+        get_data_from_processor(fd, data);
+        send_data();
+
     }
 }
 
 
 int main(void) 
 {
+    initialize_locks();
+    get_shared_memory();
     run_sender();
+    uninitialize_locks();
+    detach_memeory();   
 
-    //read ip, data from data base
-    //search for socket  related to ip in database
-    // send data
-    //once done close the socket
-    //provide 
-    close(network_socket);
-    
     return 0;
 }

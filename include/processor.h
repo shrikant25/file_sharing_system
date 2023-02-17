@@ -11,6 +11,8 @@ int run_process();
 int open_sem_locks();
 int close_sem_locks();
 int get_shared_memory();
+int destroy_shared_memory();
+int detach_shared_memory();
 
 
 typedef struct datablocks {

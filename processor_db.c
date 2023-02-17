@@ -87,7 +87,7 @@ int store_commr_into_database(char *data) {
 
     char fd[2];
     char ip_addr[4];
-    char *ptr = data;
+    unsigned char *ptr = data;
     PGresult *res = NULL;
 
     if (*ptr == 1) {
@@ -119,7 +119,7 @@ int store_comms_into_database(char *data) {
 
     char msg_id[16];
     char msg_status[1]; 
-    char *ptr = data;
+    unsigned char *ptr = data;
     PGresult* res = NULL;
 
     if (*ptr == 1) {

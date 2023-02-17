@@ -50,7 +50,7 @@ int get_data_from_receiver(int *drstart_pos) {
 }
 
 
-int give_data_to_receiver(int *dsstart_pos) {
+int give_data_to_sender(int *dsstart_pos) {
 
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -193,7 +193,7 @@ int run_process() {
         communicate_with_receiver(&crstart_pos1, &crstart_pos2);
         communicate_with_sender(&csstart_pos1, &csstart_pos2);
         get_data_from_receiver(&drstart_pos);
-        give_data_to_sender(&drstart_pos);
+        give_data_to_sender(&dsstart_pos);
         
     }
    
@@ -245,7 +245,8 @@ int get_shared_memory() {
 }
 
 
-int detach_shared_memory() {
+int detach_shared_memory() 
+{
 
     int status = 0;
     status = detach_memory_block(dblks.datar_block);
@@ -257,7 +258,19 @@ int detach_shared_memory() {
 }
 
 
-int main(void) {
+int destroy_shared_memoery()
+{
+    int status = 0;
+    status = destroy_memory_block(dblks.datar_block);
+    status = destroy_memory_block(dblks.commr_block);
+    status = destroy_memory_block(dblks.datas_block);
+    status = destroy_memory_block(dblks.comms_block);
+    
+    return status; // if any of above call fails, then return -1 
+}
+
+int main(void) 
+{
     
     get_shared_memory();
     open_sem_lock();
@@ -266,6 +279,7 @@ int main(void) {
     close_database_connection();    
     close_sem_lock();   
     detach_shared_memory();
+    destroy_shared_memory();
 
     return 0;
 }

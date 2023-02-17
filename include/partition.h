@@ -1,6 +1,7 @@
 #ifndef PARTN_H
 #define PARTN_H
 
+// todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
 #define PARTITION_SIZE 131072  
 #define DATA_BLOCK_SIZE 10485760 + 3
