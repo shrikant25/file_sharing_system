@@ -14,7 +14,7 @@
 
 #define FILENAME "p1"
 
-char * attach_memory_block(char *, int, unsigned char);
+char *attach_memory_block(char *, int, unsigned char);
 int detach_memory_block(char *);
 int destroy_memory_block(char *);
 

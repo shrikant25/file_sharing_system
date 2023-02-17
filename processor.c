@@ -95,8 +95,8 @@ int communicate_with_receiver(int *crstart_pos1, int *crstart_pos2) {
 
         retrive_comm_from_database(data);
         memcpy(blkptr, data, PARTITION_SIZE);
+
         memset(data, 0, PARTITION_SIZE);  
-        
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.commr_block, 2);
     
@@ -190,11 +190,11 @@ int run_process() {
     
         sleep(1);
         
-        get_data_from_receiver(&drstart_pos);
-        give_data_to_sender(&drstart_pos);
         communicate_with_receiver(&crstart_pos1, &crstart_pos2);
         communicate_with_sender(&csstart_pos1, &csstart_pos2);
-
+        get_data_from_receiver(&drstart_pos);
+        give_data_to_sender(&drstart_pos);
+        
     }
    
 }
@@ -262,7 +262,7 @@ int main(void) {
     get_shared_memory();
     open_sem_lock();
     connect_to_database();
-    run_process(connection); 
+    run_process(); 
     close_database_connection();    
     close_sem_lock();   
     detach_shared_memory();

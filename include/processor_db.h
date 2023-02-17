@@ -35,10 +35,10 @@ typedef struct database_info{
                         "SELECT fd, data FROM send_data limit 1";
                         "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)";
                         "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)";
-                        "SELECT cid, fd FROM for_reciever where status = 1 limit 1";
-                        "SELECT ipaddr FROM for_sender where status = 1 limit 1";
+                        "SELECT fd FROM for_receiver where status = 1 limit 1";
+                        "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1";
                         "UPDATE for_sender set status = 2 where cid = ($1)";
-                        "UPDATE for_sender set status = 3 where cid = ($!)";
+                        "UPDATE for_sender set status = 3 where cid = ($1)";
                         }; 
 
     int param_count[statement_count] = { 1, 0, 2, 2, 0, 0, 1, 1};

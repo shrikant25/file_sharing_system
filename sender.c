@@ -3,10 +3,16 @@
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets
 #include <sys/types.h>  // contains various types required to create a socket   
 #include <netinet/in.h> // contains structures to store address information
+#include "sender.h"
+#include "partition.h"
+#include "shared_memory.h"
 
+datablocks dblks;
+semlocks smlks;
+int process_status = 1;
 
-int create_connection(unsigned short int port_number, unsigned int ip_address) {
-    
+int create_connection(unsigned short int port_number, unsigned int ip_address) 
+{    
     int network_socket; // to hold socket file descriptor
     int connection_status; // to show wether a connection was established or not
     struct sockaddr_in server_address; // create a address structure to store the address of remote connection
@@ -55,16 +61,76 @@ int create_connection(unsigned short int port_number, unsigned int ip_address) {
 }
 
 
-int close_connection(unsigned int network_sokcet) {
+int close_connection(unsigned int network_sokcet) 
+{
     close(network_sokcet);
 }
 
 
-int main(void) {
+int get_shared_memory()
+{
+    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
 
+    if (!(dblks.datas_block && dblks.comms_block)) 
+        return -1; 
+    return 0;
+}
+
+
+int detach_memory()
+{
+    int status = 0;
+    
+    status = detach_memory_block(dblks.data_block);
+    status = detach_memory_block(dblks.data_block);
+
+    if (status == -1) return -1;
+    
+    return 0;
+}
+
+
+int initialize_locks() 
+{
+    int status = 0;
+
+    smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
+    smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
+
+    if (slks.sem_lock_datar == SEM_FAILED || slks.sem_lock_commr == SEM_FAILED || slks.sem_lock_datas == SEM_FAILED || slks.sem_lock_comms = SEM_FAILED)
+        status = -1;
+
+    return status;
+}
+
+
+int uninitialize_locks()
+{
+    sem_close(smlks.sem_lock_datas);
+    sem_close(smlks.sem_lock_comms);
+}
+
+
+int run_sender() 
+{
+    while (process_status) {
+
+        initialize_locks();
+        get_shared_memory();
+        read_data();
+        uninitialize_locks();
+        detach_memeory();
+    }
+}
+
+
+int main(void) 
+{
+    run_sender();
 
     //read ip, data from data base
-    //search for socket in related to ip in database
+    //search for socket  related to ip in database
     // send data
     //once done close the socket
     //provide 

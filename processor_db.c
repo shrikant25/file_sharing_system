@@ -175,7 +175,7 @@ int retrive_commr_from_database(char *data) {
 
 int retrive_comms_from_database(char *data) {
 
-    int cid = 0;
+    char cid[4];
     int row_count = 0;
     PGresult *res = NULL;
 
@@ -193,7 +193,7 @@ int retrive_comms_from_database(char *data) {
         PQclear(res);
     
         // update this row from database
-        cid = *(int *)data;
+        memcpy(cid, data, 4);             
         const char *param_values[dbinf.param_count[6]] = {cid};        
         res = PQexecPrepared(dbinf.connection, dbinf.statement_names[6], param_count[6], param_values, NULL, NULL, 0);
 
