@@ -117,7 +117,7 @@ int uninitialize_locks()
 }
 
 
-int evaluate_and_take_action(char *data)
+int evaluate_and_take_action(char *data, int *csstart_pos2)
 {
     int msg_status = -1;
     unsigned char *ptr = data;
@@ -141,7 +141,7 @@ int evaluate_and_take_action(char *data)
         connection_socket = create_connection(port_number, ipaddress);
         
         // communicate to database
-        send_message(cid, connection_socket);
+        send_message(cid, connection_socket, csstart_pos2);
 
     }
     else if (*ptr == 2) {
@@ -151,18 +151,50 @@ int evaluate_and_take_action(char *data)
         
         ptr += 16; //internal cid
         connection_socket = *(int *)ptr;
-        ptr += 4;// now points to data
-        
-        msg_status = send_data_over_network(connection_socket, ptr);
-        send_message(cid, msg_status);
+        msg_status = close_connection(connection_socket);
+        send_message(cid, msg_status, csstart_pos2);
         
     }
+    else{
+        return -1;
+    }
+
+    return 0;
 
 } 
-// this is wrong
-int read_message(char *data, int *dsstart_pos) 
+
+
+int read_message(char *data, int *csstart_pos1, int *csstart_pos2) 
 {
 
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    
+    sem_wait(smlks.sem_lock_comms);         
+    subblock_position = get_subblock(dablks.comms_block , 1, *csstart_pos1);
+    
+    if(subblock_position >= 0) {
+
+        *csstart_pos1 = subblock_position;
+        blkptr = dablks.comms_block +(subblock_position*PARTITION_SIZE);
+        memset(data, 0, PARTITION_SIZE);
+        
+        memcpy(data, blkptr, PARTITION_SIZE);
+        evaluate_and_take_action(data, csstart_pos2);
+
+        blkptr = NULL;
+        toggle_bit(subblock_position, dablks.comms_block, 2);
+    
+    }
+
+    sem_post(smlks.sem_lock_comms);
+
+}
+
+
+int get_data_from_processor(char *data, int *dsstart_pos)
+{
+    printf("unimplemented get_data_from_processor in sender.c");
     int subblock_position = -1;
     char *blkptr = NULL;
     
@@ -174,10 +206,8 @@ int read_message(char *data, int *dsstart_pos)
         *dsstart_pos = subblock_position;
         blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
-        
         memcpy(data, blkptr, PARTITION_SIZE);
-        evaluate_and_take_action(data);
-
+        memset(blkptr, 0, PARTITION_SIZE);
         blkptr = NULL;
         toggle_bit(subblock_position, dablks.datas_block, 1);
     
@@ -185,24 +215,39 @@ int read_message(char *data, int *dsstart_pos)
 
     sem_post(smlks.sem_lock_datas);
 
-}
+    return subblock_position > 0;
 
-int get_data_from_processor(int id, char *data)
-{
-    printf("unimplemented get_data_from_processor in sender.c");
 }
 
 
 int send_data_over_network(unsigned int socketid, char *data) 
 {
-        printf("unimplemented send_data_over_network in sender.c");
+    printf("unimplemented send_data_over_network in sender.c");
 }
 
 
-int send_message(char *cid, int connection_socket) 
+int send_message(char *cid, int connection_socket, int *csstart_pos2) 
 {
-    printf("unimplemented send_message in sender.c");
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    
+    sem_wait(smlks.sem_lock_comms);         
+    subblock_position = get_subblock(dablks.comms_block , 0, *csstart_pos2);
+    
+    if(subblock_position >= 0) {
+
+        *csstart_pos2 = subblock_position;
+        blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
+        memset(blkptr, 0, PARTITION_SIZE);
+        memcpy(blkptr, cid, 16);
+        memcpy(blkptr, connection_socket, sizeof(int));
+        toggle_bit(subblock_position, dablks.comms_block, 3);
+    
+    }
+
+    sem_post(smlks.sem_lock_comms);
 }
+
 
 int run_sender() 
 {
@@ -214,9 +259,9 @@ int run_sender()
 
     while (sender_status) {
 
-        read_message(data, &csstart_pos1);
-        get_data_from_processor(fd, data);
-        send_data_over_network(fd, data);
+        read_message(data, &csstart_pos1, &csstart_pos2);
+        if(get_data_from_processor(data, &dsstart_pos))
+            send_data_over_network(fd, data);
 
     }
 }

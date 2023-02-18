@@ -86,6 +86,7 @@ int communicate_with_receiver(int *crstart_pos1, int *crstart_pos2) {
     char *blkptr = NULL;
     char data[PARTITION_SIZE];
 
+    sem_wait(slks.sem_lock_commr);         
     subblock_position = get_subblock2(dblks.commr_block, 0, *crstart_pos1, 0);
     
     if(subblock_position >= 0) {
@@ -103,6 +104,7 @@ int communicate_with_receiver(int *crstart_pos1, int *crstart_pos2) {
     
     }
 
+    
     subblock_position = -1;
     subblock_position = get_subblock2(dblks.commr_block, 1, *crstart_pos2, 1);
     
@@ -146,10 +148,10 @@ int communicate_with_sender(int *csstart_pos1, int *csstart_pos2) {
         memset(data, 0, PARTITION_SIZE);  
         
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.comms_block, 1);
+        toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
-
+    
     subblock_position = -1;
     subblock_position = get_subblock2(dblks.comms_block, 1, *csstart_pos2, 1);
     
@@ -164,11 +166,11 @@ int communicate_with_sender(int *csstart_pos1, int *csstart_pos2) {
         memset(data, 0, PARTITION_SIZE);  
         
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.comms_block, 2);
+        toggle_bit(subblock_position, dblks.comms_block, 3);
     
     }
 
-    sem_post(slks.sem_lock_commr);
+    sem_post(slks.sem_lock_comms);
     
 }
 
