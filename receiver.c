@@ -10,34 +10,19 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <netinet/in.h>
-
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
-
-typedef struct server_info{
-    unsigned short int port;
-    unsigned int maxevents;
-    unsigned int servsoc_fd;
-    unsigned int epoll_fd;
-}server_info;
+#include "receiver.h"
+#include "shared_memory.h"
 
 server_info s_info;
-
-static void make_nonblocking(int);
-static void create_socket();
-static void create_epoll();
-static void add_to_list(int);
-static void remove_from_list(int); 
-static void accept_connection(); 
-static void read_socket(struct epoll_event);
-static void monitor(); 
 
 int *tbl;
 
 int run_status = 1;
 
-
-void add(char *p[]){
+void add(char *p[])
+{
 
 
      PGconn *conn = PQconnectdb("user=shrikant dbname=shrikant");
@@ -48,11 +33,11 @@ void add(char *p[]){
                         PQerrorMessage(conn));
                     
                 }
-                int         lobj_fd;
-                char        buf[1024];
-                int         nbytes= 0;
+                int lobj_fd;
+                char buf[1024];
+                int nbytes= 0;
                 int tmp;         
-                int         fd;
+                int fd;
                 
                 ///tmp/outimage.jpg
                 const char* paramValues[2];
@@ -76,8 +61,8 @@ void add(char *p[]){
 }
 
 
-
-static void make_nonblocking(int active_fd) {
+void make_nonblocking(int active_fd) 
+{
 
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
@@ -93,7 +78,8 @@ static void make_nonblocking(int active_fd) {
 }
 
 
-static void create_socket() {
+void create_socket() 
+{
 
     int optval;
     struct sockaddr_in servaddr;
@@ -112,8 +98,6 @@ static void create_socket() {
         return;
     }
 
-   
-
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(s_info.port);
@@ -127,7 +111,8 @@ static void create_socket() {
 }
 
 
-static void create_epoll() {
+void create_epoll() 
+{
 
     s_info.epoll_fd = epoll_create1(0);
     if (s_info.epoll_fd == -2) {
@@ -138,7 +123,8 @@ static void create_epoll() {
 }
 
 
-static void add_to_list(int active_fd) {
+void add_to_list(int active_fd) 
+{
 
     struct epoll_event event;
  
@@ -153,7 +139,9 @@ static void add_to_list(int active_fd) {
 
 }
 
-static void remove_from_list(int active_fd) {
+
+void remove_from_list(int active_fd) 
+{
 
     struct epoll_event event;
 
@@ -168,7 +156,8 @@ static void remove_from_list(int active_fd) {
 }
 
 
-void accept_connection() {
+void accept_connection() 
+{
     
     int client_fd = -1;
     struct sockaddr_in client_addr;
@@ -198,7 +187,8 @@ void accept_connection() {
 }
 
 
-static void read_socket(struct epoll_event event) {
+void read_socket(struct epoll_event event) 
+{
 
     char buffer[4028];
     ssize_t bytes_read = 0;
@@ -225,7 +215,8 @@ static void read_socket(struct epoll_event event) {
 }
 
 
-static void monitor() {
+void run_receiver() 
+{
 
     int i;
     int act_events_cnt = -1;
@@ -263,8 +254,25 @@ static void monitor() {
 }
 
 
-int receiver() {
- 
+int store_data_in_database(char *data, int *dsstart_pos)
+{
+    printf("storre data in database not impelmented in reveiver.c");
+}
+
+
+int read_message_from_database(int *csstart_pos1)
+{
+    printf("red message from databse not implemnte din receiver.c")
+}
+
+
+int send_message_to_database(int *csstart_pos2)
+{
+
+}
+
+int init_receiver()
+{
     s_info.maxevents = 1000;
     s_info.port = 7000;
 
@@ -282,11 +290,53 @@ int receiver() {
     create_epoll();
     add_to_list(s_info.servsoc_fd);
  
-    monitor();
- 
+}
+
+
+int close_reciever()
+{
     close(s_info.epoll_fd);
     shutdown(s_info.servsoc_fd, 2);
  
     return 0;
+}
 
+
+int initialize_locks()
+{
+    printf("initialize locks unimplemented in receiver.c");
+}
+
+
+int get_shared_memeory()
+{
+    printf("get shared memeory unimplemented in receiver.c");
+}
+
+
+int uninitialize_locks()
+{
+    printf("uninitialize locks unimplemented in receiver.c");
+}
+
+
+int detach_memory()
+{
+    printf("detach memory unimplemented in receiver.c");
+}
+
+
+
+int receiver() 
+{
+    
+    initialize_locks();
+    get_shared_memeory();   
+    init_receiver();
+    run_receiver();
+    close_receiver();
+    uninitialize_locks();
+    detach_memory();
+    
+    return 0;
 }

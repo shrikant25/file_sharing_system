@@ -6,6 +6,8 @@
 int close_sem_locks();
 int initialize_locks();
 int get_shared_memeory();
+int uninitialize_locks();
+int detach_memory();
 int run_sender();
 int send_data();
 int evaluate_and_take_action(char *, int *);
