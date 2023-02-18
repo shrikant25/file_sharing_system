@@ -215,7 +215,7 @@ void read_socket(struct epoll_event event)
 }
 
 
-void run_receiver() 
+int run_receiver() 
 {
 
     int i;
@@ -262,14 +262,15 @@ int store_data_in_database(char *data, int *dsstart_pos)
 
 int read_message_from_database(int *csstart_pos1)
 {
-    printf("red message from databse not implemnte din receiver.c")
+    printf("red message from databse not implemnte din receiver.c");
 }
 
 
 int send_message_to_database(int *csstart_pos2)
 {
-
+    printf("send message to database not implemented in receiver.c");   
 }
+
 
 int init_receiver()
 {
