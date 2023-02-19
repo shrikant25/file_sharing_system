@@ -10,11 +10,11 @@ int uninitialize_locks();
 int detach_memory();
 int run_sender();
 int send_data();
-int evaluate_and_take_action(char *, int *);
-int read_message(char *, int *, int *);
-int send_message(char *, int, int *);
+int evaluate_and_take_action(char *);
+int read_message(char *);
+int send_message(char *, int);
 int get_data_from_processor(char *, int *);
-int send_data_over_network(unsigned int, char *);
+int send_data_over_network(unsigned int, char *, int);
 
 typedef struct datablocks {     
     char *datas_block;

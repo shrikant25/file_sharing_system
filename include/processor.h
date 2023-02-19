@@ -3,10 +3,10 @@
 
 #include <semaphore.h>
 
-int get_data_from_receiver(int *);
-int give_data_to_receiver(int *);
-int communicate_with_receiver(int *, int *);
-int communicate_with_sender(int *, int *);
+int get_data_from_receiver();
+int give_data_to_receiver();
+int communicate_with_receiver();
+int communicate_with_sender();
 int run_process();
 int open_sem_locks();
 int close_sem_locks();

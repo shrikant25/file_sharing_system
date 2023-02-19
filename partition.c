@@ -3,7 +3,8 @@
 #include <stdio.h>
 
 // state = 0 means empty position, state = 1 means filled position
-int get_subblock(char *block, int state, int start_pos) {
+int get_subblock(char *block, int state) 
+{
 
     int i;
     unsigned int bmap = 0;
@@ -11,11 +12,8 @@ int get_subblock(char *block, int state, int start_pos) {
     
     for(i = 0; i<TOTAL_PARTITIONS; i++) {
 
-        start_pos++;
-        if (start_pos >= TOTAL_PARTITIONS)
-            start_pos = 0;
-        if (state == ((bmap>>start_pos) & 1) )
-            return start_pos;
+        if (state == ((bmap>>i) & 1) )
+            return i;
         
     }
        
@@ -23,7 +21,8 @@ int get_subblock(char *block, int state, int start_pos) {
 }
 
 
-int get_subblock2(char *block, int state, int start_pos, int sub_block) {
+int get_subblock2(char *block, int state, int sub_block) 
+{
 
     int i;
     int begin = 0;
@@ -42,12 +41,8 @@ int get_subblock2(char *block, int state, int start_pos, int sub_block) {
     }
 
     for (i = begin; i<end; i++) {
-
-        start_pos++;
-        if (start_pos >= end)
-            start_pos = begin;
-        if (state == ((bmap>>start_pos) & 1) )
-            return start_pos;
+        if (state == ((bmap>>i) & 1) )
+            return i;
         
     }
        

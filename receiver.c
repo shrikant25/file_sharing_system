@@ -135,6 +135,7 @@ void accept_connection()
             make_nonblocking(client_fd);
             tbl[client_fd] = client_addr.sin_addr.s_addr;
             add_to_list(client_fd);
+            // send_message_to_processor(fd, )
         }
 
     }
@@ -143,7 +144,7 @@ void accept_connection()
 
 void read_socket(struct epoll_event event) 
 {
-    char buffer[4028];
+    char buffer[1024 * 128];
     ssize_t bytes_read = 0;
 
     while (1) {
@@ -153,15 +154,7 @@ void read_socket(struct epoll_event event)
             //remove_from_list(event.data.fd);
             //printf("nothing to read");
         else {
-        
-            printf(" %d %s", tbl[event.data.fd],buffer);
-
-            char v1[100];
-            sprintf(v1, "%d", tbl[event.data.fd]);
-            char *p[] = {v1, buffer};
-            add(p);
-            
-            memset(buffer, 0, 4028);
+            send_to_processor(event.data.fd, buffer, bytes_read);
         }
     }
 }
@@ -178,13 +171,9 @@ int run_receiver()
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
             perror("epoll wait failed");
-            return;
+            return -1;
         }
 
-        char v[100];
-        sprintf(v, "%d", act_events_cnt);
-        char *p[] = {"69", v};
-        add(p);
         for (i = 0; i<act_events_cnt; i++) {
             
             // error or hangup
@@ -205,21 +194,20 @@ int run_receiver()
 }
  
     
-int send_to_processor(unsigned int ipaddress, char *data, int data_size, int *drstart_pos)
+int send_to_processor(unsigned int socketid, char *data, int data_size)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block , 0, *drstart_pos);
+    subblock_position = get_subblock(dblks.datar_block , 0);
     
     if(subblock_position >= 0) {
 
-        *drstart_pos = subblock_position;
         blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
-        memset(data, blkptr, PARTITION_SIZE);
+        memset(blkptr, 0, PARTITION_SIZE);
         
-        memcpy(blkptr, ipaddress, sizeof(ipaddress));
+        memcpy(blkptr, &socketid, sizeof(socketid));
         blkptr += 4;
         memcpy(blkptr, data, data_size);
         memset(data, 0, PARTITION_SIZE);
@@ -232,19 +220,18 @@ int send_to_processor(unsigned int ipaddress, char *data, int data_size, int *dr
 }
 
 
-int read_message_from_processor(int *csstart_pos1, char *data)
+int read_message_from_processor(char *data)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.datar_block , 1, *csstart_pos1);
+    subblock_position = get_subblock(dblks.datar_block , 1);
     
     if(subblock_position >= 0) {
 
-        *csstart_pos1 = subblock_position;
         blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
-        memset(data, blkptr, PARTITION_SIZE);
+        memset(data, 0, PARTITION_SIZE);
         
         memcpy(data, 0, PARTITION_SIZE);
         memcpy(data, blkptr, PARTITION_SIZE);
@@ -258,22 +245,21 @@ int read_message_from_processor(int *csstart_pos1, char *data)
 }
 
 
-int send_message_to_processor(unsigned int fd, unsigned int ipaddress ,int *csstart_pos2)
+int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.commr_block , 0, *csstart_pos2);
+    subblock_position = get_subblock(dblks.commr_block , 0);
     
     if(subblock_position >= 0) {
 
-        *csstart_pos2 = subblock_position;
         blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
         
-        memcpy(blkptr, fd, sizeof(fd));
+        memcpy(blkptr, &fd, sizeof(fd));
         blkptr+=4;
-        memcpy(blkptr, ipaddress, sizeof(ipaddress));
+        memcpy(blkptr, &ipaddress, sizeof(ipaddress));
         
         toggle_bit(subblock_position, dblks.commr_block, 2);
     }
@@ -303,7 +289,7 @@ int init_receiver()
 }
 
 
-int close_reciever()
+int close_receiver()
 {
     close(s_info.epoll_fd);
     shutdown(s_info.servsoc_fd, 2);
@@ -356,7 +342,7 @@ int detach_memory()
 }
 
 
-int receiver() 
+int main(void) 
 {   
     initialize_locks();
     get_shared_memeory();   
