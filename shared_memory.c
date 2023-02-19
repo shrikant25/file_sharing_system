@@ -6,8 +6,8 @@
 #include "shared_memory.h"
 
 
-int get_shared_block(char *filename, int size, unsigned char project_id) {
-
+int get_shared_block(char *filename, int size, unsigned char project_id) 
+{
     key_t key;
 
     key = ftok(filename, project_id);
@@ -19,8 +19,8 @@ int get_shared_block(char *filename, int size, unsigned char project_id) {
 }
 
 
-char *attach_memory_block(char *filename, int size, unsigned char project_id) {
- 
+char *attach_memory_block(char *filename, int size, unsigned char project_id) 
+{ 
     char *result;
     int shared_block_id = get_shared_block(filename, size, project_id);
 
@@ -34,17 +34,17 @@ char *attach_memory_block(char *filename, int size, unsigned char project_id) {
     }
 
     return result;
-
 }
 
 
-int detach_memory_block(char *block) {
+int detach_memory_block(char *block) 
+{
     return (shmdt(block) != -1);
 }
 
 
-int destroy_memory_block(char *filename, unsigned char project_id) {
-
+int destroy_memory_block(char *filename, unsigned char project_id)
+ {
     int shared_block_id = get_shared_block(filename, 0, project_id);
 
     if (shared_block_id == -1) {

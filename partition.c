@@ -29,7 +29,7 @@ int get_subblock2(char *block, int state, int sub_block)
     int end = 0;
     unsigned int bmap = 0;
  
-    if (sub_block == 0){
+    if (sub_block == 0) {
         memcpy(&bmap, block, 3); // retrive bitmap
         begin = 0;
         end = 40;
@@ -52,8 +52,8 @@ int get_subblock2(char *block, int state, int sub_block)
 // 1 = bitmap present at start representing 80 blocks 
 // 2 = bitmap present at start representing 40 blocks
 // 3 = bitmap present at middle representing 40 blocks
-void toggle_bit(int i, char *block, int block_type) {
-    
+void toggle_bit(int i, char *block, int block_type) 
+{    
     short int bmap = 0;
 
     if (block_type == 1) { 
@@ -80,8 +80,8 @@ void toggle_bit(int i, char *block, int block_type) {
 }
 
 
-void set_all_bits(char *block, int block_type) {
-
+void set_all_bits(char *block, int block_type) 
+{
     if (block_type == 1) 
         memset(block, 0xFFFFFFFF, 3);
     else if (block_type == 2)
@@ -91,13 +91,12 @@ void set_all_bits(char *block, int block_type) {
 }
 
 
-void unset_all_bits(char *block, int block_type) {
-
+void unset_all_bits(char *block, int block_type) 
+{
     if (block_type == 1) 
         memset(block, 0, 3);
     else if (block_type == 2)
         memset(block, 0, 2);
     else if (block_type == 3)
         memset(block, 0, 2);
-    
 }
