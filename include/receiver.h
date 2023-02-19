@@ -2,17 +2,18 @@
 #define RECEIVER_H
 #include <semaphore.h>
 
+
 typedef struct datablocks {     
     char *datar_block;
     char *commr_block;
 }datablocks;
 
+
 typedef struct semlocks {
     sem_t *sem_lock_datar;
     sem_t *sem_lock_commr; 
 }semlocks;
-// variables not created 
-// also change names to avoid conflict 
+
 
 typedef struct server_info{
 
@@ -31,9 +32,10 @@ void add_to_list(int);
 void remove_from_list(int); 
 void accept_connection(); 
 void read_socket(struct epoll_event);
-int store_data_in_database(char *, int *);
-int read_message_from_database(int *);
-int send_message_to_database(int *);
+int send_to_processor(unsigned int, char *, int, int *);
+int read_message_from_processor(int *, char *);
+int evaluate_and_perform(char *);
+int send_message_to_processor(unsigned int, unsigned int, int *);
 int run_receiver();
 int init_receiver();
 int close_receiver();

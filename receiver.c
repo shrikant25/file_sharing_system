@@ -14,56 +14,19 @@
 #include <libpq/libpq-fs.h>
 #include "receiver.h"
 #include "shared_memory.h"
+#include "partition.h"
 
 server_info s_info;
+datablocks dblks;
+semlocks smlks;
 
 int *tbl;
 
-int run_status = 1;
-
-void add(char *p[])
-{
-
-
-     PGconn *conn = PQconnectdb("user=shrikant dbname=shrikant");
-
-                if (PQstatus(conn) == CONNECTION_BAD) {
-
-                    fprintf(stderr, "Connection to database failed: %s\n",
-                        PQerrorMessage(conn));
-                    
-                }
-                int lobj_fd;
-                char buf[1024];
-                int nbytes= 0;
-                int tmp;         
-                int fd;
-                
-                ///tmp/outimage.jpg
-                const char* paramValues[2];
-                paramValues[0] = p[0];
-                paramValues[1] = p[1];
-                PGresult* res = PQprepare(conn, "insert_stmt0", "insert into dump values($1,$2)", 2, NULL);
-
-                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    printf("Preparation of statement failed: %s\n", PQerrorMessage(conn));
-                    PQclear(res);
-                    PQfinish(conn);
-                    return;
-                }
-
-                res = PQexecPrepared(conn, "insert_stmt0", 2, paramValues, NULL, NULL, 0);
-                  
-                close(fd);
-            
-                PQclear(res);
-                PQfinish(conn);
-}
+int receiver_status = 1;
 
 
 void make_nonblocking(int active_fd) 
 {
-
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("failed to get file descriptor flags");
@@ -74,13 +37,11 @@ void make_nonblocking(int active_fd)
         perror("failed to set file descriptor flags");
         return;
     }
-
 }
 
 
 void create_socket() 
 {
-
     int optval;
     struct sockaddr_in servaddr;
     
@@ -107,25 +68,21 @@ void create_socket()
         perror("bind error");
         exit(1);
     }
-
 }
 
 
 void create_epoll() 
 {
-
     s_info.epoll_fd = epoll_create1(0);
     if (s_info.epoll_fd == -2) {
         perror("failed to create epoll instance");
         return;
     }
-    
 }
 
 
 void add_to_list(int active_fd) 
 {
-
     struct epoll_event event;
  
     memset(&event, 0, sizeof(event));
@@ -136,13 +93,11 @@ void add_to_list(int active_fd)
         perror("error adding");
         return;
     }
-
 }
 
 
 void remove_from_list(int active_fd) 
 {
-
     struct epoll_event event;
 
     memset(&event, 0, sizeof(event));
@@ -157,8 +112,7 @@ void remove_from_list(int active_fd)
 
 
 void accept_connection() 
-{
-    
+{   
     int client_fd = -1;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len;
@@ -189,7 +143,6 @@ void accept_connection()
 
 void read_socket(struct epoll_event event) 
 {
-
     char buffer[4028];
     ssize_t bytes_read = 0;
 
@@ -211,18 +164,16 @@ void read_socket(struct epoll_event event)
             memset(buffer, 0, 4028);
         }
     }
-
 }
 
 
 int run_receiver() 
 {
-
     int i;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
 
-    while (run_status) {
+    while (receiver_status) {
         
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
@@ -252,23 +203,82 @@ int run_receiver()
 
     }
 }
-
-
-int store_data_in_database(char *data, int *dsstart_pos)
+ 
+    
+int send_to_processor(unsigned int ipaddress, char *data, int data_size, int *drstart_pos)
 {
-    printf("storre data in database not impelmented in reveiver.c");
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    
+    sem_wait(smlks.sem_lock_datar);         
+    subblock_position = get_subblock(dblks.datar_block , 0, *drstart_pos);
+    
+    if(subblock_position >= 0) {
+
+        *drstart_pos = subblock_position;
+        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        memset(data, blkptr, PARTITION_SIZE);
+        
+        memcpy(blkptr, ipaddress, sizeof(ipaddress));
+        blkptr += 4;
+        memcpy(blkptr, data, data_size);
+        memset(data, 0, PARTITION_SIZE);
+        
+        blkptr = NULL;
+        toggle_bit(subblock_position, dblks.datar_block, 1);
+    }
+
+    sem_post(smlks.sem_lock_datar);
 }
 
 
-int read_message_from_database(int *csstart_pos1)
+int read_message_from_processor(int *csstart_pos1, char *data)
 {
-    printf("red message from databse not implemnte din receiver.c");
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    
+    sem_wait(smlks.sem_lock_commr);         
+    subblock_position = get_subblock(dblks.datar_block , 1, *csstart_pos1);
+    
+    if(subblock_position >= 0) {
+
+        *csstart_pos1 = subblock_position;
+        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        memset(data, blkptr, PARTITION_SIZE);
+        
+        memcpy(data, 0, PARTITION_SIZE);
+        memcpy(data, blkptr, PARTITION_SIZE);
+        memset(blkptr, 0, PARTITION_SIZE);
+        
+        blkptr = NULL;
+        toggle_bit(subblock_position, dblks.datar_block, 2);
+    }
+    
+    sem_post(smlks.sem_lock_commr);
 }
 
 
-int send_message_to_database(int *csstart_pos2)
+int send_message_to_processor(unsigned int fd, unsigned int ipaddress ,int *csstart_pos2)
 {
-    printf("send message to database not implemented in receiver.c");   
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    
+    sem_wait(smlks.sem_lock_commr);         
+    subblock_position = get_subblock(dblks.commr_block , 0, *csstart_pos2);
+    
+    if(subblock_position >= 0) {
+
+        *csstart_pos2 = subblock_position;
+        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        
+        memcpy(blkptr, fd, sizeof(fd));
+        blkptr+=4;
+        memcpy(blkptr, ipaddress, sizeof(ipaddress));
+        
+        toggle_bit(subblock_position, dblks.commr_block, 2);
+    }
+    
+    sem_post(smlks.sem_lock_commr);
 }
 
 
@@ -290,7 +300,6 @@ int init_receiver()
  
     create_epoll();
     add_to_list(s_info.servsoc_fd);
- 
 }
 
 
@@ -305,32 +314,50 @@ int close_reciever()
 
 int initialize_locks()
 {
-    printf("initialize locks unimplemented in receiver.c");
+    int status = 0;
+
+    smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
+    smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
+
+    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED)
+        status = -1;
+
+    return status;
 }
 
 
 int get_shared_memeory()
 {
-    printf("get shared memeory unimplemented in receiver.c");
+    dblks.datar_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAR);
+    dblks.commr_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
+
+    if (!(dblks.datar_block && dblks.commr_block))
+        return -1;
+    
+    return 0;
 }
 
 
 int uninitialize_locks()
-{
-    printf("uninitialize locks unimplemented in receiver.c");
+{    
+    sem_close(smlks.sem_lock_commr);
+    sem_close(smlks.sem_lock_datar);
 }
 
 
 int detach_memory()
 {
-    printf("detach memory unimplemented in receiver.c");
+    int status = 0;
+
+    status = detach_memory_block(dblks.datar_block);
+    status = detach_memory_block(dblks.commr_block);
+
+    return status;
 }
 
 
-
 int receiver() 
-{
-    
+{   
     initialize_locks();
     get_shared_memeory();   
     init_receiver();

@@ -90,9 +90,7 @@ int detach_memory()
     status = detach_memory_block(dablks.datas_block);
     status = detach_memory_block(dablks.comms_block);
 
-    if (status == -1) return -1;
-    
-    return 0;
+    return status;
 }
 
 
@@ -166,7 +164,6 @@ int evaluate_and_take_action(char *data, int *csstart_pos2)
 
 int read_message(char *data, int *csstart_pos1, int *csstart_pos2) 
 {
-
     int subblock_position = -1;
     char *blkptr = NULL;
     
@@ -188,13 +185,11 @@ int read_message(char *data, int *csstart_pos1, int *csstart_pos2)
     }
 
     sem_post(smlks.sem_lock_comms);
-
 }
 
 
 int get_data_from_processor(char *data, int *dsstart_pos)
 {
-    printf("unimplemented get_data_from_processor in sender.c");
     int subblock_position = -1;
     char *blkptr = NULL;
     
