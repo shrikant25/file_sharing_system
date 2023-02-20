@@ -79,7 +79,7 @@ int store_data_in_database(int fd, char *data, int data_size)
                                     param_count[0], param_values, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
-        
+        return -1;
     }
 
     PQclear(res);
@@ -96,7 +96,7 @@ int retrive_data_from_database(char *data)
     res = PQexecPrepared(connection, statement_names[1], param_count[1], 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(connection));
+        printf("retriving failed: %s\n", PQerrorMessage(connection));
         return -1;
     }    
 
@@ -140,6 +140,7 @@ int store_commr_into_database(char *data)
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
+        return -1;
     }
 
     PQclear(res);
@@ -174,6 +175,7 @@ int store_comms_into_database(char *data)
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
+        return -1;
     }
 
     PQclear(res);
@@ -191,8 +193,8 @@ int retrive_commr_from_database(char *data)
                                     NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(connection));
-        return 1;
+        printf("retriving failed: %s\n", PQerrorMessage(connection));
+        return -1;
     }    
 
     row_count = PQntuples(res);
@@ -203,7 +205,7 @@ int retrive_commr_from_database(char *data)
     }
 
     PQclear(res);
-    return 1;
+    return -1;
 }
 
 
@@ -216,8 +218,8 @@ int retrive_comms_from_database(char *data)
     res = PQexecPrepared(connection, statement_names[5], param_count[5], NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(connection));
-        return 1;
+        printf("retriving failed: %s\n", PQerrorMessage(connection));
+        return -1;
     }    
 
     row_count = PQntuples(res);
@@ -235,10 +237,10 @@ int retrive_comms_from_database(char *data)
         res = PQexecPrepared(connection, statement_names[6], param_count[6], param_values, NULL, NULL, 0);
 
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            printf("Insert failed: %s\n", PQerrorMessage(connection));
+            printf("updation after retriving failed: %s\n", PQerrorMessage(connection));
             PQclear(res);
    
-            return 1;
+            return -1;
         }   
 
         PQclear(res);
@@ -248,7 +250,7 @@ int retrive_comms_from_database(char *data)
     }
 
     PQclear(res);
-    return 1;
+    return -1;
 
 }
 
