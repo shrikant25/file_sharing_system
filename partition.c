@@ -54,7 +54,7 @@ int get_subblock2(char *block, int state, int sub_block)
 // 3 = bitmap present at middle representing 40 blocks
 void toggle_bit(int idx, char *block, int block_type) 
 {    
-    short int bmap = 0;
+    unsigned int bmap = 0;
 
     if (block_type == 1) { 
 

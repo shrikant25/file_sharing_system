@@ -3,9 +3,9 @@
 
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
-#define PARTITION_SIZE 131072  
-#define DATA_BLOCK_SIZE 10485760 + 3
-#define COMM_BLOCK_SIZE 10485758 + 4
+#define PARTITION_SIZE 131072 
+#define DATA_BLOCK_SIZE (PARTITION_SIZE + 8) * TOTAL_PARTITIONS + 3
+#define COMM_BLOCK_SIZE PARTITION_SIZE + 4
 
 // 1024 * 128 * 80 + 3
 // 3 bytes extra for bitmap   __

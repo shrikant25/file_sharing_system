@@ -230,8 +230,10 @@ int get_shared_memory()
     dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
     dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
 
-    if (!(dblks.datar_block && dblks.commr_block && dblks.datas_block && dblks.comms_block)) 
+    if (!(dblks.datar_block && dblks.commr_block && dblks.datas_block && dblks.comms_block)) {
+        printf("failed to get shared memory");
         return -1; 
+    }
     return 0;
 }
 
