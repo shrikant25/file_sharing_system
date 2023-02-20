@@ -13,7 +13,7 @@ int send_data();
 int evaluate_and_take_action(char *);
 int read_message(char *);
 int send_message(char *, int);
-int get_data_from_processor(char *, int *);
+int get_data_from_processor(int, char *, int *);
 int send_data_over_network(unsigned int, char *, int);
 
 typedef struct datablocks {     

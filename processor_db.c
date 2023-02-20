@@ -22,8 +22,8 @@ char *statement_names[statement_count] = {
 
 
 char *statements[statement_count] = {
-                    "INSERT INTO raw_data (data) values($1)",
-                    "SELECT fd, data FROM send_data limit 1",
+                    "INSERT INTO raw_data (fd, data, data_size) values($1, $2, $3)",
+                    "SELECT fd, data, data_size FROM send_data limit 1",
                     "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)",
                     "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)",
                     "SELECT fd FROM for_receiver where status = 1 limit 1",
@@ -32,13 +32,13 @@ char *statements[statement_count] = {
                     "UPDATE for_sender set status = 3 where cid = ($1)",
                     }; 
 
-int param_count[statement_count] = { 1, 0, 2, 2, 0, 0, 1, 1};
+int param_count[statement_count] = { 3, 0, 2, 2, 0, 0, 1, 1};
 
 
 //if any error occurs try to mitigate it here only
 //if mitigation fails then return -1
-int connect_to_database() {
-   
+int connect_to_database() 
+{   
     connection = PQconnectdb("user=shrikant dbname=shrikant");
     if (PQstatus(connection) == CONNECTION_BAD) {
         fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
@@ -50,8 +50,8 @@ int connect_to_database() {
 }
 
 
-int prepare_statments() {
-    
+int prepare_statments() 
+{    
     int i;
 
     for(i = 0; i<statement_count; i++){
@@ -69,8 +69,8 @@ int prepare_statments() {
 }
 
 
-int store_data_in_database(char *data) {
-
+int store_data_in_database(int fd, char *data, int data_size) 
+{
     PGresult *res = NULL;
     const char *param_values[param_count[0]];
     param_values[0] = data;
@@ -88,8 +88,8 @@ int store_data_in_database(char *data) {
 }
 
 
-int retrive_data_from_database(char *data) {
-
+int retrive_data_from_database(char *data) 
+{
     int row_count;
     PGresult *res = NULL;
 
@@ -97,27 +97,26 @@ int retrive_data_from_database(char *data) {
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
-        return 1;
+        return -1;
     }    
 
     row_count = PQntuples(res);
     if (row_count > 0) {
         memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-        memcpy(data+2, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+        memcpy(data+4, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+        memcpy(data+8, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
         PQclear(res);
         return 0;
     }
 
     PQclear(res);
-    return 1;
-
-    
+    return -1;   
 }
 
 
 // if first byte is denotes values 1, then it is data containing fd,ip and port
-int store_commr_into_database(char *data) {
-
+int store_commr_into_database(char *data) 
+{
     char fd[2];
     char ip_addr[4];
     unsigned char *ptr = data;
@@ -146,12 +145,11 @@ int store_commr_into_database(char *data) {
     PQclear(res);
 
     return 0;
-
 }
 
 
-int store_comms_into_database(char *data) {
-
+int store_comms_into_database(char *data) 
+{
     char msg_id[16];
     char msg_status[1]; 
     unsigned char *ptr = data;
@@ -181,12 +179,11 @@ int store_comms_into_database(char *data) {
     PQclear(res);
 
     return 0;
-
 }
 
 
-int retrive_commr_from_database(char *data) {
-
+int retrive_commr_from_database(char *data) 
+{
     int row_count = 0;
     PGresult *res = NULL;
 
@@ -210,8 +207,8 @@ int retrive_commr_from_database(char *data) {
 }
 
 
-int retrive_comms_from_database(char *data) {
-
+int retrive_comms_from_database(char *data) 
+{
     char cid[4];
     int row_count = 0;
     PGresult *res = NULL;

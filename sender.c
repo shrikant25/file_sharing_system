@@ -185,7 +185,7 @@ int read_message(char *data)
 }
 
 
-int get_data_from_processor(char *data, int *data_size)
+int get_data_from_processor(int *socketid, char *data, int *data_size)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -197,9 +197,13 @@ int get_data_from_processor(char *data, int *data_size)
 
         blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
-        memcpy(data_size, blkptr, sizeof(data_size));
+
+        memcpy(socketid, blkptr, sizeof(int))
         blkptr += 4;
-        memcpy(data, blkptr, PARTITION_SIZE);
+        memcpy(data_size, blkptr, sizeof(int));
+        blkptr += 4;
+        memcpy(data, blkptr, data_size);
+        
         memset(blkptr, 0, PARTITION_SIZE);
         blkptr = NULL;
         toggle_bit(subblock_position, dablks.datas_block, 1);
@@ -251,7 +255,7 @@ int run_sender()
     while (sender_status) {
 
         read_message(data);
-        if(get_data_from_processor(data, &data_size))
+        if(get_data_from_processor(&fd, data, &data_size))
             send_data_over_network(fd, data, data_size);
 
     }

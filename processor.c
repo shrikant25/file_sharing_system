@@ -16,7 +16,7 @@
 int process_status = 1;
 
 datablocks dblks;
-semlocks slks;
+semlocks smlks;
 
 // read any incoming data from p2
     
@@ -24,9 +24,11 @@ int get_data_from_receiver()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
+    int fd = 0;
+    int data_size = 0;
     char data[PARTITION_SIZE];
 
-    sem_wait(slks.sem_lock_datar);         
+    sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block , 1);
     
     if(subblock_position >= 0) {
@@ -34,8 +36,13 @@ int get_data_from_receiver()
         blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
 
+        memcpy(&fd, blkptr, sizeof(fd));
+        blkptr += 4;
+        memcpy(&data_size, blkptr, sizeof(data_size));
+        blkptr += 4;
         memcpy(data, blkptr, PARTITION_SIZE); 
-        store_data_in_database(data);
+        
+        store_data_in_database(fd, data, data_size);
 
         memset(data, 0, PARTITION_SIZE);
         blkptr = NULL;
@@ -43,7 +50,7 @@ int get_data_from_receiver()
     
     }
 
-    sem_post(slks.sem_lock_datar);
+    sem_post(smlks.sem_lock_datar);
 }
 
 
@@ -53,7 +60,7 @@ int give_data_to_sender()
     char *blkptr = NULL;
     char data[PARTITION_SIZE];
 
-    sem_wait(slks.sem_lock_datas);         
+    sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block , 0);
     
     if(subblock_position >= 0) {
@@ -70,7 +77,7 @@ int give_data_to_sender()
     
     }
 
-    sem_post(slks.sem_lock_datas);
+    sem_post(smlks.sem_lock_datas);
 }
 
 
@@ -80,14 +87,14 @@ int communicate_with_receiver()
     char *blkptr = NULL;
     char data[PARTITION_SIZE];
 
-    sem_wait(slks.sem_lock_commr);         
+    sem_wait(smlks.sem_lock_commr);         
     subblock_position = get_subblock2(dblks.commr_block, 0, 0);
     
     if(subblock_position >= 0) {
 
         blkptr = dblks.commr_block +(subblock_position*PARTITION_SIZE);
+        
         memset(data, 0, PARTITION_SIZE);
-
         retrive_commr_from_database(data);
         memcpy(blkptr, data, PARTITION_SIZE);
 
@@ -104,18 +111,18 @@ int communicate_with_receiver()
     if(subblock_position >= 0) {
 
         blkptr = dblks.commr_block +(subblock_position*PARTITION_SIZE);
+        
         memset(data, 0, PARTITION_SIZE);
-
         memcpy(data, blkptr, PARTITION_SIZE);
         store_commr_into_database(data);
-        memset(data, 0, PARTITION_SIZE);  
         
+        memset(data, 0, PARTITION_SIZE);  
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.commr_block, 3);
     
     }
 
-    sem_post(slks.sem_lock_commr);   
+    sem_post(smlks.sem_lock_commr);   
 }
 
 
@@ -125,18 +132,18 @@ int communicate_with_sender()
     char *blkptr = NULL;
     char data[PARTITION_SIZE];
 
-    sem_wait(slks.sem_lock_comms);         
+    sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock2(dblks.comms_block, 0, 0);
     
     if(subblock_position >= 0) {
 
         blkptr = dblks.comms_block +(subblock_position*PARTITION_SIZE);
+        
         memset(data, 0, PARTITION_SIZE);
-
         retrive_comms_from_database(data);
         memcpy(blkptr, data, PARTITION_SIZE);
-        memset(data, 0, PARTITION_SIZE);  
         
+        memset(data, 0, PARTITION_SIZE);  
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
@@ -148,18 +155,18 @@ int communicate_with_sender()
     if(subblock_position >= 0) {
 
         blkptr = dblks.comms_block +(subblock_position*PARTITION_SIZE);
+        
         memset(data, 0, PARTITION_SIZE);
-
         memcpy(data, blkptr, PARTITION_SIZE);
         store_comms_into_database(data);
-        memset(data, 0, PARTITION_SIZE);  
         
+        memset(data, 0, PARTITION_SIZE);  
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.comms_block, 3);
     
     }
 
-    sem_post(slks.sem_lock_comms);   
+    sem_post(smlks.sem_lock_comms);   
 }
 
 
@@ -173,14 +180,13 @@ int run_process()
     unset_all_bits(dblks.datar_block, 1);
 
     while (process_status) {
-    
-        sleep(1);
-        
+
+        sleep(1);    
         communicate_with_receiver();
         communicate_with_sender();
         get_data_from_receiver();
         give_data_to_sender();
-        
+    
     }  
 }
 
@@ -193,12 +199,12 @@ int open_sem_locks()
     status = sem_unlink(SEM_LOCK_DATAS);
     status = sem_unlink(SEM_LOCK_COMMS);
     
-    slks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
-    slks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
-    slks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
-    slks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
+    smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
+    smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
+    smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
+    smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
-    if (slks.sem_lock_datar == SEM_FAILED || slks.sem_lock_commr == SEM_FAILED || slks.sem_lock_datas == SEM_FAILED || slks.sem_lock_comms == SEM_FAILED)
+    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
         status = -1;
 
     return status;
@@ -208,10 +214,10 @@ int open_sem_locks()
 int close_sem_locks() 
 {
     int status = 0;
-    status = sem_close(slks.sem_lock_datar);
-    status = sem_close(slks.sem_lock_commr);
-    status = sem_close(slks.sem_lock_datas);
-    status = sem_close(slks.sem_lock_comms);
+    status = sem_close(smlks.sem_lock_datar);
+    status = sem_close(smlks.sem_lock_commr);
+    status = sem_close(smlks.sem_lock_datas);
+    status = sem_close(smlks.sem_lock_comms);
 
     return status; // if any of above call fails, then return -1
 }
