@@ -7,17 +7,18 @@
 
 PGconn *connection;
 
-#define statement_count  8
+#define statement_count 9
 
 char *statement_names[statement_count] = {
-                            "s0" // store data in database ;
-                            "s1" // retrive data from_database;
-                            "s2" // store (commr received from receiver) into database;
-                            "s3" // store (comms received from senders) into database;
-                            "s4" // retrive commr from database intended for receiver;
-                            "s5" // retrive comms from database intended for sender;
-                            "s6" // update for_sender table set status as 2 i.e "connection establishment in progress";
+                            "s0" // store data in database 
+                            "s1" // retrive data from_database
+                            "s2" // store (commr received from receiver) into database
+                            "s3" // store (comms received from senders) into database
+                            "s4" // retrive commr from database intended for receiver
+                            "s5" // retrive comms from database intended for sender
+                            "s6" // update for_sender table set status as 2 i.e "connection establishment in progress"
                             "s7" // update for_sender table set status as 3 i.e "connection established"
+                            "s8" // update the open connections table and set the connection as closed
                           };
 
 
@@ -30,9 +31,10 @@ char *statements[statement_count] = {
                     "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1",
                     "UPDATE for_sender set status = 2 where cid = ($1)",
                     "UPDATE for_sender set status = 3 where cid = ($1)",
+                    "UPDATE open_connection set status = 0 where fd = ($1)",
                     }; 
 
-int param_count[statement_count] = { 3, 0, 2, 2, 0, 0, 1, 1};
+int param_count[statement_count] = { 3, 0, 2, 2, 0, 0, 1, 1, 1};
 
 
 //if any error occurs try to mitigate it here only
@@ -117,7 +119,7 @@ int retrive_data_from_database(char *data)
 // if first byte is denotes values 1, then it is data containing fd,ip and port
 int store_commr_into_database(char *data) 
 {
-    char fd[2];
+    char fd[4];
     char ip_addr[4];
     unsigned char *ptr = data;
     PGresult *res = NULL;
@@ -125,21 +127,31 @@ int store_commr_into_database(char *data)
     if (*ptr == 1) {
 
         ptr++;
-        memcpy(fd, ptr, 2);   
+        memcpy(fd, ptr, 4);   
 
-        ptr += 2;
+        ptr += 4;
         memcpy(ip_addr, ptr, 4);
 
-        const char *param_values[param_count[0]];
+        const char *param_values[param_count[2]];
         param_values[0] = fd;
         param_values[1] = ip_addr;
         
         res = PQexecPrepared(connection, statement_names[2], param_count[2], param_values, NULL, NULL, 0);
 
     }
+    else if (*ptr == 2) {
+        
+        ptr++;
+        memcpy(fd, ptr, 4);
+        const char *param_values[param_count[7]];
+        param_values[0] = fd;
+        
+        res = PQexecPrepared(connection, statement_names[7], param_count[7], param_values, NULL, NULL, 0);
+        
+    }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(connection));
+        printf("message storing failed failed: %s\n", PQerrorMessage(connection));
         return -1;
     }
 

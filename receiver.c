@@ -20,8 +20,6 @@ server_info s_info;
 datablocks dblks;
 semlocks smlks;
 
-int *tbl;
-
 int receiver_status = 1;
 
 
@@ -133,11 +131,9 @@ void accept_connection()
         }
         else{
             make_nonblocking(client_fd);
-            tbl[client_fd] = client_addr.sin_addr.s_addr;
             add_to_list(client_fd);
-            // send_message_to_processor(fd, )
+            while (send_message_to_processor(client_fd, client_addr.sin_addr.s_addr) == -1);
         }
-
     }
 }
 
@@ -151,10 +147,8 @@ void read_socket(struct epoll_event event)
         bytes_read = read(event.data.fd, buffer, sizeof(buffer));
         if (bytes_read <=0) 
             return;
-            //remove_from_list(event.data.fd);
-            //printf("nothing to read");
         else {
-            send_to_processor(event.data.fd, buffer, bytes_read);
+            while ( send_to_processor(event.data.fd, buffer, bytes_read) == -1);
         }
     }
 }
@@ -165,9 +159,12 @@ int run_receiver()
     int i;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
+    char data[PARTITION_SIZE];
 
     while (receiver_status) {
         
+        read_message_from_processor(data); // dont know what to do with this message
+
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
             perror("epoll wait failed");
@@ -178,16 +175,19 @@ int run_receiver()
             
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
-                perror("removing from list");
+                
+                printf("removing from list");
                 remove_from_list(events[i].data.fd);
+                while (send_message_to_processor(events[i].data.fd, 0) == -1);
                 continue;
+            
             }
-            else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) {
+            else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) 
                 accept_connection();
-            }
-            else if (events[i].events & EPOLLIN){
+            
+            else if (events[i].events & EPOLLIN)
                 read_socket(events[i]);
-            }
+            
         }
 
     }
@@ -217,6 +217,7 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     }
 
     sem_post(smlks.sem_lock_datar);
+    return subblock_position;
 }
 
 
@@ -242,6 +243,7 @@ int read_message_from_processor(char *data)
     }
     
     sem_post(smlks.sem_lock_commr);
+    return subblock_position;
 }
 
 
@@ -249,6 +251,7 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
+    unsigned char msg_type = -1;
     
     sem_wait(smlks.sem_lock_commr);         
     subblock_position = get_subblock(dblks.commr_block , 0);
@@ -256,15 +259,23 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     if(subblock_position >= 0) {
 
         blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+
+        msg_type = ipaddress == 0 ? 0 : 1;
         
+        memcpy(blkptr, &msg_type, sizeof(msg_type));
+        blkptr++;
+            
         memcpy(blkptr, &fd, sizeof(fd));
         blkptr+=4;
-        memcpy(blkptr, &ipaddress, sizeof(ipaddress));
+            
+        if (msg_type == 1) 
+            memcpy(blkptr, &ipaddress, sizeof(ipaddress));
         
         toggle_bit(subblock_position, dblks.commr_block, 2);
     }
     
     sem_post(smlks.sem_lock_commr);
+    return subblock_position;
 }
 
 
@@ -273,8 +284,6 @@ int init_receiver()
     s_info.maxevents = 1000;
     s_info.port = 7000;
 
-    tbl = (int *)malloc(sizeof(int) * s_info.maxevents);
- 
     create_socket();
     make_nonblocking(s_info.servsoc_fd);
  
