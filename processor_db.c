@@ -52,7 +52,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s8", 
-      .statement = "UPDATE open_connection set status = 0 where fd = ($1)",
+      .statement = "UPDATE open_connections set status = 0 where fd = ($1)",
       .param_count = 1,
     },
 };
@@ -72,7 +72,7 @@ int connect_to_database()
 }
 
 
-int prepare_statments() 
+int prepare_statements() 
 {    
     int i;
 

@@ -204,7 +204,7 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datar_block + 3 + (subblock_position*PARTITION_SIZE);
         memset(blkptr, 0, PARTITION_SIZE);
         
         memcpy(blkptr, &socketid, sizeof(socketid));
@@ -231,7 +231,7 @@ int read_message_from_processor(char *data)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datar_block + 2 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
         
         memcpy(data, 0, PARTITION_SIZE);
@@ -258,7 +258,7 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datar_block + 4 + (subblock_position*PARTITION_SIZE);
 
         msg_type = ipaddress == 0 ? 0 : 1;
         

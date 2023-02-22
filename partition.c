@@ -34,7 +34,7 @@ int get_subblock2(char *block, int state, int sub_block)
         begin = 0;
         end = 40;
     }
-    else{
+    else {
         memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 3);
         begin = 40;
         end = TOTAL_PARTITIONS;

@@ -8,6 +8,7 @@ typedef struct db_statements {
 }db_statements;
 
 int close_database_connection();
+int prepare_statements();
 int connect_to_database();
 int store_data_in_database(int, char *, int);
 int retrive_data_from_database(char *);

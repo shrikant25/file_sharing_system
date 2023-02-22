@@ -170,7 +170,7 @@ int read_message(char *data)
     
     if(subblock_position >= 0) {
 
-        blkptr = dablks.comms_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dablks.comms_block + 2 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
         
         memcpy(data, blkptr, PARTITION_SIZE);
@@ -196,14 +196,14 @@ int get_data_from_processor(int *socketid, char *data, int *data_size)
     
     if(subblock_position >= 0) {
 
-        blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dablks.datas_block + 3 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
 
         memcpy(socketid, blkptr, sizeof(int));
         blkptr += 4;
         memcpy(data_size, blkptr, sizeof(int));
         blkptr += 4;
-        memcpy(data, blkptr, data_size);
+        memcpy(data, blkptr, *data_size);
         
         memset(blkptr, 0, PARTITION_SIZE);
         blkptr = NULL;
@@ -235,7 +235,7 @@ int send_message(char *cid, int connection_socket)
     
     if(subblock_position >= 0) {
 
-        blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dablks.datas_block + 4 + (subblock_position*PARTITION_SIZE);
         memset(blkptr, 0, PARTITION_SIZE);
         memcpy(blkptr, cid, 16);
         memcpy(blkptr, &connection_socket, sizeof(int));

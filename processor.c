@@ -33,7 +33,7 @@ int get_data_from_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datar_block + 3 +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
 
         memcpy(&fd, blkptr, sizeof(fd));
@@ -65,7 +65,7 @@ int give_data_to_sender()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datas_block + 3 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
         
         if (retrive_data_from_database(data) != -1) {
@@ -91,7 +91,7 @@ int communicate_with_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.commr_block + 2 +(subblock_position*PARTITION_SIZE);
         
         memset(data, 0, PARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1){
@@ -110,7 +110,7 @@ int communicate_with_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.commr_block + 4 +(subblock_position*PARTITION_SIZE);
         
         memset(data, 0, PARTITION_SIZE);
         memcpy(data, blkptr, PARTITION_SIZE);
@@ -137,7 +137,7 @@ int communicate_with_sender()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.comms_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.comms_block + 2 + (subblock_position*PARTITION_SIZE);
         
         memset(data, 0, PARTITION_SIZE);
         if (retrive_comms_from_database(data) == -1){
@@ -154,7 +154,7 @@ int communicate_with_sender()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.comms_block +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.comms_block + 4 + (subblock_position*PARTITION_SIZE);
         
         memset(data, 0, PARTITION_SIZE);
         memcpy(data, blkptr, PARTITION_SIZE);
@@ -266,6 +266,7 @@ int main(void)
     get_shared_memory();
     open_sem_locks();
     connect_to_database();
+    prepare_statements();   
     run_process(); 
     close_database_connection();    
     close_sem_locks();   
