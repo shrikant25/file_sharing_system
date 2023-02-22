@@ -1,6 +1,11 @@
 #ifndef PROCESSOR_DB_H
 #define PROCESSOR_DB_H
 
+typedef struct db_statements {
+    char statement_name[4];
+    char *statement;
+    int param_count;
+}db_statements;
 
 int close_database_connection();
 int connect_to_database();

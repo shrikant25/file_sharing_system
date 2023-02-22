@@ -95,9 +95,11 @@ int communicate_with_receiver()
         
         memset(data, 0, PARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1){
+
             memcpy(blkptr, data, PARTITION_SIZE);
             memset(data, 0, PARTITION_SIZE);  
             toggle_bit(subblock_position, dblks.commr_block, 2);
+
         }
         blkptr = NULL;
     }
@@ -179,7 +181,6 @@ int run_process()
 
     while (process_status) {
 
-        sleep(1);    
         communicate_with_receiver();
         communicate_with_sender();
         get_data_from_receiver();
@@ -202,7 +203,8 @@ int open_sem_locks()
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
+    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED || 
+        smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
         status = -1;
 
     return status;

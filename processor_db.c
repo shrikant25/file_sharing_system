@@ -9,33 +9,53 @@ PGconn *connection;
 
 #define statement_count 9
 
-char *statement_names[statement_count] = {
-                            "s0" // store data in database 
-                            "s1" // retrive data from_database
-                            "s2" // store (commr received from receiver) into database
-                            "s3" // store (comms received from senders) into database
-                            "s4" // retrive commr from database intended for receiver
-                            "s5" // retrive comms from database intended for sender
-                            "s6" // update for_sender table set status as 2 i.e "connection establishment in progress"
-                            "s7" // update for_sender table set status as 3 i.e "connection established"
-                            "s8" // update the open connections table and set the connection as closed
-                          };
-
-
-char *statements[statement_count] = {
-                    "INSERT INTO raw_data (fd, data, data_size) values($1, $2, $3)",
-                    "SELECT fd, data, data_size FROM send_data limit 1",
-                    "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)",
-                    "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)",
-                    "SELECT fd FROM for_receiver where status = 1 limit 1",
-                    "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1",
-                    "UPDATE for_sender set status = 2 where cid = ($1)",
-                    "UPDATE for_sender set status = 3 where cid = ($1)",
-                    "UPDATE open_connection set status = 0 where fd = ($1)",
-                    }; 
-
-int param_count[statement_count] = { 3, 0, 2, 2, 0, 0, 1, 1, 1};
-
+db_statements dbs[statement_count] = {
+    { 
+      .statement_name = "s0", 
+      .statement = "INSERT INTO raw_data (fd, data, data_size) values($1, $2, $3)",
+      .param_count = 3,
+    },
+    { 
+      .statement_name = "s1", 
+      .statement = "SELECT fd, data, data_size FROM send_data limit 1",
+      .param_count = 0,
+    },
+    { 
+      .statement_name = "s2", 
+      .statement = "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)",
+      .param_count = 2,
+    },
+    { 
+      .statement_name = "s3", 
+      .statement = "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)",
+      .param_count = 2,
+    },
+    { 
+      .statement_name = "s4", 
+      .statement = "SELECT fd FROM for_receiver where status = 1 limit 1",
+      .param_count = 0,
+    },
+    { 
+      .statement_name = "s5", 
+      .statement = "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1",
+      .param_count = 0,
+    },
+    { 
+      .statement_name = "s6", 
+      .statement = "UPDATE for_sender set status = 2 where cid = ($1)",
+      .param_count = 1,
+    },
+    { 
+      .statement_name = "s7", 
+      .statement = "UPDATE for_sender set status = 3 where cid = ($1)",
+      .param_count = 1,
+    },
+    { 
+      .statement_name = "s8", 
+      .statement = "UPDATE open_connection set status = 0 where fd = ($1)",
+      .param_count = 1,
+    },
+};
 
 //if any error occurs try to mitigate it here only
 //if mitigation fails then return -1
@@ -58,8 +78,8 @@ int prepare_statments()
 
     for(i = 0; i<statement_count; i++){
 
-        PGresult* res = PQprepare(connection, statement_names[i], 
-                                    statements[i], param_count[i], NULL);
+        PGresult* res = PQprepare(connection, dbs[i].statement_name, 
+                                    dbs[i].statement, dbs[i].param_count, NULL);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
         }
@@ -74,11 +94,11 @@ int prepare_statments()
 int store_data_in_database(int fd, char *data, int data_size) 
 {
     PGresult *res = NULL;
-    const char *param_values[param_count[0]];
+    const char *param_values[dbs[0].param_count];
     param_values[0] = data;
 
-    res = PQexecPrepared(connection, statement_names[0], 
-                                    param_count[0], param_values, NULL, NULL, 0);
+    res = PQexecPrepared(connection, dbs[0].statement_name, 
+                                    dbs[0].param_count, param_values, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
         return -1;
@@ -95,7 +115,7 @@ int retrive_data_from_database(char *data)
     int row_count;
     PGresult *res = NULL;
 
-    res = PQexecPrepared(connection, statement_names[1], param_count[1], 
+    res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         printf("retriving failed: %s\n", PQerrorMessage(connection));
@@ -132,21 +152,21 @@ int store_commr_into_database(char *data)
         ptr += 4;
         memcpy(ip_addr, ptr, 4);
 
-        const char *param_values[param_count[2]];
+        const char *param_values[dbs[2].param_count];
         param_values[0] = fd;
         param_values[1] = ip_addr;
         
-        res = PQexecPrepared(connection, statement_names[2], param_count[2], param_values, NULL, NULL, 0);
+        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, NULL, NULL, 0);
 
     }
     else if (*ptr == 2) {
         
         ptr++;
         memcpy(fd, ptr, 4);
-        const char *param_values[param_count[7]];
+        const char *param_values[dbs[7].param_count];
         param_values[0] = fd;
         
-        res = PQexecPrepared(connection, statement_names[7], param_count[7], param_values, NULL, NULL, 0);
+        res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, NULL, NULL, 0);
         
     }
 
@@ -176,11 +196,11 @@ int store_comms_into_database(char *data)
         ptr += 16;
         memcpy(msg_status, ptr, 1);
 
-        const char *param_values[param_count[3]];
+        const char *param_values[dbs[3].param_count];
         param_values[0] = msg_id;
         param_values[1] = msg_status;
         
-        res = PQexecPrepared(connection, statement_names[3], param_count[3], 
+        res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, 
                                         param_values, NULL, NULL, 0);
 
     }
@@ -201,7 +221,7 @@ int retrive_commr_from_database(char *data)
     int row_count = 0;
     PGresult *res = NULL;
 
-    res = PQexecPrepared(connection, statement_names[4], param_count[4],
+    res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count,
                                     NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -227,7 +247,7 @@ int retrive_comms_from_database(char *data)
     int row_count = 0;
     PGresult *res = NULL;
 
-    res = PQexecPrepared(connection, statement_names[5], param_count[5], NULL, NULL, NULL, 0);
+    res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         printf("retriving failed: %s\n", PQerrorMessage(connection));
@@ -243,10 +263,10 @@ int retrive_comms_from_database(char *data)
         // update this row from database
         memcpy(cid, data, 4);             
         
-        const char *param_values[param_count[6]];
+        const char *param_values[dbs[6].param_count];
         param_values[0] = cid;        
         
-        res = PQexecPrepared(connection, statement_names[6], param_count[6], param_values, NULL, NULL, 0);
+        res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values, NULL, NULL, 0);
 
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             printf("updation after retriving failed: %s\n", PQerrorMessage(connection));

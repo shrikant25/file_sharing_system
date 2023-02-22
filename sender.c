@@ -175,6 +175,7 @@ int read_message(char *data)
         
         memcpy(data, blkptr, PARTITION_SIZE);
         evaluate_and_take_action(data);
+        // if returns -1 then handle appropriately
 
         blkptr = NULL;
         toggle_bit(subblock_position, dablks.comms_block, 2);
@@ -198,7 +199,7 @@ int get_data_from_processor(int *socketid, char *data, int *data_size)
         blkptr = dablks.datas_block +(subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
 
-        memcpy(socketid, blkptr, sizeof(int))
+        memcpy(socketid, blkptr, sizeof(int));
         blkptr += 4;
         memcpy(data_size, blkptr, sizeof(int));
         blkptr += 4;
@@ -212,7 +213,7 @@ int get_data_from_processor(int *socketid, char *data, int *data_size)
 
     sem_post(smlks.sem_lock_datas);
 
-    return subblock_position > 0;
+    return subblock_position;
 }
 
 
@@ -257,7 +258,7 @@ int run_sender()
         read_message(data);
         if(get_data_from_processor(&fd, data, &data_size))
             send_data_over_network(fd, data, data_size);
-
+            // if sending fails send message to database
     }
 }
 
