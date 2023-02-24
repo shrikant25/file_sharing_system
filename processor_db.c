@@ -4,7 +4,6 @@
 #include "partition.h"
 #include "processor_db.h"
 
-
 PGconn *connection;
 
 #define statement_count 9
@@ -12,47 +11,47 @@ PGconn *connection;
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "s0", 
-      .statement = "INSERT INTO raw_data (fd, data, data_size) values($1, $2, $3)",
+      .statement = "INSERT INTO raw_data (fd, data, data_size) values($1, $2, $3);",
       .param_count = 3,
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT fd, data, data_size FROM send_data limit 1",
+      .statement = "SELECT fd, data, data_size FROM send_data limit 1;",
       .param_count = 0,
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO open_connections (fd, ipaddr) VALUES($1, $2)",
-      .param_count = 2,
+      .statement = "INSERT INTO open_connections (fd, ipaddr, status) VALUES($1, $2, $3);",
+      .param_count = 3,
     },
     { 
       .statement_name = "s3", 
-      .statement = "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2)",
+      .statement = "INSERT INTO  senders_comm (msgid, status) VALUES($1, $2);",
       .param_count = 2,
     },
     { 
       .statement_name = "s4", 
-      .statement = "SELECT fd FROM for_receiver where status = 1 limit 1",
+      .statement = "SELECT fd FROM for_receiver where status = 1 limit 1;",
       .param_count = 0,
     },
     { 
       .statement_name = "s5", 
-      .statement = "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1",
+      .statement = "SELECT cid, ipaddr FROM for_sender where status = 1 limit 1;",
       .param_count = 0,
     },
     { 
       .statement_name = "s6", 
-      .statement = "UPDATE for_sender set status = 2 where cid = ($1)",
+      .statement = "UPDATE for_sender set status = 2 where cid = ($1);",
       .param_count = 1,
     },
     { 
       .statement_name = "s7", 
-      .statement = "UPDATE for_sender set status = 3 where cid = ($1)",
+      .statement = "UPDATE for_sender set status = 3 where cid = ($1);",
       .param_count = 1,
     },
     { 
       .statement_name = "s8", 
-      .statement = "UPDATE open_connections set status = 0 where fd = ($1)",
+      .statement = "UPDATE open_connections set status = 0 where fd = ($1);",
       .param_count = 1,
     },
 };
@@ -94,14 +93,18 @@ int prepare_statements()
 int store_data_in_database(int fd, char *data, int data_size) 
 {
     PGresult *res = NULL;
-    char *param_values[dbs[0].param_count];
     
-    sprintf(param_values[0], "%d", fd);
-    strncpy(param_values[1], data, data_size);
-    sprintf(param_values[2], "%d", data_size);
+    char cfd[4];
+    char cdata_size[4];
+    
+    memcpy(cfd, &fd, sizeof(fd));
+    memcpy(cdata_size, &data_size, sizeof(data_size));
 
+    const char *const param_values[] = {cfd, data, cdata_size};
+    
+    
     res = PQexecPrepared(connection, dbs[0].statement_name, 
-                                    dbs[0].param_count, (const char * const *)param_values, NULL, NULL, 0);
+                                    dbs[0].param_count, param_values, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
         return -1;
@@ -142,27 +145,38 @@ int retrive_data_from_database(char *data)
 // if first byte is denotes values 1, then it is data containing fd,ip and port
 int store_commr_into_database(char *data) 
 {
-    char fd[4];
-    char ip_addr[4];
+    char fd[10];
+    char ip_addr[33];
+    char status[2];
     unsigned char *ptr = data;
+    
     PGresult *res = NULL;
 
-    if (*ptr == 1) {
+    if (*ptr == '1') {
+        
+        memset(status, 0, sizeof(status));
+        memcpy(status, ptr, 1);
 
         ptr++;
-        memcpy(fd, ptr, 4);   
-
-        ptr += 4;
-        memcpy(ip_addr, ptr, 4);
-
-        const char *param_values[dbs[2].param_count];
-        param_values[0] = fd;
-        param_values[1] = ip_addr;
+        memset(fd, 0, sizeof(fd));
+        sprintf(fd, "%u", *(int *)ptr);
         
-        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, NULL, NULL, 0);
+        ptr+=4;
+        memset(ip_addr, 0, sizeof(ip_addr));
+        sprintf(ip_addr, "%u", *(int *)ptr);
+
+        const int paramLengths[] = {sizeof(fd), sizeof(ip_addr), sizeof(status)};
+        const int paramFormats[] = {0, 0, 0};
+        int resultFormat = 0;
+        
+     
+
+        const char *const param_values[] = {fd, ip_addr, status};
+        
+        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
 
     }
-    else if (*ptr == 2) {
+    else if (*ptr == '2') {
         
         ptr++;
         memcpy(fd, ptr, 4);

@@ -250,27 +250,27 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    unsigned char msg_type = -1;
+    char msg_type;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.commr_block , 0);
+    subblock_position = get_subblock2(dblks.commr_block , 0, 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 4 + (subblock_position*PARTITION_SIZE);
+        blkptr = dblks.commr_block + 4 + (subblock_position*PARTITION_SIZE);
 
-        msg_type = ipaddress == 0 ? 0 : 1;
+        msg_type = ipaddress == 0 ? '0' : '1';
         
         memcpy(blkptr, &msg_type, sizeof(msg_type));
         blkptr++;
             
         memcpy(blkptr, &fd, sizeof(fd));
         blkptr+=4;
-            
-        if (msg_type == 1) 
+         
+        if (msg_type == '1') 
             memcpy(blkptr, &ipaddress, sizeof(ipaddress));
         
-        toggle_bit(subblock_position, dblks.commr_block, 2);
+        toggle_bit(subblock_position, dblks.commr_block, 3);
     }
     
     sem_post(smlks.sem_lock_commr);

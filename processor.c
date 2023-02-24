@@ -91,7 +91,7 @@ int communicate_with_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 2 +(subblock_position*PARTITION_SIZE);
+        blkptr = dblks.commr_block  + 2 +(subblock_position*PARTITION_SIZE);
         
         memset(data, 0, PARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1){
@@ -114,6 +114,9 @@ int communicate_with_receiver()
         
         memset(data, 0, PARTITION_SIZE);
         memcpy(data, blkptr, PARTITION_SIZE);
+        // printf("val %s\n",data[0]);
+        // printf("fd %d\n", data[1]);
+        // printf("ipaddr %d\n", data[5]);
         store_commr_into_database(data);
         
         memset(data, 0, PARTITION_SIZE);  
