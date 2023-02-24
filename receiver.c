@@ -148,7 +148,7 @@ void read_socket(struct epoll_event event)
         if (bytes_read <=0) 
             return;
         else {
-            while ( send_to_processor(event.data.fd, buffer, bytes_read) == -1);
+            while (send_to_processor(event.data.fd, buffer, bytes_read) == -1);
         }
     }
 }
@@ -234,7 +234,6 @@ int read_message_from_processor(char *data)
         blkptr = dblks.datar_block + 2 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
         
-        memcpy(data, 0, PARTITION_SIZE);
         memcpy(data, blkptr, PARTITION_SIZE);
         memset(blkptr, 0, PARTITION_SIZE);
         

@@ -94,11 +94,14 @@ int prepare_statements()
 int store_data_in_database(int fd, char *data, int data_size) 
 {
     PGresult *res = NULL;
-    const char *param_values[dbs[0].param_count];
-    param_values[0] = data;
+    char *param_values[dbs[0].param_count];
+    
+    sprintf(param_values[0], "%d", fd);
+    strncpy(param_values[1], data, data_size);
+    sprintf(param_values[2], "%d", data_size);
 
     res = PQexecPrepared(connection, dbs[0].statement_name, 
-                                    dbs[0].param_count, param_values, NULL, NULL, 0);
+                                    dbs[0].param_count, (const char * const *)param_values, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
         return -1;

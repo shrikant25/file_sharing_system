@@ -11,7 +11,7 @@ processor_files := processor.c processor_db.c shared_memory.c partition.c
 sender_target = sender
 sender_files := sender.c shared_memory.c partition.c
 
-receiver_target = sender
+receiver_target = receiver
 receiver_files := receiver.c shared_memory.c partition.c 
 
 processor: $(processor_files)
