@@ -90,17 +90,29 @@ int prepare_statements()
 }
 
 
-int store_data_in_database(int fd, char *data, int data_size) 
+int store_data_in_database(char *data) 
 {
     PGresult *res = NULL;
     
     char cfd[4];
     char cdata_size[4];
-    
-    memcpy(cfd, &fd, sizeof(fd));
-    memcpy(cdata_size, &data_size, sizeof(data_size));
+    char cdata[1024*128];
 
-    const char *const param_values[] = {cfd, data, cdata_size};
+    memset(cfd, 0 , sizeof(cfd));
+    sprintf(cfd, "%d", *(int*)data);
+    data += 4;
+
+    memset(cdata_size, 0, sizeof(cdata_size));
+    sprintf(cdata_size, "%d", *(int *)data);
+
+    memset(cdata, 0, sizeof(cdata));
+    memcpy(cdata, data+4, *(int *)data);
+
+    const int paramLengths[] = {sizeof(cfd), *(int *)data, sizeof(cdata_size)};
+    const int paramFormats[] = {0, 0, 0};
+    int resultFormat = 0;
+
+    const char *const param_values[] = {cfd, cdata, cdata_size};
     
     
     res = PQexecPrepared(connection, dbs[0].statement_name, 
@@ -169,8 +181,6 @@ int store_commr_into_database(char *data)
         const int paramFormats[] = {0, 0, 0};
         int resultFormat = 0;
         
-     
-
         const char *const param_values[] = {fd, ip_addr, status};
         
         res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);

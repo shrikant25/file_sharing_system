@@ -10,7 +10,7 @@ typedef struct db_statements {
 int close_database_connection();
 int prepare_statements();
 int connect_to_database();
-int store_data_in_database(int, char *, int);
+int store_data_in_database(char *);
 int retrive_data_from_database(char *);
 int store_comms_into_database(char *);
 int store_commr_into_database(char *);

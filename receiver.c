@@ -159,7 +159,7 @@ int run_receiver()
     int i;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
-    char data[PARTITION_SIZE];
+    char data[CPARTITION_SIZE];
 
     while (receiver_status) {
         
@@ -204,13 +204,13 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 3 + (subblock_position*PARTITION_SIZE);
-        memset(blkptr, 0, PARTITION_SIZE);
+        blkptr = dblks.datar_block + 3 + (subblock_position*DPARTITION_SIZE);
+        memset(blkptr, 0, DPARTITION_SIZE);
         
         memcpy(blkptr, &socketid, sizeof(socketid));
         blkptr += 4;
         memcpy(blkptr, data, data_size);
-        memset(data, 0, PARTITION_SIZE);
+        memset(data, 0, DPARTITION_SIZE);
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
@@ -231,11 +231,11 @@ int read_message_from_processor(char *data)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 2 + (subblock_position*PARTITION_SIZE);
-        memset(data, 0, PARTITION_SIZE);
+        blkptr = dblks.datar_block + 2 + (subblock_position*CPARTITION_SIZE);
+        memset(data, 0, CPARTITION_SIZE);
         
-        memcpy(data, blkptr, PARTITION_SIZE);
-        memset(blkptr, 0, PARTITION_SIZE);
+        memcpy(data, blkptr, CPARTITION_SIZE);
+        memset(blkptr, 0, CPARTITION_SIZE);
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 2);
@@ -257,7 +257,7 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 4 + (subblock_position*PARTITION_SIZE);
+        blkptr = dblks.commr_block + 4 + (subblock_position*CPARTITION_SIZE);
 
         msg_type = ipaddress == 0 ? '0' : '1';
         
