@@ -131,10 +131,10 @@ int evaluate_and_take_action(char *data)
         memcpy(cid, ptr, 16);
         
         ptr += 16;
-        port_number = *(int *)ptr;
+        port_number = atoi(ptr);
        
         ptr += 4;
-        ipaddress = *(int *)ptr;
+        ipaddress = atoi(ptr);
        
         connection_socket = create_connection(port_number, ipaddress);
         
@@ -148,10 +148,8 @@ int evaluate_and_take_action(char *data)
         memcpy(cid, ptr, 16);
         
         ptr += 16; //internal cid
-        connection_socket = *(int *)ptr;
-        msg_status = close_connection(connection_socket);
-        send_message(cid, msg_status);
-        
+        connection_socket = atoi(ptr);
+        close_connection(connection_socket);
     }
     else
         return -1;
@@ -196,16 +194,18 @@ int get_data_from_processor(int *fd, char *data, int *data_size)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block + 3 + (subblock_position*PARTITION_SIZE);
-        memset(data, 0, PARTITION_SIZE);
+        blkptr = dblks.datas_block + 3 + subblock_position * DPARTITION_SIZE;
+        memset(data, 0, DPARTITION_SIZE);
 
-        memcpy(socketid, blkptr, sizeof(int));
+        *fd = atoi(blkptr);
+
         blkptr += 4;
-        memcpy(data_size, blkptr, sizeof(int));
+        *data_size = atoi(blkptr);
+
         blkptr += 4;
         memcpy(data, blkptr, *data_size);
         
-        memset(blkptr, 0, PARTITION_SIZE);
+        memset(blkptr, 0, DPARTITION_SIZE);
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datas_block, 1);
     
@@ -225,20 +225,21 @@ int send_data_over_network(unsigned int socketid, char *data, int data_size)
 }
 
 
-int send_message(char *cid, int connection_socket) 
+int send_message(char *cid, int data) 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock(dblks.comms_block , 0);
+    subblock_position = get_subblock2(dblks.comms_block, 0, 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block + 4 + (subblock_position*PARTITION_SIZE);
-        memset(blkptr, 0, PARTITION_SIZE);
+        blkptr = dblks.comms_block + 4 + subblock_position * CPARTITION_SIZE;
+        memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, cid, 16);
-        memcpy(blkptr, &connection_socket, sizeof(int));
+        blkptr += 16;
+        memcpy(blkptr, &data, sizeof(int));
         toggle_bit(subblock_position, dblks.comms_block, 3);
     
     }
@@ -252,13 +253,17 @@ int run_sender()
     int fd = 0;
     char data[CPARTITION_SIZE];
     int data_size;
+    int status = 0;
 
     while (sender_status) {
 
         read_message(data);
-        if(get_data_from_processor(&fd, data, &data_size))
-            send_data_over_network(fd, data, data_size);
-            // if sending fails send message to database
+        if (get_data_from_processor(&fd, data, &data_size)) {
+            status = send_data_over_network(fd, data, data_size);
+            if (status == -1) {
+                send_message()
+            }
+        }
     }
 }
 

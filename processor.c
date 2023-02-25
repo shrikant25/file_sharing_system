@@ -35,7 +35,7 @@ int get_data_from_receiver()
         store_data_in_database(blkptr);
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 0);
+        toggle_bit(subblock_position, dblks.datar_block, 1);
     
     }
 
@@ -60,7 +60,7 @@ int give_data_to_sender()
         if (retrive_data_from_database(data) != -1) {
             memcpy(blkptr, data, DPARTITION_SIZE);
             memset(data, 0, DPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.datas_block, 0);
+            toggle_bit(subblock_position, dblks.datas_block, 1);
         }
         blkptr = NULL;
     }
@@ -83,7 +83,7 @@ int communicate_with_receiver()
         blkptr = dblks.commr_block  + 2 + subblock_position * CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
-        if (retrive_commr_from_database(data) != -1){
+        if (retrive_commr_from_database(data) != -1) {
 
             memcpy(blkptr, data, CPARTITION_SIZE);
             memset(data, 0, CPARTITION_SIZE);  

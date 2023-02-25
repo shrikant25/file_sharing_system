@@ -259,7 +259,7 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     sem_wait(smlks.sem_lock_commr);         
     subblock_position = get_subblock2(dblks.commr_block , 0, 1);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
         blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
 
