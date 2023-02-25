@@ -30,12 +30,12 @@ int get_subblock2(char *block, int state, int sub_block)
     unsigned int bmap = 0;
  
     if (sub_block == 0) {
-        memcpy(&bmap, block, 3); // retrive bitmap
+        memcpy(&bmap, block, 2); // retrive bitmap
         begin = 0;
         end = 40;
     }
     else {
-        memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 3);
+        memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 2);
         begin = 40;
         end = TOTAL_PARTITIONS;
     }

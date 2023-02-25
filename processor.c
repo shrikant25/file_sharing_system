@@ -24,20 +24,18 @@ int get_data_from_receiver()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    int fd = 0;
-    int data_size = 0;
 
     sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block , 1);
+    subblock_position = get_subblock(dblks.datar_block, 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 3 +(subblock_position*DPARTITION_SIZE);
+        blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
          
         store_data_in_database(blkptr);
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 1);
+        toggle_bit(subblock_position, dblks.datar_block, 0);
     
     }
 
@@ -56,13 +54,13 @@ int give_data_to_sender()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block + 3 + (subblock_position*DPARTITION_SIZE);
+        blkptr = dblks.datas_block + 3 + subblock_position * DPARTITION_SIZE;
         memset(data, 0, DPARTITION_SIZE);
         
         if (retrive_data_from_database(data) != -1) {
             memcpy(blkptr, data, DPARTITION_SIZE);
             memset(data, 0, DPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.datas_block, 1);
+            toggle_bit(subblock_position, dblks.datas_block, 0);
         }
         blkptr = NULL;
     }
@@ -82,7 +80,7 @@ int communicate_with_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block  + 2 +(subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.commr_block  + 2 + subblock_position * CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1){
@@ -101,7 +99,7 @@ int communicate_with_receiver()
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 4 +(subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.commr_block + 4 + subblock_position*CPARTITION_SIZE;
         
         store_commr_into_database(blkptr);
           
@@ -125,7 +123,7 @@ int communicate_with_sender()
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 2 + (subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.comms_block + 2 + subblock_position*CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         if (retrive_comms_from_database(data) == -1){
@@ -142,7 +140,7 @@ int communicate_with_sender()
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 4 + (subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.comms_block + 4 + subblock_position*CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         memcpy(data, blkptr, CPARTITION_SIZE);
@@ -248,6 +246,7 @@ int destroy_shared_memory()
     
     return status; // if any of above call fails, then return -1 
 }
+
 
 int main(void) 
 {   

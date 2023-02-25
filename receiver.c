@@ -163,7 +163,7 @@ int run_receiver()
 
     while (receiver_status) {
         
-        read_message_from_processor(data); // dont know what to do with this message
+        read_message_from_processor(data); // todo
 
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
@@ -202,16 +202,20 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block , 0);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 3 + (subblock_position*DPARTITION_SIZE);
+        blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
         memset(blkptr, 0, DPARTITION_SIZE);
         
         memcpy(blkptr, &socketid, sizeof(socketid));
+        
+        blkptr += 4;
+        memcpy(blkptr, &data_size, sizeof(data_size));
+        
         blkptr += 4;
         memcpy(blkptr, data, data_size);
-        memset(data, 0, DPARTITION_SIZE);
         
+        memset(data, 0, DPARTITION_SIZE);
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
     }
@@ -227,18 +231,18 @@ int read_message_from_processor(char *data)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.datar_block , 1);
+    subblock_position = get_subblock2(dblks.commr_block, 1, 0);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 2 + (subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.commr_block + 2 + subblock_position * CPARTITION_SIZE;
         memset(data, 0, CPARTITION_SIZE);
         
         memcpy(data, blkptr, CPARTITION_SIZE);
         memset(blkptr, 0, CPARTITION_SIZE);
         
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 2);
+        toggle_bit(subblock_position, dblks.commr_block, 2);
     }
     
     sem_post(smlks.sem_lock_commr);
@@ -257,19 +261,19 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 4 + (subblock_position*CPARTITION_SIZE);
+        blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
 
         msg_type = ipaddress == 0 ? '0' : '1';
-        
         memcpy(blkptr, &msg_type, sizeof(msg_type));
-        blkptr++;
-            
+   
+        blkptr++;         
         memcpy(blkptr, &fd, sizeof(fd));
-        blkptr+=4;
          
-        if (msg_type == '1') 
+        if (msg_type == '1') { 
+            blkptr+=4;
             memcpy(blkptr, &ipaddress, sizeof(ipaddress));
-        
+        }
+
         toggle_bit(subblock_position, dblks.commr_block, 3);
     }
     
@@ -308,15 +312,14 @@ int close_receiver()
 
 int initialize_locks()
 {
-    int status = 0;
-
+ 
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
 
     if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED)
-        status = -1;
+        return -1;
 
-    return status;
+    return 0;
 }
 
 

@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-datablocks dablks;
+datablocks dblks;
 semlocks smlks;
 int sender_status = 1;
 
@@ -72,12 +72,12 @@ int close_connection(unsigned int network_sokcet)
 }
 
 
-static int get_shared_memory()
+int get_shared_memory()
 {
-    dablks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
-    dablks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
+    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
 
-    if (!(dablks.datas_block && dablks.comms_block)) 
+    if (!(dblks.datas_block && dblks.comms_block)) 
         return -1; 
     return 0;
 }
@@ -87,8 +87,8 @@ int detach_memory()
 {
     int status = 0;
     
-    status = detach_memory_block(dablks.datas_block);
-    status = detach_memory_block(dablks.comms_block);
+    status = detach_memory_block(dblks.datas_block);
+    status = detach_memory_block(dblks.comms_block);
 
     return status;
 }
@@ -122,7 +122,7 @@ int evaluate_and_take_action(char *data)
     unsigned int port_number = -1;
     unsigned int ipaddress = -1;
     int connection_socket = -1;
-    char cid[16];
+    char cid[17];
 
     if (*ptr == 1) {
         // ippaddres
@@ -166,19 +166,19 @@ int read_message(char *data)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock(dablks.comms_block , 1);
+    subblock_position = get_subblock2(dblks.comms_block, 1, 0);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
-        blkptr = dablks.comms_block + 2 + (subblock_position*PARTITION_SIZE);
-        memset(data, 0, PARTITION_SIZE);
+        blkptr = dblks.comms_block + 2 + subblock_position * CPARTITION_SIZE;
+        memset(data, 0, CPARTITION_SIZE);
         
-        memcpy(data, blkptr, PARTITION_SIZE);
+        memcpy(data, blkptr, CPARTITION_SIZE);
         evaluate_and_take_action(data);
         // if returns -1 then handle appropriately
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dablks.comms_block, 2);
+        toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
 
@@ -186,17 +186,17 @@ int read_message(char *data)
 }
 
 
-int get_data_from_processor(int *socketid, char *data, int *data_size)
+int get_data_from_processor(int *fd, char *data, int *data_size)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dablks.datas_block , 1);
+    subblock_position = get_subblock(dblks.datas_block , 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dablks.datas_block + 3 + (subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datas_block + 3 + (subblock_position*PARTITION_SIZE);
         memset(data, 0, PARTITION_SIZE);
 
         memcpy(socketid, blkptr, sizeof(int));
@@ -207,7 +207,7 @@ int get_data_from_processor(int *socketid, char *data, int *data_size)
         
         memset(blkptr, 0, PARTITION_SIZE);
         blkptr = NULL;
-        toggle_bit(subblock_position, dablks.datas_block, 1);
+        toggle_bit(subblock_position, dblks.datas_block, 1);
     
     }
 
@@ -231,15 +231,15 @@ int send_message(char *cid, int connection_socket)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock(dablks.comms_block , 0);
+    subblock_position = get_subblock(dblks.comms_block , 0);
     
     if(subblock_position >= 0) {
 
-        blkptr = dablks.datas_block + 4 + (subblock_position*PARTITION_SIZE);
+        blkptr = dblks.datas_block + 4 + (subblock_position*PARTITION_SIZE);
         memset(blkptr, 0, PARTITION_SIZE);
         memcpy(blkptr, cid, 16);
         memcpy(blkptr, &connection_socket, sizeof(int));
-        toggle_bit(subblock_position, dablks.comms_block, 3);
+        toggle_bit(subblock_position, dblks.comms_block, 3);
     
     }
 
@@ -250,7 +250,7 @@ int send_message(char *cid, int connection_socket)
 int run_sender() 
 {
     int fd = 0;
-    char data[PARTITION_SIZE];
+    char data[CPARTITION_SIZE];
     int data_size;
 
     while (sender_status) {
