@@ -21,7 +21,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO open_connections (fd, ipaddr, status) VALUES ($1, $2, $3);",
+      .statement = "INSERT INTO open_connections_receiving (fd, ipaddr, status) VALUES ($1, $2, $3);",
       .param_count = 3,
     },
     { 
