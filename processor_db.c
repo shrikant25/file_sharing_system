@@ -6,7 +6,7 @@
 
 PGconn *connection;
 
-#define statement_count 9
+#define statement_count 11
 
 db_statements dbs[statement_count] = {
     { 
@@ -51,7 +51,17 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s8", 
-      .statement = "UPDATE open_connections SET status = 0 WHERE fd = ($1);",
+      .statement = "UPDATE open_connections_receiving SET status = 0 WHERE fd = ($1);",
+      .param_count = 1,
+    },
+    { 
+      .statement_name = "s9", 
+      .statement = "INSERT INTO open_connections_sending (fd, ipaddr, status) VALUES ($1, $2, $3);",
+      .param_count = 3,
+    },
+    { 
+      .statement_name = "s10", 
+      .statement = "UPDATE open_connections_sending SET status = 0 WHERE fd = ($1);",
       .param_count = 1,
     },
 };
@@ -232,7 +242,7 @@ int store_comms_into_database(char *data)
 
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
 
-    }
+    } 
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
