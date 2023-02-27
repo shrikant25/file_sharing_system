@@ -25,12 +25,14 @@ int receiver_status = 1;
 
 void make_nonblocking(int active_fd) 
 {
+    // get current flags for file descriptor
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
         perror("failed to get file descriptor flags");
         return;
     }
 
+    // set the non blocking flag
     if( fcntl(active_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         perror("failed to set file descriptor flags");
         return;
@@ -43,7 +45,7 @@ void create_socket()
     int optval;
     struct sockaddr_in servaddr;
     
-    s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
+    s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0); // create socket for servet
     if (s_info.servsoc_fd == -1) {
         perror("socket error");
         exit(1);
@@ -58,10 +60,11 @@ void create_socket()
     }
 
     memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(s_info.port);
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_family = AF_INET; // set family
+    servaddr.sin_port = htons(s_info.port); // set port
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set ip
 
+    // bind address to socketfd
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
         perror("bind error");
         exit(1);
@@ -71,7 +74,7 @@ void create_socket()
 
 void create_epoll() 
 {
-    s_info.epoll_fd = epoll_create1(0);
+    s_info.epoll_fd = epoll_create1(0); // create epoll instance
     if (s_info.epoll_fd == -2) {
         perror("failed to create epoll instance");
         return;
@@ -83,10 +86,11 @@ void add_to_list(int active_fd)
 {
     struct epoll_event event;
  
-    memset(&event, 0, sizeof(event));
-    event.data.fd = active_fd;
-    event.events = EPOLLIN | EPOLLET;
+    memset(&event, 0, sizeof(event)); // set var to zero
+    event.data.fd = active_fd; // add a file descriptor
+    event.events = EPOLLIN | EPOLLET; // epollin to listen for incoming , epollet to specify it as edge triggered
  
+    // try to add epoll variable to epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_ADD, active_fd, &event) == -1) {
         perror("error adding");
         return;
@@ -98,10 +102,11 @@ void remove_from_list(int active_fd)
 {
     struct epoll_event event;
 
-    memset(&event, 0, sizeof(event));
-    event.data.fd = active_fd;
-    event.events = -1;
+    memset(&event, 0, sizeof(event)); // set var to zero
+    event.data.fd = active_fd; // add file descriptor
+    event.events = -1; // not of any use of set to -1
     
+    // try to delete the file descriptor from epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_DEL, active_fd, &event) == -1) {
         perror("error removing");
         return;
@@ -284,27 +289,27 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
 
 int init_receiver()
 {
-    s_info.maxevents = 1000;
-    s_info.port = 7000;
-
-    create_socket();
-    make_nonblocking(s_info.servsoc_fd);
+    s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
+    s_info.port = 7000; // server port
+ 
+    create_socket(); // create socket
+    make_nonblocking(s_info.servsoc_fd); // make the server socket file descriptor as non blocking
  
     // somaxconn is defined in socket.h
-    if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) {
+    if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
         perror("failed to listen on port");
         return 1;
     }
  
-    create_epoll();
-    add_to_list(s_info.servsoc_fd);
+    create_epoll(); // create
+    add_to_list(s_info.servsoc_fd); // add socket file descriptor to epoll list
 }
 
 
 int close_receiver()
 {
-    close(s_info.epoll_fd);
-    shutdown(s_info.servsoc_fd, 2);
+    close(s_info.epoll_fd); // close epoll instance
+    shutdown(s_info.servsoc_fd, 2); // close server socket
  
     return 0;
 }
@@ -312,8 +317,10 @@ int close_receiver()
 
 int initialize_locks()
 {
- 
+    // get lock variable for lock on data sharing memory
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
+
+    // get lock variable for lock on message sharing memory
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
 
     if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED)
@@ -325,7 +332,13 @@ int initialize_locks()
 
 int get_shared_memeory()
 {
+    // filename and projectid are present in shared_memory.h
+    // block sizes are present in partition.h
+
+    // attach memroy block for data sharing
     dblks.datar_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAR);
+    
+    // attach memroy block for message sharing
     dblks.commr_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
 
     if (!(dblks.datar_block && dblks.commr_block))
@@ -337,8 +350,8 @@ int get_shared_memeory()
 
 int uninitialize_locks()
 {    
-    sem_close(smlks.sem_lock_commr);
-    sem_close(smlks.sem_lock_datar);
+    sem_close(smlks.sem_lock_commr); // unlink lock used for communication
+    sem_close(smlks.sem_lock_datar); // unlink lock used for data sharing
 }
 
 
@@ -346,22 +359,26 @@ int detach_memory()
 {
     int status = 0;
 
-    status = detach_memory_block(dblks.datar_block);
-    status = detach_memory_block(dblks.commr_block);
+    status = detach_memory_block(dblks.datar_block); // detach memory used for data sharing
+    status = detach_memory_block(dblks.commr_block); // detach memory used for communication
 
-    return status;
+    /*
+        instead of returning status, status can be checked here and appropriate action can be taken
+    */
+
+    return status;  // return status
 }
 
 
 int main(void) 
 {   
-    initialize_locks();
-    get_shared_memeory();   
-    init_receiver();
-    run_receiver();
-    close_receiver();
-    uninitialize_locks();
-    detach_memory();
+    initialize_locks(); // link variables to use as locks
+    get_shared_memeory(); // connect to shared memory
+    init_receiver(); // creates server instance
+    run_receiver(); // recieve connections, data and communicate with database
+    close_receiver(); // close server instance
+    uninitialize_locks(); // unlink variables from locks
+    detach_memory(); // detach memory
     
     return 0;
 }
