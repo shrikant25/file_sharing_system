@@ -263,7 +263,7 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
 
         blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
 
-        msg_type = ipaddress == 0 ? '0' : '1';
+        msg_type = ipaddress == 0 ? '2' : '1';
         memcpy(blkptr, &msg_type, sizeof(msg_type));
    
         blkptr++;         
