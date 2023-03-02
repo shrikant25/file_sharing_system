@@ -12,21 +12,31 @@ drop table get_system_info;
 drop table message_status;
 
 CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY, 
-                              mdata bytea NOT NULL, 
+                              mdata text NOT NULL, 
                               destination bigint NOT NULL);
+
+CREATE TRIGGER tr_extract_receivers_comms after insert on 
+receivers_comms FOR EACH ROW EXCUTE extract_receivers_comms();
 
 CREATE OR REPLACE FUNCTION extract_receivers_comms () RETURNS VOID AS
 '
 DECLARE
-    l_mdata bytea;
     l_msgtype int;
-    l_fd int;
-    l_ipaddr bigint;
 BEGIN
-    SELECT mdata INTO l_mdata FROM receivers_comms WHERE destination = 1 LIMIT 1;
-    
-    if rcstatus = 1 then
-        insert into connections_receiving
+
+    IF NEW.destination = 1 THEN        
+        select substring(new.mdata, 1, 4)::int into l_msgtype;
+        
+        IF msgtype = 1 THEN
+            INSERT INTO CONNECTIONS_RECEIVING(fd, ipaddr, status)
+            VALUES (SUBSTRING(NEW.MDATA, 5, 4)::int, SUBSTRING(NEW.MDATA, 9, 8)::bigint, 
+            STATUS = 1);
+        ELIF msgtype = 2 THEN
+            UPDATE connections_receiving status = 2 WHERE fd = l_fd;
+        ENDIF;
+
+        DELETE FROM receivers_comms WHERE rcid = new.rcid;   
+    ENDIF;
 END;
 '
 LANGUAGE 'plpgsql';
@@ -51,7 +61,7 @@ CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY,
                                   mstatus int NOT NULL);
 
 CREATE TABLE raw_data (rdid SERIAL PRIMARY KEY, 
-                       fd int NOT NULL, data bytea NOT NULL, 
+                       fd int NOT NULL, data text NOT NULL, 
                        data_size int NOT NULL);
 
 CREATE TABLE msg_chunk (msgid text PRIMARY KEY, 
@@ -62,7 +72,7 @@ CREATE TABLE msg_chunk (msgid text PRIMARY KEY,
                         original_msgid text NOT NULL, 
                         chunk_number int NOT NULL, 
                         size int NOT NULL, 
-                        mdata bytea NOT NULL,
+                        mdata text NOT NULL,
                         msg_status int NOT NULL);
 
 CREATE TABLE msg_info (miid text PRIMARY KEY, 
@@ -81,14 +91,14 @@ CREATE TABLE status_r (msid text PRIMARY KEY,
                        mtype int NOT NULL, 
                        original_msgid text NOT NULL, 
                        mstatus int NOT NULL, 
-                       size int NOT NULL, mdata bytea);
+                       size int NOT NULL, mdata text);
 
 CREATE TABLE get_system_info (msid text PRIMARY KEY, 
                               source bigint NOT NULL, 
                               destination bigint NOT NULL,
                               mpriority int NOT NULL, 
                               mtype int NOT NULL, 
-                              info required bytea NOT NULL, 
+                              info required text NOT NULL, 
                               message_type int NOT NULL);
 
 CREATE TABLE message_status (msid text PRIMARY KEY, 
@@ -99,7 +109,7 @@ CREATE TABLE message_status (msid text PRIMARY KEY,
                               original_msgid text NOT NULL);
 
 CREATE TABLE send_data (sdid SERIAL PRIMARY KEY, 
-                        fd int NOT NULL, data bytea NOT NULL, 
+                        fd int NOT NULL, data text NOT NULL, 
                         data_size int NOT NULL, 
                         mstatus int NOT NULL);
 
