@@ -128,6 +128,9 @@ CREATE TABLE raw_data (rdid SERIAL PRIMARY KEY,
                        fd int NOT NULL, data text NOT NULL, 
                        data_size int NOT NULL);
 
+
+
+
 CREATE TABLE msg_chunk (msgid text PRIMARY KEY, 
                         source bigint NOT NULL, 
                         destination bigint NOT NULL,
@@ -155,7 +158,8 @@ CREATE TABLE status_r (msid text PRIMARY KEY,
                        mtype int NOT NULL, 
                        original_msgid text NOT NULL, 
                        mstatus int NOT NULL, 
-                       size int NOT NULL, mdata text);
+                       size int NOT NULL, 
+                       mdata text);
 
 CREATE TABLE get_system_info (msid text PRIMARY KEY, 
                               source bigint NOT NULL, 
@@ -264,6 +268,22 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
 
 
 
+-- incoming statsu if status = 1 means read, 2 means unread
+--raws data
+-- check status 
+    -- rstaus = 1
+        -- read header
+        -- store header and data
+
+    -- rstatus = 2 also read msgid and remaining data
+        -- read remaining data
+        -- update data
+
+    -- 1 if didnt found enough data
+    --   1.1 set rstatus = 2 and store msgid
+    --   1.2 set total data and remaining data
+    --   1.3 also mark the message as incomplete
+    -- 2 else mark data as complete and set rstatus = 1
 
 
-
+    
