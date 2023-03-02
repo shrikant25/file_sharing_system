@@ -15,7 +15,7 @@ CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY,
                               mdata text NOT NULL, 
                               destination bigint NOT NULL);
 
-CREATE TRIGGER tr_extract_receivers_comms after insert on 
+CREATE TRIGGER tr_extract_receivers_comms AFTER INSERT ON 
 receivers_comms FOR EACH ROW EXCUTE extract_receivers_comms();
 
 CREATE OR REPLACE FUNCTION extract_receivers_comms () RETURNS VOID AS
@@ -25,30 +25,76 @@ DECLARE
 BEGIN
 
     IF NEW.destination = 1 THEN        
+        
         select substring(new.mdata, 1, 4)::int into l_msgtype;
         
         IF msgtype = 1 THEN
+            
             INSERT INTO CONNECTIONS_RECEIVING(fd, ipaddr, status)
-            VALUES (SUBSTRING(NEW.MDATA, 5, 4)::int, SUBSTRING(NEW.MDATA, 9, 8)::bigint, 
+            VALUES (SUBSTRING(NEW.mdata, 5, 4)::int, 
+            SUBSTRING(NEW.mdata, 9, 8)::bigint, 
             STATUS = 1);
+        
         ELIF msgtype = 2 THEN
-            UPDATE connections_receiving status = 2 WHERE fd = l_fd;
+        
+            UPDATE connections_receiving 
+            SET status = 2 
+            WHERE fd = SUBSTRING(NEW.mdata, 5, 4)::int;
+        
         ENDIF;
 
         DELETE FROM receivers_comms WHERE rcid = new.rcid;   
+    
     ENDIF;
 END;
 '
 LANGUAGE 'plpgsql';
 
-insert into data(d1, d2) select  substring(data, 1,10)::int as da1, substring(data, 11,20)::int as da2 from tm1;
 
-copy tm1(data) FROM '/home/shrikant/gb.txt';
+--------
 
 
 CREATE TABLE senders_comms (scid SERIAL PRIMARY KEY, 
                             mdata text NOT NULL, 
-                            mstatus int NOT NULL);
+                            destination int NOT NULL);
+
+CREATE TRIGGER tr_extract_senders_comms AFTER INSERT ON 
+senders_comms FOR EACH ROW EXCUTE extract_senders_comms();
+
+CREATE OR REPLACE FUNCTION extract_senders_comms () RETURNS VOID AS
+'
+DECLARE
+    l_msgtype int;
+BEGIN
+
+    IF NEW.destination = 1 THEN        
+        
+        select substring(new.mdata, 1, 4)::int into l_msgtype;
+        
+        IF msgtype = 1 THEN
+            
+            INSERT INTO CONNECTIONS_RECEIVING(fd, ipaddr, status)
+            VALUES (SUBSTRING(NEW.mdata, 5, 4)::int, 
+            SUBSTRING(NEW.mdata, 9, 8)::bigint, 
+            STATUS = 1);
+        
+        ELIF msgtype = 2 THEN
+        
+            UPDATE connections_receiving 
+            SET status = 2 
+            WHERE fd IN
+            (SELECT SUBSTRING(NEW.mdata, 5, 4)::int);
+        
+        ENDIF;
+
+        DELETE FROM receivers_comms WHERE rcid = new.rcid;   
+    
+    ENDIF;
+END;
+'
+LANGUAGE 'plpgsql';
+
+
 
 CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
                                     fd int NOT NULL, 
@@ -133,6 +179,10 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
 
 
 
+--insert into data(d1, d2) select  substring(data, 1,10)::int as da1, substring(data, 11,20)::int as da2 from tm1;
+
+--copy tm1(data) FROM '/home/shrikant/gb.txt';
+
 
 
 -- raw_data will get data from receiver : path = receiver.c -> processor.c -> raw_data
@@ -142,16 +192,42 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
     -- status 2 = sending in progress
     -- status 3 = sending failed
 
--- connections_receiving :
-    -- status 1 will indicate connection opened
-    -- status 2 will indicate connection closed
-
 -- connections_sending : 
     -- for connections sending 
         -- status 1 = need to be opened
         -- status 2 = opened
         -- status 3 = need to be closed
         -- status 4 = closed
+
+-- senders_comms
+    -- 2 columns: data and destination
+        -- if destination = 1 then message is intended for db
+        -- if destination = 2 then message is meant for sender
+
+    -- it can have 4 types of messages
+
+        -- msgtype = 1 open a connection
+            -- it will consist of (msgtype, ipaddr)
+            -- from db -> sender
+    
+        -- msgtype = 2 close a connection
+            -- it will consist of (msgtype, fd)
+            --  from db -> sender
+    
+        -- msgtype = 3 connection opening status
+            -- from sender -> db 
+            -- if status = 2 means connection opened
+            -- it will be followed by a fd (msgytpe, status, fd)
+            -- if status = 1 means conneciton opening failed(msgtype, status)
+    
+        -- msgtyp3 = 4 msg sending status
+            -- from sender -> db
+            -- consist of (msgtype, msgid, msgstatus)
+            -- if msgtype
+
+-- connections_receiving :
+    -- status 1 will indicate connection opened
+    -- status 2 will indicate connection closed
 
 -- receiver_comms :
     -- stores communications received from receiver with status = 1
