@@ -13,7 +13,7 @@ drop table message_status;
 
 CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY, 
                               mdata text NOT NULL, 
-                              destination bigint NOT NULL);
+                              destination int NOT NULL DEFAULT 1);
 
 CREATE TRIGGER tr_extract_receivers_comms AFTER INSERT ON 
 receivers_comms FOR EACH ROW EXCUTE extract_receivers_comms();
@@ -26,11 +26,11 @@ BEGIN
 
     IF NEW.destination = 1 THEN        
         
-        select substring(new.mdata, 1, 4)::int into l_msgtype;
+        SELECT SUBSTRING(new.mdata, 1, 4)::int INTO l_msgtype;
         
         IF msgtype = 1 THEN
             
-            INSERT INTO CONNECTIONS_RECEIVING(fd, ipaddr, status)
+            INSERT INTO connections_receiving(fd, ipaddr, rcstatus)
             VALUES (SUBSTRING(NEW.mdata, 5, 4)::int, 
             SUBSTRING(NEW.mdata, 9, 8)::bigint, 
             STATUS = 1);
@@ -38,7 +38,7 @@ BEGIN
         ELIF msgtype = 2 THEN
         
             UPDATE connections_receiving 
-            SET status = 2 
+            SET rcstatus = 2 
             WHERE fd = SUBSTRING(NEW.mdata, 5, 4)::int;
         
         ENDIF;
@@ -51,43 +51,62 @@ END;
 LANGUAGE 'plpgsql';
 
 
+CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
+                                    fd int NOT NULL, 
+                                    ipaddr bigint NOT NULL, 
+                                    rcstatus int NOT NULL);
+
+
 --------
 
 
 CREATE TABLE senders_comms (scid SERIAL PRIMARY KEY, 
                             mdata text NOT NULL, 
-                            destination int NOT NULL);
+                            destination int NOT NULL DEFAULT 1);
 
 CREATE TRIGGER tr_extract_senders_comms AFTER INSERT ON 
 senders_comms FOR EACH ROW EXCUTE extract_senders_comms();
+
 
 CREATE OR REPLACE FUNCTION extract_senders_comms () RETURNS VOID AS
 '
 DECLARE
     l_msgtype int;
+    l_msgstatus int;
 BEGIN
 
     IF NEW.destination = 1 THEN        
         
-        select substring(new.mdata, 1, 4)::int into l_msgtype;
+        SELECT SUBSTRING(new.mdata, 1, 4)::int, 
+        SUBSTRING(new.mdata, 5, 4)::int 
+        INTO l_msgtype, l_msgstatus;
         
-        IF msgtype = 1 THEN
+        IF msgtype = 3 THEN
             
-            INSERT INTO CONNECTIONS_RECEIVING(fd, ipaddr, status)
-            VALUES (SUBSTRING(NEW.mdata, 5, 4)::int, 
-            SUBSTRING(NEW.mdata, 9, 8)::bigint, 
-            STATUS = 1);
+            IF l_msgstatus = 3 THEN
+
+                UPDATE connections_sendign 
+                SET scstatus = l_msgstatus,
+                fd = SUBSTRING(17, 4)::int
+                WHERE ipaddr = SUBSTRING(new.mdata, 9, 8)::bigint;
+            
+            ELIF l_msgstatus = 1 THEN 
+
+                UPDATE connections_sending 
+                SET scstatus = l_msgstatus,
+                WHERE ipaddr = SUBSTRING(new.mdata, 9, 8)::bigint;
+
+            ENDIF;           
+
+        ELIF msgtype = 4 THEN
         
-        ELIF msgtype = 2 THEN
-        
-            UPDATE connections_receiving 
-            SET status = 2 
-            WHERE fd IN
-            (SELECT SUBSTRING(NEW.mdata, 5, 4)::int);
+            UPDATE send_data 
+            SET status = l_msgstatus 
+            WHERE sdid = SUBSTRING(NEW.mdata, 9, 4)::int;
         
         ENDIF;
 
-        DELETE FROM receivers_comms WHERE rcid = new.rcid;   
+        DELETE FROM senders_comms WHERE scid = new.scid;   
     
     ENDIF;
 END;
@@ -96,15 +115,14 @@ LANGUAGE 'plpgsql';
 
 
 
-CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
-                                    fd int NOT NULL, 
-                                    ipaddr bigint NOT NULL, 
-                                    mstatus int NOT NULL);
-
 CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY, 
                                   fd int NOT NULL,
                                   ipaddr bigint NOT NULL, 
-                                  mstatus int NOT NULL);
+                                  scstatus int NOT NULL);
+
+
+----
+
 
 CREATE TABLE raw_data (rdid SERIAL PRIMARY KEY, 
                        fd int NOT NULL, data text NOT NULL, 
@@ -155,27 +173,10 @@ CREATE TABLE message_status (msid text PRIMARY KEY,
                               original_msgid text NOT NULL);
 
 CREATE TABLE send_data (sdid SERIAL PRIMARY KEY, 
-                        fd int NOT NULL, data text NOT NULL, 
+                        fd int NOT NULL, 
+                        sdata text NOT NULL, 
                         data_size int NOT NULL, 
                         mstatus int NOT NULL);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -195,12 +196,13 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
 -- connections_sending : 
     -- for connections sending 
         -- status 1 = need to be opened
-        -- status 2 = opened
-        -- status 3 = need to be closed
-        -- status 4 = closed
+        -- status 2 = trying to open
+        -- status 3 = opened
+        -- status 4 = need to be closed
+        -- status 5 = closed
 
 -- senders_comms
-    -- 2 columns: data and destination
+    -- 2 columns: data and destination (DEFAULT 1)
         -- if destination = 1 then message is intended for db
         -- if destination = 2 then message is meant for sender
 
@@ -216,13 +218,14 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
     
         -- msgtype = 3 connection opening status
             -- from sender -> db 
-            -- if status = 2 means connection opened
-            -- it will be followed by a fd (msgytpe, status, fd)
-            -- if status = 1 means conneciton opening failed(msgtype, status)
+            -- if status = 3 means connection opened
+            -- (msgytpe, status, ipaddr, fd)
+            -- if status = 1 means conneciton opening failed
+            -- (msgtype, status,  ipaddr)
     
-        -- msgtyp3 = 4 msg sending status
+        -- msgtyp = 4 msg sending status
             -- from sender -> db
-            -- consist of (msgtype, msgid, msgstatus)
+            -- consist of (msgtype, msgstatus, msgid)
             -- if msgtype
 
 -- connections_receiving :
@@ -233,8 +236,8 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
     -- stores communications received from receiver with status = 1
     -- stores communications intended to be sent to 
 
-    -- 2 columns: data and destination
-        -- if destination = 1 then message is intended for db,  1 will be default value
+-- if destination = 1 then message is intended for db,  1 will be default value    -- 2 columns: data and destination(DEFAULT 1)
+        
         -- if destination = 2 then message is meant for receiver
 
     -- receiver will inform db about a new connection's opening
