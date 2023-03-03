@@ -18,7 +18,7 @@ CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY,
 CREATE TRIGGER tr_extract_receivers_comms AFTER INSERT ON 
 receivers_comms FOR EACH ROW EXCUTE extract_receivers_comms();
 
-CREATE OR REPLACE FUNCTION extract_receivers_comms () RETURNS VOID AS
+CREATE OR REPLACE FUNCTION extract_receivers_comms () RETURNS void AS
 '
 DECLARE
     l_msgtype int;
@@ -26,7 +26,8 @@ BEGIN
 
     IF NEW.destination = 1 THEN        
         
-        SELECT SUBSTRING(new.mdata, 1, 4)::int INTO l_msgtype;
+        SELECT SUBSTRING(new.mdata, 1, 4)::int 
+        INTO l_msgtype;
         
         IF msgtype = 1 THEN
             
@@ -43,7 +44,8 @@ BEGIN
         
         ENDIF;
 
-        DELETE FROM receivers_comms WHERE rcid = new.rcid;   
+        DELETE FROM receivers_comms 
+        WHERE rcid = new.rcid;   
     
     ENDIF;
 END;
@@ -68,7 +70,7 @@ CREATE TRIGGER tr_extract_senders_comms AFTER INSERT ON
 senders_comms FOR EACH ROW EXCUTE extract_senders_comms();
 
 
-CREATE OR REPLACE FUNCTION extract_senders_comms () RETURNS VOID AS
+CREATE OR REPLACE FUNCTION extract_senders_comms () RETURNS void AS
 '
 DECLARE
     l_msgtype int;
@@ -106,7 +108,8 @@ BEGIN
         
         ENDIF;
 
-        DELETE FROM senders_comms WHERE scid = new.scid;   
+        DELETE FROM senders_comms 
+        WHERE scid = new.scid;   
     
     ENDIF;
 END;
@@ -123,11 +126,94 @@ CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY,
 
 ----
 
+CREATE TABLE incoming_msg_status (imstatus int NOT NULL, 
+                                  original_msgid text, 
+                                  fd int,
+                                  required_data_amount int,
+                                  total_data int);
+
 
 CREATE TABLE raw_data (rdid SERIAL PRIMARY KEY, 
-                       fd int NOT NULL, data text NOT NULL, 
-                       data_size int NOT NULL);
+                       rfd int NOT NULL, 
+                       rdata text NOT NULL, 
+                       rdata_size int NOT NULL);
 
+
+CREATE TRIGGER tr_build_msg AFTER INSERT ON 
+raw_data FOR EACH ROW EXCUTE build_msg();
+
+CREATE OR REPLACE FUNCTION build_msg () RETURNS void AS
+'
+DECLARE
+    l_status int;
+    l_rdatasize int;
+    l_mdatasize int;
+    l_msgid int;
+    l_data_to_read int;
+BEGIN
+    
+    SELECT imstatus into l_status 
+    from incoming_msg_status;
+
+    SELECT rdata_size into 
+    l_rdatasize from raw_data;
+
+    IF l_status = 1 THEN        
+        
+        IF l_rdatasize >= 4 THEN
+           
+            SELECT SUBSTRING(NEW.rdata, 1, 4) into l_mdatasize from raw_data;
+            l_rdatatsize := l_rdatasize - 4
+           
+            IF l_rdatasize >= l_mdatasize THEN
+                INSERT INTO new_msg (nmdata_size, nmdata, nmstatus)
+                VALUES (l_mdatasize, SUBSTRING(4, l_mdatasize, 2));
+                l_rdatasize := l_rdatasize - l_mdatasize;
+            ENDIF;
+        ENDIF;
+    ENDIF;
+END;
+'
+LANGUAGE 'plpgsql';
+
+
+CREATE TABLE new_msg (nmgid SERIAL PRIMARY KEY, 
+                      nmdata_size int NOT NULL,
+                      nmdata text NOT NULL,
+                      nmstatus int NOT NULL);
+
+
+CREATE TRIGGER tr_extract_msg_info AFTER INSERT ON 
+new_msg FOR EACH ROW EXCUTE extract_msg_info();
+
+
+CREATE OR REPLACE FUNCTION extract_msg_info () RETURNS void AS
+'
+DECLARE
+    l_nmdata text;
+    l_nmid int;
+    l_query text;
+    
+BEGIN
+    
+    SELECT nmdata, nmgid 
+    INTO l_nmdata, l_nmid 
+    FROM new_msg 
+    WHERE status = 2 
+    LIMIT 1;
+
+    SELECT query 
+    FROM query_table 
+    WHERE id = SUBSTRING(l_nmdata, 5, 4)::int 
+    INTO l_query;
+
+    EXECUTE query || ' (' || l_nmdata || ')';
+
+    DELETE FROM new_msg 
+    WHERE nmgid = l_nmid;
+
+'
+LANGUAGE 'plpgsql';
 
 
 
@@ -267,8 +353,7 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
         -- in reply to this receiver will send a message about status of type 1
 
 
-
--- incoming statsu if status = 1 means read, 2 means unread
+-- incoming status if status = 1 means read, 2 means unread
 --raws data
 -- check status 
     -- rstaus = 1
@@ -286,4 +371,6 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
     -- 2 else mark data as complete and set rstatus = 1
 
 
-    
+-- nm table
+    -- status = 1 means incomplete
+    -- status = 2 means complete
