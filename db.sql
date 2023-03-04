@@ -1,15 +1,7 @@
-drop table raw_data;
-drop table raw_data;
-drop table send_data;
-drop table connections_receiving;
-drop table connections_sending;
-drop table receivers_comms;
-drop table senders_comms;
-drop table msg_chunk;
-drop table msg_info;
-drop table status_r;
-drop table get_system_info;
-drop table message_status;
+
+-- launch every second
+SELECT pgcron.schedule('* * * * * *', 'copy_message_ids;');
+
 
 CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY, 
                               mdata text NOT NULL, 
@@ -204,10 +196,10 @@ BEGIN
 
     SELECT query 
     FROM query_table 
-    WHERE id = SUBSTRING(l_nmdata, 5, 4)::int 
+    WHERE queryid = SUBSTRING(l_nmdata, 5, 4)::int 
     INTO l_query;
 
-    EXECUTE query || ' (' || l_nmdata || ')';
+    EXECUTE query;
 
     DELETE FROM new_msg 
     WHERE nmgid = l_nmid;
@@ -215,7 +207,36 @@ BEGIN
 '
 LANGUAGE 'plpgsql';
 
+CREATE TABLE query (queryid int PRIMARY KEY,
+                    query text);
 
+INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk values(
+                            SUBSTRING( l_nmdata, 9, 16),
+                            SUBSTRING( l_nmdata, 25, 8)::bigint,
+                            SUBSTRING( l_nmdata, 33, 8)::bigint,
+                            SUBSTRING( l_nmdata, 41, 4)::int,
+                            SUBSTRING( l_nmdata, 5, 4)::int,
+                            SUBSTRING( l_nmdata, 45, 16),
+                            SUBSTRING( l_nmdata, 61, 4)::int,
+                            SUBSTRING( l_nmdata, 65, 4)::int,
+                            SUBSTRING( l_nmdata, 69, 4)::int,
+                            SUBSTRING( l_nmdata, 73, SUBSTRING(l_mdata, 1, 4)::int - 72),
+                            )'
+                        )
+
+
+INSERT INTO query VALUES (2, 'INSERT INTO msg_info values(
+                            SUBSTRING( l_nmdata, 9, 16),
+                            SUBSTRING( l_nmdata, 25, 8)::bigint,
+                            SUBSTRING( l_nmdata, 33, 8)::bigint,
+                            SUBSTRING( l_nmdata, 41, 4)::int,
+                            SUBSTRING( l_nmdata, 5, 4)::int,
+                            SUBSTRING( l_nmdata, 45, 16),
+                            SUBSTRING( l_nmdata, 61, 4)::int,
+                            SUBSTRING( l_nmdata, 65, 4)::int,
+                            SUBSTRING( l_nmdata, 69, 4)::int
+                            )'
+                        )
 
 CREATE TABLE msg_chunk (msgid text PRIMARY KEY, 
                         source bigint NOT NULL, 
@@ -225,11 +246,12 @@ CREATE TABLE msg_chunk (msgid text PRIMARY KEY,
                         original_msgid text NOT NULL, 
                         chunk_number int NOT NULL, 
                         size int NOT NULL, 
-                        mdata text NOT NULL,
-                        msg_status int NOT NULL);
+                        msg_status int NOT NULL,
+                        mdata text NOT NULL);
 
 CREATE TABLE msg_info (miid text PRIMARY KEY, 
                        source bigint NOT NULL, 
+                       destination bigint NOT NULL,
                        mpriority int NOT NULL, 
                        mtype int NOT NULL, 
                        origingl_msgid text NOT NULL, 
