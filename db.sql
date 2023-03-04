@@ -259,31 +259,6 @@ CREATE TABLE msg_info (miid text PRIMARY KEY,
                        total_size int NOT NULL, 
                        time_to_receive int NOT NULL);
 
-CREATE TABLE status_r (msid text PRIMARY KEY, 
-                       source bigint NOT NULL, 
-                       destination bigint NOT NULL,
-                       mpriority int NOT NULL, 
-                       mtype int NOT NULL, 
-                       original_msgid text NOT NULL, 
-                       mstatus int NOT NULL, 
-                       size int NOT NULL, 
-                       mdata text);
-
-CREATE TABLE get_system_info (msid text PRIMARY KEY, 
-                              source bigint NOT NULL, 
-                              destination bigint NOT NULL,
-                              mpriority int NOT NULL, 
-                              mtype int NOT NULL, 
-                              info required text NOT NULL, 
-                              message_type int NOT NULL);
-
-CREATE TABLE message_status (msid text PRIMARY KEY, 
-                              source bigint NOT NULL, 
-                              destination bigint NOT NULL,
-                              mpriority int NOT NULL, 
-                              mtype int NOT NULL,
-                              original_msgid text NOT NULL);
-
 CREATE TABLE send_data (sdid SERIAL PRIMARY KEY, 
                         fd int NOT NULL, 
                         sdata text NOT NULL, 
@@ -396,3 +371,31 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
 -- nm table
     -- status = 1 means incomplete
     -- status = 2 means complete
+
+
+
+
+-- CREATE TABLE status_r (msid text PRIMARY KEY, 
+--                        source bigint NOT NULL, 
+--                        destination bigint NOT NULL,
+--                        mpriority int NOT NULL, 
+--                        mtype int NOT NULL, 
+--                        original_msgid text NOT NULL, 
+--                        mstatus int NOT NULL, 
+--                        size int NOT NULL, 
+--                        mdata text);
+
+-- CREATE TABLE get_system_info (msid text PRIMARY KEY, 
+--                               source bigint NOT NULL, 
+--                               destination bigint NOT NULL,
+--                               mpriority int NOT NULL, 
+--                               mtype int NOT NULL, 
+--                               info required text NOT NULL, 
+--                               message_type int NOT NULL);
+
+-- CREATE TABLE message_status (msid text PRIMARY KEY, 
+--                               source bigint NOT NULL, 
+--                               destination bigint NOT NULL,
+--                               mpriority int NOT NULL, 
+--                               mtype int NOT NULL,
+--                               original_msgid text NOT NULL);
