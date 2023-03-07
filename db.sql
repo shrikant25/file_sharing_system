@@ -118,52 +118,57 @@ CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY,
 
 ----
 
-CREATE TABLE incoming_msg_status (imstatus int NOT NULL, 
+CREATE TABLE incoming_msg_status (insid serial PRIMARY KEY,
+                                  status int NOT NULL, 
                                   original_msgid text, 
-                                  fd int,
+                                  sfd int,
                                   required_data_amount int,
                                   total_data int);
 
 
-CREATE TABLE raw_data (rdid SERIAL PRIMARY KEY, 
-                       rfd int NOT NULL, 
-                       rdata text NOT NULL, 
-                       rdata_size int NOT NULL);
+CREATE TABLE raw_data (fd int NOT NULL, 
+                       data text NOT NULL, 
+                       data_size int NOT NULL,
+                       priority int NOT NULL);
 
 
-CREATE TRIGGER tr_build_msg AFTER INSERT ON 
-raw_data FOR EACH ROW EXCUTE build_msg();
+--CREATE TRIGGER tr_build_msg AFTER INSERT ON 
+--raw_data FOR EACH ROW EXCUTE build_msg();
 
 CREATE OR REPLACE FUNCTION build_msg () RETURNS void AS
 '
 DECLARE
-    l_status int;
-    l_rdatasize int;
-    l_mdatasize int;
-    l_msgid int;
-    l_data_to_read int;
+    lfd int;
+    ldata text;
+    ldata_size int;
+    ldata_read int;
+    lmdata_size int;
 BEGIN
     
-    SELECT imstatus into l_status 
-    from incoming_msg_status;
+    SELECT fd, data, data_size FROM raw_data into lfd, ldata, ldata_size;
+    ldata_read := 0;
 
-    SELECT rdata_size into 
-    l_rdatasize from raw_data;
+    LOOP UNTIL ldata_size - ldata_read >= 40
+      
+        SELECT into lmdata_size SUBSTRING(ldata, 1, 4);
+        IF ldata_size - ldata_read >= lmdata_size THEN
+            
+            INSERT INTO new_msg (nmdata_size, nmdata) 
+            VALUES lmdata_size, (SUBSTRING(ldata, ldata_read+1, lmdata_size));
 
-    IF l_status = 1 THEN        
+            ldata_read := ldata_read + lmdata_size;
+    ENDLOOP;
+
+    IF ldata_read > 0 THEN
         
-        IF l_rdatasize >= 4 THEN
-           
-            SELECT SUBSTRING(NEW.rdata, 1, 4) into l_mdatasize from raw_data;
-            l_rdatatsize := l_rdatasize - 4
-           
-            IF l_rdatasize >= l_mdatasize THEN
-                INSERT INTO new_msg (nmdata_size, nmdata, nmstatus)
-                VALUES (l_mdatasize, SUBSTRING(4, l_mdatasize, 2));
-                l_rdatasize := l_rdatasize - l_mdatasize;
-            ENDIF;
-        ENDIF;
+        UPDATE raw_data 
+        SET data = SUBSTRING(data, ldata_read+1, ldata_size - ldata_read),
+        ldata_size = ldata_read, 
+        priority = 10
+        WHERE fd = lfd;
+
     ENDIF;
+
 END;
 '
 LANGUAGE 'plpgsql';
@@ -171,8 +176,7 @@ LANGUAGE 'plpgsql';
 
 CREATE TABLE new_msg (nmgid SERIAL PRIMARY KEY, 
                       nmdata_size int NOT NULL,
-                      nmdata text NOT NULL,
-                      nmstatus int NOT NULL);
+                      nmdata text NOT NULL);
 
 
 CREATE TRIGGER tr_extract_msg_info AFTER INSERT ON 
@@ -210,7 +214,7 @@ LANGUAGE 'plpgsql';
 CREATE TABLE query (queryid int PRIMARY KEY,
                     query text);
 
-INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk values(
+INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk VALUES(
                             SUBSTRING( l_nmdata, 9, 16),
                             SUBSTRING( l_nmdata, 25, 8)::bigint,
                             SUBSTRING( l_nmdata, 33, 8)::bigint,
@@ -220,12 +224,12 @@ INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk values(
                             SUBSTRING( l_nmdata, 61, 4)::int,
                             SUBSTRING( l_nmdata, 65, 4)::int,
                             SUBSTRING( l_nmdata, 69, 4)::int,
-                            SUBSTRING( l_nmdata, 73, SUBSTRING(l_mdata, 1, 4)::int - 72),
+                            SUBSTRING( l_nmdata, 73, SUBSTRING(l_mdata, 1, 4)::int - 72)
                             )'
-                        )
+                        );
 
 
-INSERT INTO query VALUES (2, 'INSERT INTO msg_info values(
+INSERT INTO query VALUES (2, 'INSERT INTO msg_info VALUES(
                             SUBSTRING( l_nmdata, 9, 16),
                             SUBSTRING( l_nmdata, 25, 8)::bigint,
                             SUBSTRING( l_nmdata, 33, 8)::bigint,
@@ -236,7 +240,23 @@ INSERT INTO query VALUES (2, 'INSERT INTO msg_info values(
                             SUBSTRING( l_nmdata, 65, 4)::int,
                             SUBSTRING( l_nmdata, 69, 4)::int
                             )'
-                        )
+                        );
+
+INSERT INTO query VALUES (3, 'INSERT INTO get_info VALUES(
+                            SUBSTRING( l_nmdata, 9, 16),
+                            SUBSTRING( l_nmdata, 25, 4)::int,
+                            SUBSTRING( l_nmdata, 29, 4)::int,
+                            SUBSTRING( l_nmdata, 32, SUBSTRING(l_mdata, 1, 4)::int - 72)
+                            )'
+                        );
+
+INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
+                            SUBSTRING( l_nmdata, 9, 16),
+                            SUBSTRING( l_nmdata, 33, 8)::int,
+                            SUBSTRING( l_nmdata, 1, 4)::int,
+                            l_nmdata
+                            )'
+                        );
 
 CREATE TABLE msg_chunk (msgid text PRIMARY KEY, 
                         source bigint NOT NULL, 
@@ -258,6 +278,18 @@ CREATE TABLE msg_info (miid text PRIMARY KEY,
                        total_parts int NOT NULL,
                        total_size int NOT NULL, 
                        time_to_receive int NOT NULL);
+
+CREATE TABLE get_info (msgid text PRIMARY KEY,
+                        mtype int NOT NULL,
+                        data_size int,
+                        mdata text);
+
+CREATE TABLE for_others (fomid serial PRIMARY KEY,
+                         destination bigint NOT NULL,
+                         mpriority int NOT NULL,
+                         msg text NOT NULL,
+                         data_size int NOT NULL, 
+                         );
 
 CREATE TABLE send_data (sdid SERIAL PRIMARY KEY, 
                         fd int NOT NULL, 
