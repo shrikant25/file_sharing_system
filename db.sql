@@ -1,6 +1,7 @@
 
 -- launch every second
-SELECT pgcron.schedule('* * * * * *', 'copy_message_ids;');
+SELECT pgcron.schedule('* * * * * *', 'call_jobs;');
+-- call jobs function yet to be written
 
 
 CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY, 
@@ -38,7 +39,8 @@ CREATE TABLE msg_chunk (msgid text PRIMARY KEY,
                         original_msgid text NOT NULL, 
                         chunk_number int NOT NULL, 
                         datasize int NOT NULL, 
-                        mdata text NOT NULL);
+                        mdata text NOT NULL,
+                        md5_hash text NOT NULL);
 
 CREATE TABLE msg_info (original_msgid text PRIMARY KEY,
                        msgid text, 
@@ -68,16 +70,17 @@ CREATE TABLE for_others (fomid serial PRIMARY KEY,
                          mdata text NOT NULL);
 
 CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
-                        msgid NOT NULL,
+                        msgid text NOT NULL,
                         destinationip bigint NOT NULL,
-                        fd int NOT NULL,  
+                        fd int,  
                         data_size int NOT NULL,
                         sdata text NOT NULL, 
-                        mstatus int NOT NULL,
-                        mpriority int NOT NULL);
+                        mstatus int NOT NULL DEFAULT 0,
+                        mpriority int NOT NULL DEFAULT 10);
 
 CREATE TABLE sysinfo (system_name char(2) PRIMARY key,
-                        ipaddress bigint);
+                        ipaddress bigint,
+                        receiving_capacity int);
 
 CREATE TABLE log (lgid serial PRIMARY KEY,
                   msgid text,
@@ -203,7 +206,7 @@ BEGIN
             VALUES lmdata_size, (SUBSTRING(ldata, ldata_read+1, lmdata_size));
 
             ldata_read := ldata_read + lmdata_size;
-    ENDLOOP;
+    END LOOP;
 
     IF ldata_read > 0 THEN
         
@@ -246,6 +249,7 @@ BEGIN
     DELETE FROM new_msg 
     WHERE nmgid = l_nmid;
 
+END;
 '
 LANGUAGE 'PLPGSQL';
 
@@ -257,24 +261,48 @@ FOR EACH ROW EXECUTE merged_msg();
 CREATE OR REPLACE FUNCTION merge_msg()
 RETURN void AS
 '
-DECLARE msg text;
+DECLARE 
+    msg text;
+    invalid_chunks int[];
 BEGIN
 
     IF new.total_parts > 0 and new.parts_recieved = new.total_parts THEN
 
-        INSERT INTO msg (msgid, source, size, mdata) 
-        SELECT NEW.original_msgid, 
-               NEW.source,
-               NEW.total_size,
-               STRING_AGG(m.mdata, ''''), 
-        FROM msg_chunk as m 
-        WHERE NEW.original_msgid = m.original_msgid
-        group by m.original_msgid
-        order by m.chunk_number;
+        SELECT array_agg(C.chunk_number)
+        INTO invalid_chunks 
+        FROM (
+            SELECT row_number() over() 
+            as row_numb, md5_elem
+            FROM unnset(NEW.md5_list) 
+            AS md5_elem
+        ) AS M
+        JOIN msg_chunk AS C
+        ON C.chunk_number = M.row_num
+        WHERE C.md5_hash <> M.md5_elem;
+
+        IF array_length(invalid_chunkd) > 0 THEN
+        
+            SELECT handle_invalid_chunks(invalid_chunks);
+        
+        ELSE
+        
+            INSERT INTO msg (msgid, source, size, mdata) 
+            SELECT NEW.original_msgid, 
+                NEW.source,
+                NEW.total_size,
+                string_agg(m.mdata, ''''), 
+            FROM msg_chunk as m 
+            WHERE NEW.original_msgid = m.original_msgid
+            group by m.original_msgid
+            order by m.chunk_number;
+
+        ENDIF;
+    ENDIF;
 END;
 '
 LANGUAGE 'PLPGSQL';
 
+--todo : write function for  handle_invalid_chunks
 
 CREATE TRIGGER tr_update_chunk_count 
 AFTER INSERT ON msg_chunk
