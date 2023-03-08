@@ -7,10 +7,93 @@ CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY,
                               mdata text NOT NULL, 
                               destination int NOT NULL DEFAULT 1);
 
-CREATE TRIGGER tr_extract_receivers_comms AFTER INSERT ON 
-receivers_comms FOR EACH ROW EXCUTE extract_receivers_comms();
+CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
+                                    fd int NOT NULL, 
+                                    ipaddr bigint NOT NULL, 
+                                    rcstatus int NOT NULL);
 
-CREATE OR REPLACE FUNCTION extract_receivers_comms () RETURNS void AS
+CREATE TABLE senders_comms (scid SERIAL PRIMARY KEY, 
+                            mdata text NOT NULL, 
+                            destination int NOT NULL DEFAULT 1);
+
+CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY, 
+                                  fd int NOT NULL,
+                                  ipaddr bigint NOT NULL, 
+                                  scstatus int NOT NULL);
+
+CREATE TABLE raw_data (fd int PRIMARY KEY, 
+                       data text NOT NULL, 
+                       data_size int NOT NULL,
+                       priority int NOT NULL);
+
+CREATE TABLE new_msg (nmgid SERIAL PRIMARY KEY, 
+                      nmdata_size int NOT NULL,
+                      nmdata text NOT NULL);
+
+CREATE TABLE query (queryid int PRIMARY KEY,
+                    query text);
+
+CREATE TABLE msg_chunk (msgid text PRIMARY KEY,
+                        header text NOT NULL,
+                        original_msgid text NOT NULL, 
+                        chunk_number int NOT NULL, 
+                        datasize int NOT NULL, 
+                        mdata text NOT NULL);
+
+CREATE TABLE msg_info (original_msgid text PRIMARY KEY,
+                       msgid text, 
+                       header text,
+                       source char(4),
+                       total_size int,
+                       total_parts int NOT NULL DEFAULT 0,
+                       parts_received int NOT NULL DEFAULT 0,
+                       time_to_receive int,
+                       md5_list text[]);
+
+CREATE TABLE get_info (msgid text PRIMARY KEY,
+                       header text NOT NULL,
+                       infotype smallint NOT NULL,
+                       data_size int,
+                       mdata text);
+
+CREATE TABLE merged_msg (msgid text PRIMARY KEY,
+                         source char(4) NOT NULL,
+                         size int NOT NULL,
+                         mdata text NOT NULL);
+
+CREATE TABLE for_others (fomid serial PRIMARY KEY,
+                         msgid NOT NULL,
+                         destination bigint NOT NULL,
+                         data_size int NOT NULL,
+                         mdata text NOT NULL);
+
+CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
+                        msgid NOT NULL,
+                        destinationip bigint NOT NULL,
+                        fd int NOT NULL,  
+                        data_size int NOT NULL,
+                        sdata text NOT NULL, 
+                        mstatus int NOT NULL,
+                        mpriority int NOT NULL);
+
+CREATE TABLE sysinfo (system_name char(2) PRIMARY key,
+                        ipaddress bigint);
+
+CREATE TABLE log (lgid serial PRIMARY KEY,
+                  msgid text,
+                  mstatus text);
+
+
+CREATE TRIGGER tr_extract_msg_info 
+AFTER INSERT ON new_msg 
+FOR EACH ROW EXCUTE extract_msg_info();
+
+CREATE TRIGGER tr_extract_receivers_comms 
+AFTER INSERT ON receivers_comms 
+FOR EACH ROW EXCUTE extract_receivers_comms();
+
+CREATE OR REPLACE FUNCTION extract_receivers_comms () 
+RETURNS void AS
 '
 DECLARE
     l_msgtype int;
@@ -42,27 +125,15 @@ BEGIN
     ENDIF;
 END;
 '
-LANGUAGE 'plpgsql';
+LANGUAGE 'PLPGSQL';
 
 
-CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
-                                    fd int NOT NULL, 
-                                    ipaddr bigint NOT NULL, 
-                                    rcstatus int NOT NULL);
+CREATE TRIGGER tr_extract_senders_comms 
+AFTER INSERT ON senders_comms 
+FOR EACH ROW EXCUTE extract_senders_comms();
 
-
---------
-
-
-CREATE TABLE senders_comms (scid SERIAL PRIMARY KEY, 
-                            mdata text NOT NULL, 
-                            destination int NOT NULL DEFAULT 1);
-
-CREATE TRIGGER tr_extract_senders_comms AFTER INSERT ON 
-senders_comms FOR EACH ROW EXCUTE extract_senders_comms();
-
-
-CREATE OR REPLACE FUNCTION extract_senders_comms () RETURNS void AS
+CREATE OR REPLACE FUNCTION extract_senders_comms() 
+RETURNS void AS
 '
 DECLARE
     l_msgtype int;
@@ -106,36 +177,11 @@ BEGIN
     ENDIF;
 END;
 '
-LANGUAGE 'plpgsql';
+LANGUAGE 'PLPGSQL';
 
 
-
-CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY, 
-                                  fd int NOT NULL,
-                                  ipaddr bigint NOT NULL, 
-                                  scstatus int NOT NULL);
-
-
-----
-
-CREATE TABLE incoming_msg_status (insid serial PRIMARY KEY,
-                                  status int NOT NULL, 
-                                  original_msgid text, 
-                                  sfd int,
-                                  required_data_amount int,
-                                  total_data int);
-
-
-CREATE TABLE raw_data (fd int NOT NULL, 
-                       data text NOT NULL, 
-                       data_size int NOT NULL,
-                       priority int NOT NULL);
-
-
---CREATE TRIGGER tr_build_msg AFTER INSERT ON 
---raw_data FOR EACH ROW EXCUTE build_msg();
-
-CREATE OR REPLACE FUNCTION build_msg () RETURNS void AS
+CREATE OR REPLACE FUNCTION build_msg() 
+RETURNS void AS
 '
 DECLARE
     lfd int;
@@ -171,19 +217,11 @@ BEGIN
 
 END;
 '
-LANGUAGE 'plpgsql';
+LANGUAGE 'PLPGSQL';
 
 
-CREATE TABLE new_msg (nmgid SERIAL PRIMARY KEY, 
-                      nmdata_size int NOT NULL,
-                      nmdata text NOT NULL);
-
-
-CREATE TRIGGER tr_extract_msg_info AFTER INSERT ON 
-new_msg FOR EACH ROW EXCUTE extract_msg_info();
-
-
-CREATE OR REPLACE FUNCTION extract_msg_info () RETURNS void AS
+CREATE OR REPLACE FUNCTION extract_msg_info() 
+RETURNS void AS
 '
 DECLARE
     l_nmdata text;
@@ -209,10 +247,52 @@ BEGIN
     WHERE nmgid = l_nmid;
 
 '
-LANGUAGE 'plpgsql';
+LANGUAGE 'PLPGSQL';
 
-CREATE TABLE query (queryid int PRIMARY KEY,
-                    query text);
+
+CREATE TRIGGER tr_merge_msg
+AFTER INSERT, UPDATE ON msg_info
+FOR EACH ROW EXECUTE merged_msg();
+
+CREATE OR REPLACE FUNCTION merge_msg()
+RETURN void AS
+'
+DECLARE msg text;
+BEGIN
+
+    IF new.total_parts > 0 and new.parts_recieved = new.total_parts THEN
+
+        INSERT INTO msg (msgid, source, size, mdata) 
+        SELECT NEW.original_msgid, 
+               NEW.source,
+               NEW.total_size,
+               STRING_AGG(m.mdata, ''''), 
+        FROM msg_chunk as m 
+        WHERE NEW.original_msgid = m.original_msgid
+        group by m.original_msgid
+        order by m.chunk_number;
+END;
+'
+LANGUAGE 'PLPGSQL';
+
+
+CREATE TRIGGER tr_update_chunk_count 
+AFTER INSERT ON msg_chunk
+FOR EACH ROW EXECUTE update_chunk_count();
+
+CREATE OR REPLACE FUNCTION update_chunk_count()
+RETURNS void AS
+'
+BEGIN
+    INSERT INTO msg_info (original_msgid, parts_received)
+    VALUES (new.original_msgid, 1) 
+    ON CONFLICT (original_msgid)
+    DO UPDATE
+    SET parts_received = parts_received + 1;  
+END;
+'
+LANGUAGE 'PLPGSQL'; 
+
 
 INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk VALUES(
                             SUBSTRING( l_nmdata, 9, 16),
@@ -257,45 +337,6 @@ INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
                             l_nmdata
                             )'
                         );
-
-CREATE TABLE msg_chunk (msgid text PRIMARY KEY, 
-                        source bigint NOT NULL, 
-                        destination bigint NOT NULL,
-                        mpriority int NOT NULL, 
-                        mtype int NOT NULL, 
-                        original_msgid text NOT NULL, 
-                        chunk_number int NOT NULL, 
-                        size int NOT NULL, 
-                        msg_status int NOT NULL,
-                        mdata text NOT NULL);
-
-CREATE TABLE msg_info (miid text PRIMARY KEY, 
-                       source bigint NOT NULL, 
-                       destination bigint NOT NULL,
-                       mpriority int NOT NULL, 
-                       mtype int NOT NULL, 
-                       origingl_msgid text NOT NULL, 
-                       total_parts int NOT NULL,
-                       total_size int NOT NULL, 
-                       time_to_receive int NOT NULL);
-
-CREATE TABLE get_info (msgid text PRIMARY KEY,
-                        mtype int NOT NULL,
-                        data_size int,
-                        mdata text);
-
-CREATE TABLE for_others (fomid serial PRIMARY KEY,
-                         destination bigint NOT NULL,
-                         mpriority int NOT NULL,
-                         msg text NOT NULL,
-                         data_size int NOT NULL, 
-                         );
-
-CREATE TABLE send_data (sdid SERIAL PRIMARY KEY, 
-                        fd int NOT NULL, 
-                        sdata text NOT NULL, 
-                        data_size int NOT NULL, 
-                        mstatus int NOT NULL);
 
 
 
@@ -407,27 +448,3 @@ CREATE TABLE send_data (sdid SERIAL PRIMARY KEY,
 
 
 
--- CREATE TABLE status_r (msid text PRIMARY KEY, 
---                        source bigint NOT NULL, 
---                        destination bigint NOT NULL,
---                        mpriority int NOT NULL, 
---                        mtype int NOT NULL, 
---                        original_msgid text NOT NULL, 
---                        mstatus int NOT NULL, 
---                        size int NOT NULL, 
---                        mdata text);
-
--- CREATE TABLE get_system_info (msid text PRIMARY KEY, 
---                               source bigint NOT NULL, 
---                               destination bigint NOT NULL,
---                               mpriority int NOT NULL, 
---                               mtype int NOT NULL, 
---                               info required text NOT NULL, 
---                               message_type int NOT NULL);
-
--- CREATE TABLE message_status (msid text PRIMARY KEY, 
---                               source bigint NOT NULL, 
---                               destination bigint NOT NULL,
---                               mpriority int NOT NULL, 
---                               mtype int NOT NULL,
---                               original_msgid text NOT NULL);
