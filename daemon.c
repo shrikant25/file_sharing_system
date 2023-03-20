@@ -25,7 +25,7 @@ static void skeleton_daemon(){
     if (pid > 0)
         exit(EXIT_SUCCESS);
 
-    // if >= 0 menas chidl process has beocmme session leader
+    // if >= 0 means child process has become session leader
     if (setsid() < 0)
         exit(EXIT_FAILURE);
 
@@ -37,7 +37,6 @@ static void skeleton_daemon(){
     //fork again
     pid = fork();
 
-    
     if (pid < 0)
         exit(EXIT_FAILURE);
 

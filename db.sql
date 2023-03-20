@@ -95,7 +95,7 @@ CREATE TRIGGER tr_extract_receivers_comms
 AFTER INSERT ON receivers_comms 
 FOR EACH ROW EXCUTE extract_receivers_comms();
 
-CREATE OR REPLACE FUNCTION extract_receivers_comms () 
+CREATE FUNCTION extract_receivers_comms () 
 RETURNS void AS
 '
 DECLARE
@@ -135,7 +135,7 @@ CREATE TRIGGER tr_extract_senders_comms
 AFTER INSERT ON senders_comms 
 FOR EACH ROW EXCUTE extract_senders_comms();
 
-CREATE OR REPLACE FUNCTION extract_senders_comms() 
+CREATE FUNCTION extract_senders_comms() 
 RETURNS void AS
 '
 DECLARE
@@ -183,7 +183,7 @@ END;
 LANGUAGE 'PLPGSQL';
 
 
-CREATE OR REPLACE FUNCTION build_msg() 
+CREATE FUNCTION build_msg() 
 RETURNS void AS
 '
 DECLARE
@@ -223,7 +223,7 @@ END;
 LANGUAGE 'PLPGSQL';
 
 
-CREATE OR REPLACE FUNCTION extract_msg_info() 
+CREATE FUNCTION extract_msg_info() 
 RETURNS void AS
 '
 DECLARE
@@ -258,7 +258,7 @@ CREATE TRIGGER tr_merge_msg
 AFTER INSERT, UPDATE ON msg_info
 FOR EACH ROW EXECUTE merged_msg();
 
-CREATE OR REPLACE FUNCTION merge_msg()
+CREATE FUNCTION merge_msg()
 RETURN void AS
 '
 DECLARE 
@@ -303,6 +303,21 @@ END;
 LANGUAGE 'PLPGSQL';
 
 --todo : write function for  handle_invalid_chunks
+--CREATE FUNCTION handle_invalid_chunks(chunk_ids text[])
+--RETURN void AS
+--'
+--BEGIN
+    -- create a message that is consist of list of ids
+    -- insert that message in send_data with destination
+    -- same as senders destinatoin for these ids
+
+    -- update the msg info table reduce the count of 
+    -- messages
+
+    -- remove the chunks from msg_chunk
+--END
+--' 
+--LANGUAGE 'PLPGSQL';
 
 CREATE TRIGGER tr_update_chunk_count 
 AFTER INSERT ON msg_chunk
