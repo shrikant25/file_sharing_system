@@ -3,44 +3,52 @@
 SELECT pgcron.schedule('* * * * * *', 'call_jobs;');
 -- call jobs function yet to be written
 
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
 
-CREATE TABLE receivers_comms (rcid SERIAL PRIMARY KEY, 
-                              mdata text NOT NULL, 
-                              destination int NOT NULL DEFAULT 1);
+CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
+                              mdata TEXT NOT NULL, 
+                              mtype INTEGER NOT NULL);
 
-CREATE TABLE connections_receiving (orid SERIAL PRIMARY KEY, 
-                                    fd int NOT NULL, 
-                                    ipaddr bigint NOT NULL, 
-                                    rcstatus int NOT NULL);
+CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
+                              fd INTEGER NOT NULL, 
+                              ipaddr BIGINT NOT NULL, 
+                              rcstatus INTEGER NOT NULL,
+                              rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE senders_comms (scid SERIAL PRIMARY KEY, 
-                            mdata text NOT NULL, 
-                            destination int NOT NULL DEFAULT 1);
+CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
+                            mdata TEXT NOT NULL, 
+                            mtype SMALLINT NOT NULL);
 
-CREATE TABLE connections_sending (osid SERIAL PRIMARY KEY, 
-                                  fd int NOT NULL,
-                                  ipaddr bigint NOT NULL, 
-                                  scstatus int NOT NULL);
+CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
+                            fd INTEGER NOT NULL,
+                            ipaddr BIGINT NOT NULL, 
+                            scstatus SMALLINT NOT NULL,
+                            sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE raw_data (fd int PRIMARY KEY, 
-                       data text NOT NULL, 
-                       data_size int NOT NULL,
-                       priority int NOT NULL);
+CREATE TABLE logs (logid SERIAL PRIMARY KEY,
+                  log TEXT NOT NULL,
+                   lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
+CREATE TABLE raw_data (fd PRIMARY KEY, 
+                       rdata TEXT NOT NULL, 
+                       rdata_size INTEGER NOT NULL,
+                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       rdpriority INTEGER NOT NULL);
 
-CREATE TABLE query (queryid int PRIMARY KEY,
-                    query text);
+CREATE TABLE query (queryid INTEGER PRIMARY KEY,
+                    query TEXT);
 
-
-
-CREATE TABLE sysinfo (system_name char(2) PRIMARY key,
-                        ipaddress bigint,
-                        receiving_capacity int);
-
-CREATE TABLE log (lgid serial PRIMARY KEY,
-                  msgid text,
-                  mstatus text);
-
+CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
+                        jobdata TEXT NOT NULL,
+                        jstate CHAR(5) NOT NULL,
+                        jtype SMALLINT NOT NULL,
+                        jsource_ip BIGINT NOT NULL,
+                        jobid UUID REFERENCES job_scheduler(jparent_jobid) UNIQUE NOT NULL,
+                        jparent_jobid UUID UNIQUE NOT NULL,
+                        jdestination_ip BIGINT NOT NULL,
+                        jpriority SMALLINT NOT NULL);
 
 CREATE TRIGGER tr_extract_msg_info 
 AFTER INSERT ON new_msg 
@@ -157,7 +165,7 @@ BEGIN
         SELECT into lmdata_size SUBSTRING(ldata, 1, 4);
         IF ldata_size - ldata_read >= lmdata_size THEN
             
-            INSERT INTO new_msg (nmdata_size, nmdata) 
+            INSERT INTO scheduler (nmdata_size, nmdata) 
             VALUES lmdata_size, (SUBSTRING(ldata, ldata_read+1, lmdata_size));
 
             ldata_read := ldata_read + lmdata_size;

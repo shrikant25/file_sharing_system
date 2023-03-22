@@ -246,7 +246,7 @@ int read_message_from_processor(char *data)
         memcpy(data, blkptr, CPARTITION_SIZE);
         memset(blkptr, 0, CPARTITION_SIZE);
         
-        blkptr = NULL;
+        blkptr = NULL; 
         toggle_bit(subblock_position, dblks.commr_block, 2);
     }
     
