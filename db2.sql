@@ -3,6 +3,11 @@
 SELECT pgcron.schedule('* * * * * *', 'call_jobs;');
 -- call jobs function yet to be written
 
+
+DROP TABLE sysinfo, receivers_comms, receiving_conns, senders_comms,
+            sending_conns, logs, raw_data, query, job_scheduler; 
+
+
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
                         ipaddress BIGINT NOT NULL,
                         systems_capacity INTEGER NOT NULL);
@@ -45,11 +50,24 @@ CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY,
                         jstate CHAR(5) NOT NULL DEFAULT 'N-1',
                         jtype SMALLINT NOT NULL DEFAULT 1,
                         jsource_ip BIGINT NOT NULL DEFAULT 0,
-                        jparent_jobid UUID UNIQUE NOT NULL,
-                        jobid UUID REFERENCES job_scheduler(jparent_jobid) UNIQUE NOT NULL,
+                        jobid UUID UNIQUE NOT NULL,
+                        jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE UNIQUE,
                         jdestination_ip BIGINT NOT NULL DEFAULT 0,
                         jpriority SMALLINT NOT NULL DEFAULT 10,
                         jcreation TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+insert into job_scheduler
+(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
+values('__ROOT__', 'N-0', 0, 0, GEN_RANDOM_UUID(), NULL, 0, 0);
+
+
+UPDATE job_scheduler 
+SET jparent_jobid = jobid 
+WHERE jidx = 1;
+
+ALTER TABLE job_scheduler 
+ALTER COLUMN jparent_jobid
+SET NOT NULL;
 
 CREATE TRIGGER tr_extract_msg_info 
 AFTER INSERT ON new_msg 
