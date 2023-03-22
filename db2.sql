@@ -17,8 +17,8 @@ CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY,
                               mtype INTEGER NOT NULL);
 
 CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
-                              fd INTEGER NOT NULL, 
-                              ipaddr BIGINT NOT NULL, 
+                              rfd INTEGER NOT NULL, 
+                              ripaddr BIGINT NOT NULL, 
                               rcstatus INTEGER NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
@@ -42,7 +42,7 @@ CREATE TABLE raw_data (fd INTEGER PRIMARY KEY,
                        rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        rdpriority INTEGER NOT NULL);
 
-CREATE TABLE query (queryid INTEGER PRIMARY KEY,
+CREATE TABLE queries (queryid INTEGER PRIMARY KEY,
                     query TEXT);
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
@@ -54,12 +54,11 @@ CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY,
                         jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE UNIQUE,
                         jdestination_ip BIGINT NOT NULL DEFAULT 0,
                         jpriority SMALLINT NOT NULL DEFAULT 10,
-                        jcreation TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 insert into job_scheduler
 (jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
 values('__ROOT__', 'N-0', 0, 0, GEN_RANDOM_UUID(), NULL, 0, 0);
-
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -81,33 +80,20 @@ CREATE FUNCTION extract_receivers_comms ()
 RETURNS void AS
 '
 DECLARE
-    l_msgtype int;
+
+    lmsgtype integer;
+    lquery text;
+
 BEGIN
 
-    IF NEW.destination = 1 THEN        
-        
-        SELECT SUBSTRING(new.mdata, 1, 4)::int 
-        INTO l_msgtype;
-        
-        IF msgtype = 1 THEN
-            
-            INSERT INTO connections_receiving(fd, ipaddr, rcstatus)
-            VALUES (SUBSTRING(NEW.mdata, 5, 4)::int, 
-            SUBSTRING(NEW.mdata, 9, 8)::bigint, 
-            STATUS = 1);
-        
-        ELIF msgtype = 2 THEN
-        
-            UPDATE connections_receiving 
-            SET rcstatus = 2 
-            WHERE fd = SUBSTRING(NEW.mdata, 5, 4)::int;
-        
-        ENDIF;
-
-        DELETE FROM receivers_comms 
-        WHERE rcid = new.rcid;   
+    SELECT NEW.mtype into lmsgtype;
     
-    ENDIF;
+    SELECT query INTO lquery 
+    FROM queries 
+    WHERE queryid = lmsgtype;
+    
+    EXECUTE query;
+    
 END;
 '
 LANGUAGE 'PLPGSQL';
@@ -121,45 +107,20 @@ CREATE FUNCTION extract_senders_comms()
 RETURNS void AS
 '
 DECLARE
-    l_msgtype int;
-    l_msgstatus int;
+
+    lmsgtype integer;
+    lquery text;
+
 BEGIN
 
-    IF NEW.destination = 1 THEN        
-        
-        SELECT SUBSTRING(new.mdata, 1, 4)::int, 
-        SUBSTRING(new.mdata, 5, 4)::int 
-        INTO l_msgtype, l_msgstatus;
-        
-        IF msgtype = 3 THEN
-            
-            IF l_msgstatus = 3 THEN
-
-                UPDATE connections_sendign 
-                SET scstatus = l_msgstatus,
-                fd = SUBSTRING(17, 4)::int
-                WHERE ipaddr = SUBSTRING(new.mdata, 9, 8)::bigint;
-            
-            ELIF l_msgstatus = 1 THEN 
-
-                UPDATE connections_sending 
-                SET scstatus = l_msgstatus,
-                WHERE ipaddr = SUBSTRING(new.mdata, 9, 8)::bigint;
-
-            ENDIF;           
-
-        ELIF msgtype = 4 THEN
-        
-            UPDATE send_data 
-            SET status = l_msgstatus 
-            WHERE sdid = SUBSTRING(NEW.mdata, 9, 4)::int;
-        
-        ENDIF;
-
-        DELETE FROM senders_comms 
-        WHERE scid = new.scid;   
+    SELECT NEW.mtype into lmsgtype;
     
-    ENDIF;
+    SELECT query INTO lquery 
+    FROM queries 
+    WHERE queryid = lmsgtype;
+    
+    EXECUTE query;
+    
 END;
 '
 LANGUAGE 'PLPGSQL';
