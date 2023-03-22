@@ -31,7 +31,7 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                   log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE raw_data (fd PRIMARY KEY, 
+CREATE TABLE raw_data (fd INTEGER PRIMARY KEY, 
                        rdata TEXT NOT NULL, 
                        rdata_size INTEGER NOT NULL,
                        rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -42,13 +42,14 @@ CREATE TABLE query (queryid INTEGER PRIMARY KEY,
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
                         jobdata TEXT NOT NULL,
-                        jstate CHAR(5) NOT NULL,
-                        jtype SMALLINT NOT NULL,
-                        jsource_ip BIGINT NOT NULL,
-                        jobid UUID REFERENCES job_scheduler(jparent_jobid) UNIQUE NOT NULL,
+                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
+                        jtype SMALLINT NOT NULL DEFAULT 1,
+                        jsource_ip BIGINT NOT NULL DEFAULT 0,
                         jparent_jobid UUID UNIQUE NOT NULL,
-                        jdestination_ip BIGINT NOT NULL,
-                        jpriority SMALLINT NOT NULL);
+                        jobid UUID REFERENCES job_scheduler(jparent_jobid) UNIQUE NOT NULL,
+                        jdestination_ip BIGINT NOT NULL DEFAULT 0,
+                        jpriority SMALLINT NOT NULL DEFAULT 10,
+                        jcreation TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TRIGGER tr_extract_msg_info 
 AFTER INSERT ON new_msg 
