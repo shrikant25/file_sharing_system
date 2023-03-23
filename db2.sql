@@ -245,22 +245,7 @@ END;
 '
 LANGUAGE 'PLPGSQL';
 
---todo : write function for  handle_invalid_chunks
---CREATE FUNCTION handle_invalid_chunks(chunk_ids text[])
---RETURN void AS
---'
---BEGIN
-    -- create a message that is consist of list of ids
-    -- insert that message in send_data with destination
-    -- same as senders destinatoin for these ids
 
-    -- update the msg info table reduce the count of 
-    -- messages
-
-    -- remove the chunks from msg_chunk
---END
---' 
---LANGUAGE 'PLPGSQL';
 
 CREATE TRIGGER tr_update_chunk_count 
 AFTER INSERT ON msg_chunk
