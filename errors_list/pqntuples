@@ -1,0 +1,2 @@
+PQntuples
+Returns the number of rows (tuples) in the query result. (Note that PGresult objects are limited to no more than INT_MAX rows, so an int result is sufficient.)

@@ -1,0 +1,5 @@
+PQfinish
+Closes the connection to the server. Also frees memory used by the PGconn object.
+
+void PQfinish(PGconn *conn);
+Note that even if the server connection attempt fails (as indicated by PQstatus), the application should call PQfinish to free the memory used by the PGconn object. The PGconn pointer must not be used again after PQfinish has been called.

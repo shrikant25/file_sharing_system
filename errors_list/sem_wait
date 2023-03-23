@@ -1,0 +1,18 @@
+RETURN VALUE
+       All of these functions return 0 on success; on error, the value of the semaphore is left unchanged, -1 is returned, and errno is set to indicate the error.
+
+ERRORS
+       EINTR  The call was interrupted by a signal handler; see signal(7).
+
+       EINVAL sem is not a valid semaphore.
+
+       The following additional error can occur for sem_trywait():
+
+       EAGAIN The operation could not be performed without blocking (i.e., the semaphore currently has the value zero).
+
+       The following additional errors can occur for sem_timedwait():
+
+       EINVAL The value of abs_timeout.tv_nsecs is less than 0, or greater than or equal to 1000 million.
+
+       ETIMEDOUT
+              The call timed out before the semaphore could be locked.

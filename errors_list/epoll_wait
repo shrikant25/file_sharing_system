@@ -1,0 +1,12 @@
+RETURN VALUE
+       When successful, epoll_wait() returns the number of file descriptors ready for the requested I/O, or zero if no file descriptor became ready during the requested timeout milliseconds.  When an error
+       occurs, epoll_wait() returns -1 and errno is set appropriately.
+
+ERRORS
+       EBADF  epfd is not a valid file descriptor.
+
+       EFAULT The memory area pointed to by events is not accessible with write permissions.
+
+       EINTR  The call was interrupted by a signal handler before either (1) any of the requested events occurred or (2) the timeout expired; see signal(7).
+
+       EINVAL epfd is not an epoll file descriptor, or maxevents is less than or equal to zero.

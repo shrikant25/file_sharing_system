@@ -1,0 +1,29 @@
+RETURN VALUE
+       A successful IPC_INFO or SHM_INFO operation returns the index of the highest used entry in the kernel's internal array recording information about all shared memory segments.  (This information  can
+       be used with repeated SHM_STAT or SHM_STAT_ANY operations to obtain information about all shared memory segments on the system.)  A successful SHM_STAT operation returns the identifier of the shared
+       memory segment whose index was given in shmid.  Other operations return 0 on success.
+
+       On error, -1 is returned, and errno is set appropriately.
+
+ERRORS
+       EACCES IPC_STAT or SHM_STAT is requested and shm_perm.mode does not allow read access for shmid, and the calling process does not have the CAP_IPC_OWNER capability in the user namespace that governs
+              its IPC namespace.
+
+       EFAULT The argument cmd has value IPC_SET or IPC_STAT but the address pointed to by buf isn't accessible.
+
+       EIDRM  shmid points to a removed identifier.
+
+       EINVAL shmid  is  not a valid identifier, or cmd is not a valid command.  Or: for a SHM_STAT or SHM_STAT_ANY operation, the index value specified in shmid referred to an array slot that is currently
+              unused.
+
+       ENOMEM (In kernels since 2.6.9), SHM_LOCK was specified and the size of the to-be-locked segment would mean that the total bytes in locked shared memory segments would exceed the limit for the  real
+              user ID of the calling process.  This limit is defined by the RLIMIT_MEMLOCK soft resource limit (see setrlimit(2)).
+
+       EOVERFLOW
+              IPC_STAT is attempted, and the GID or UID value is too large to be stored in the structure pointed to by buf.
+
+       EPERM  IPC_SET  or  IPC_RMID is attempted, and the effective user ID of the calling process is not that of the creator (found in shm_perm.cuid), or the owner (found in shm_perm.uid), and the process
+              was not privileged (Linux: did not have the CAP_SYS_ADMIN capability).
+
+              Or (in kernels before 2.6.9), SHM_LOCK or SHM_UNLOCK was specified, but the process was not privileged (Linux: did not have the CAP_IPC_LOCK capability).  (Since Linux 2.6.9, this  error  can
+              also occur if the RLIMIT_MEMLOCK is 0 and the caller is not privileged.)

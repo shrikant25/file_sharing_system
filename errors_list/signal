@@ -1,0 +1,6 @@
+
+RETURN VALUE
+       signal() returns the previous value of the signal handler, or SIG_ERR on error.  In the event of an error, errno is set to indicate the cause.
+
+ERRORS
+       EINVAL signum is invalid.

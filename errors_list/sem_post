@@ -1,0 +1,9 @@
+RETURN VALUE
+       sem_post() returns 0 on success; on error, the value of the semaphore is left unchanged, -1 is returned, and errno is set to indicate the error.
+
+ERRORS
+       EINVAL sem is not a valid semaphore.
+
+       EOVERFLOW
+              The maximum allowable value for a semaphore would be exceeded.
+

@@ -1,0 +1,20 @@
+RETURN VALUE
+       On success, shmat() returns the address of the attached shared memory segment; on error, (void *) -1 is returned, and errno is set to indicate the cause of the error.
+
+       On success, shmdt() returns 0; on error -1 is returned, and errno is set to indicate the cause of the error.
+
+ERRORS
+       When shmat() fails, errno is set to one of the following:
+
+       EACCES The calling process does not have the required permissions for the requested attach type, and does not have the CAP_IPC_OWNER capability in the user namespace that governs its IPC namespace.
+
+       EIDRM  shmid points to a removed identifier.
+
+       EINVAL Invalid shmid value, unaligned (i.e., not page-aligned and SHM_RND was not specified) or invalid shmaddr value, or can't attach segment at shmaddr, or SHM_REMAP was specified and shmaddr  was
+              NULL.
+
+       ENOMEM Could not allocate memory for the descriptor or for the page tables.
+
+       When shmdt() fails, errno is set as follows:
+
+       EINVAL There is no shared memory segment attached at shmaddr; or, shmaddr is not aligned on a page boundary.
