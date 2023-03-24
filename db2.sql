@@ -8,6 +8,122 @@ DROP TABLE sysinfo, receivers_comms, receiving_conns, senders_comms,
             sending_conns, logs, raw_data, query, job_scheduler; 
 
 
+DROP TABLE receiving_conns, raw_data, job_scheduler;
+
+CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
+                              rfd INTEGER NOT NULL, 
+                              ripaddr BIGINT NOT NULL, 
+                              rcstatus INTEGER NOT NULL,
+                              rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE raw_data (rfd INTEGER PRIMARY KEY, 
+                       rdata TEXT NOT NULL, 
+                       rdata_size INTEGER NOT NULL,
+                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       rdpriority INTEGER NOT NULL);
+
+
+CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
+                        jobdata TEXT NOT NULL,
+                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
+                        jtype SMALLINT NOT NULL DEFAULT 1,
+                        jsource_ip BIGINT NOT NULL DEFAULT 0,
+                        jobid UUID UNIQUE NOT NULL,
+                        jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE,
+                        jdestination_ip BIGINT NOT NULL DEFAULT 0,
+                        jpriority SMALLINT NOT NULL DEFAULT 10,
+                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+
+INSERT INTO job_scheduler
+(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
+VALUES('__ROOT__', 'N-0', 0, 0, GEN_RANDOM_UUID(), NULL, 0, 0);
+
+UPDATE job_scheduler 
+SET jparent_jobid = jobid 
+WHERE jidx = 1;
+
+ALTER TABLE job_scheduler 
+ALTER COLUMN jparent_jobid
+SET NOT NULL;
+
+INSERT INTO raw_data(rfd, rdata, rdata_size, rdpriority) VALUES(1, '0042aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahello0043aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahelloZLMNOP', 90, 5);
+INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES(1, 23666332, 1);
+
+
+CREATE OR REPLACE FUNCTION build_msg() 
+RETURNS void AS
+'
+DECLARE
+    lfd int;
+    ldata text;
+    ldata_size int;
+    ldata_read int;
+    lmdata_size int;
+BEGIN
+    
+    SELECT rfd, rdata, rdata_size FROM raw_data into lfd, ldata, ldata_size;
+    ldata_read := 0;
+
+    WHILE ldata_size - ldata_read >= 40 LOOP
+      
+        SELECT into lmdata_size SUBSTRING(ldata, 1+ldata_read, 4)::int;
+        RAISE NOTICE ''v : %'', lmdata_size;
+        IF ldata_size - ldata_read >= lmdata_size THEN
+            
+            INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource_ip, 
+                    jobid, jparent_jobid, jdestination_ip, jpriority) 
+            VALUES (
+                SUBSTRING(ldata, ldata_read+1, lmdata_size),
+                ''N-1'',
+                1,
+                (SELECT ripaddr FROM receiving_conns WHERE rfd = lfd),
+                (SELECT GEN_RANDOM_UUID()),
+                (SELECT jobid FROM job_scheduler WHERE jidx = 1),
+                0,
+                5
+            );
+
+            ldata_read := ldata_read + lmdata_size;
+        END IF;
+    END LOOP;
+
+    IF ldata_read > 0 THEN
+        
+        UPDATE raw_data 
+        SET rdata = SUBSTRING(rdata, ldata_read+1, ldata_size - ldata_read),
+        rdata_size = ldata_size - ldata_read, 
+        rdpriority = 10
+        WHERE rfd = lfd;
+
+    END IF;
+
+END;
+'
+LANGUAGE 'plpgsql';
+
+
+SELECT build_msg();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
                         ipaddress BIGINT NOT NULL,
                         systems_capacity INTEGER NOT NULL);
@@ -16,11 +132,6 @@ CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY,
                               mdata TEXT NOT NULL, 
                               mtype INTEGER NOT NULL);
 
-CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
-                              rfd INTEGER NOT NULL, 
-                              ripaddr BIGINT NOT NULL, 
-                              rcstatus INTEGER NOT NULL,
-                              rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
                             mdata TEXT NOT NULL, 
@@ -36,37 +147,11 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                   log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE raw_data (fd INTEGER PRIMARY KEY, 
-                       rdata TEXT NOT NULL, 
-                       rdata_size INTEGER NOT NULL,
-                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       rdpriority INTEGER NOT NULL);
+
 
 CREATE TABLE queries (queryid INTEGER PRIMARY KEY,
                     query TEXT);
 
-CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
-                        jobdata TEXT NOT NULL,
-                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
-                        jtype SMALLINT NOT NULL DEFAULT 1,
-                        jsource_ip BIGINT NOT NULL DEFAULT 0,
-                        jobid UUID UNIQUE NOT NULL,
-                        jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE UNIQUE,
-                        jdestination_ip BIGINT NOT NULL DEFAULT 0,
-                        jpriority SMALLINT NOT NULL DEFAULT 10,
-                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
-insert into job_scheduler
-(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
-values('__ROOT__', 'N-0', 0, 0, GEN_RANDOM_UUID(), NULL, 0, 0);
-
-UPDATE job_scheduler 
-SET jparent_jobid = jobid 
-WHERE jidx = 1;
-
-ALTER TABLE job_scheduler 
-ALTER COLUMN jparent_jobid
-SET NOT NULL;
 
 CREATE TRIGGER tr_extract_msg_info 
 AFTER INSERT ON new_msg 
@@ -96,7 +181,7 @@ BEGIN
     
 END;
 '
-LANGUAGE 'PLPGSQL';
+LANGUAGE 'plpgsql';
 
 
 CREATE TRIGGER tr_extract_senders_comms 
@@ -123,48 +208,18 @@ BEGIN
     
 END;
 '
-LANGUAGE 'PLPGSQL';
+LANGUAGE 'plpgsql';
 
 
-CREATE FUNCTION build_msg() 
+
+CREATE OR REPLACE FUNCTION call_jobs()
 RETURNS void AS
 '
-DECLARE
-    lfd int;
-    ldata text;
-    ldata_size int;
-    ldata_read int;
-    lmdata_size int;
 BEGIN
-    
-    SELECT fd, data, data_size FROM raw_data into lfd, ldata, ldata_size;
-    ldata_read := 0;
-
-    LOOP UNTIL ldata_size - ldata_read >= 40
-      
-        SELECT into lmdata_size SUBSTRING(ldata, 1, 4);
-        IF ldata_size - ldata_read >= lmdata_size THEN
-            
-            INSERT INTO scheduler (nmdata_size, nmdata) 
-            VALUES lmdata_size, (SUBSTRING(ldata, ldata_read+1, lmdata_size));
-
-            ldata_read := ldata_read + lmdata_size;
-    END LOOP;
-
-    IF ldata_read > 0 THEN
-        
-        UPDATE raw_data 
-        SET data = SUBSTRING(data, ldata_read+1, ldata_size - ldata_read),
-        ldata_size = ldata_read, 
-        priority = 10
-        WHERE fd = lfd;
-
-    ENDIF;
-
+    SELECT build_msg();
 END;
 '
-LANGUAGE 'PLPGSQL';
-
+LANGUAGE'plpgsql';
 
 CREATE FUNCTION extract_msg_info() 
 RETURNS void AS
@@ -194,7 +249,7 @@ BEGIN
 
 END;
 '
-LANGUAGE 'PLPGSQL';
+LANGUAGE 'plpgsql';
 
 
 CREATE TRIGGER tr_merge_msg
@@ -243,7 +298,7 @@ BEGIN
     ENDIF;
 END;
 '
-LANGUAGE 'PLPGSQL';
+LANGUAGE 'plpgsql';
 
 
 
@@ -262,7 +317,7 @@ BEGIN
     SET parts_received = parts_received + 1;  
 END;
 '
-LANGUAGE 'PLPGSQL'; 
+LANGUAGE 'plpgsql'; 
 
 
 INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk VALUES(
