@@ -16,12 +16,6 @@ CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY,
                               rcstatus INTEGER NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE raw_data (rfd INTEGER PRIMARY KEY, 
-                       rdata TEXT NOT NULL, 
-                       rdata_size INTEGER NOT NULL,
-                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       rdpriority INTEGER NOT NULL);
-
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
                         jobdata TEXT NOT NULL,
@@ -47,9 +41,7 @@ ALTER TABLE job_scheduler
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
 
-INSERT INTO raw_data(rfd, rdata, rdata_size, rdpriority) VALUES(1, '0042aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahello0043aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahelloZLMNOP', 90, 5);
 INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES(1, 23666332, 1);
-
 
 CREATE OR REPLACE FUNCTION build_msg() 
 RETURNS void AS
@@ -110,9 +102,14 @@ SELECT build_msg();
 
 
 
-
-
-
+CREATE FUNCTION f(x integer) RETURNS set of t1 AS 
+'
+BEGIN
+select c1 from t1 limit 4 offset $1;
+return;
+END;
+' 
+LANGUAGE 'plpgsql';
 
 
 
@@ -151,6 +148,9 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
 
 CREATE TABLE queries (queryid INTEGER PRIMARY KEY,
                     query TEXT);
+
+
+
 
 
 CREATE TRIGGER tr_extract_msg_info 
@@ -364,3 +364,21 @@ INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
                             )'
                         );
 
+
+
+
+
+
+
+
+
+
+
+
+--CREATE TABLE raw_data (rfd INTEGER PRIMARY KEY, 
+--                       rdata TEXT NOT NULL, 
+--                       rdata_size INTEGER NOT NULL,
+--                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--                       rdpriority INTEGER NOT NULL);
+
+-- INSERT INTO raw_data(rfd, rdata, rdata_size, rdpriority) VALUES(1, '0042aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahello0043aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahelloZLMNOP', 90, 5);
