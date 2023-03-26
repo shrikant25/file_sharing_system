@@ -382,3 +382,45 @@ INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
 --                       rdpriority INTEGER NOT NULL);
 
 -- INSERT INTO raw_data(rfd, rdata, rdata_size, rdpriority) VALUES(1, '0042aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahello0043aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahelloZLMNOP', 90, 5);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION create_message(
+    message_type text,
+    messaget text,
+    message_source text,
+    message_destination text,
+    message_priority text
+) RETURNS bytea
+LANGUAGE plpgsql
+AS $$
+DECLARE   
+    hnmessage bytea;
+BEGIN
+
+    hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea ||  (now())::text::bytea || messaget::bytea;
+    RETURN md5(hnmessage)::bytea || hnmessage;
+END;
+$$;
+
+
+select create_message('01'::text, 'hellogal'::text, 's1'::text, 's2'::text, '05'::text);
+
+
+
+select encode(gen_random_uuid::text:bytea, 'escape');
+select encode(now()::text::bytea, 'escape');
