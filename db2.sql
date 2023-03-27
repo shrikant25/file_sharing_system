@@ -5,16 +5,97 @@ SELECT pgcron.schedule('* * * * * *', 'call_jobs;');
 
 
 DROP TABLE sysinfo, receivers_comms, receiving_conns, senders_comms,
-            sending_conns, logs, raw_data, query, job_scheduler; 
+            sending_conns, logs,  query, job_scheduler; 
 
 
-DROP TABLE receiving_conns, raw_data, job_scheduler;
+DROP TABLE receiving_conns, job_scheduler;
+
+DROP TABLE receivers_comms, receiving_conns, transactions;
+
+CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
+                              mdata bytea NOT NULL, 
+                              mtype INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
                               rfd INTEGER NOT NULL, 
                               ripaddr BIGINT NOT NULL, 
                               rcstatus INTEGER NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
+
+CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
+                    transaction_text TEXT);
+
+
+
+CREATE OR REPLACE FUNCTION process_receivers_comms () 
+RETURNS void AS
+$$
+DECLARE
+    ltransaction_string text;
+BEGIN
+
+    SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
+    EXECUTE ltransaction_string;
+
+END;
+$$
+LANGUAGE 'plpgsql';
+
+INSERT INTO transactions (transactionid, transaction_text)
+VALUES (1, '
+            WITH deleted_rows AS 
+            ( 
+              DELETE FROM receivers_comms 
+              WHERE mtype = 1 
+              RETURNING mdata
+            )
+            INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
+            SELECT encode(SUBSTRING(mdata, 2, 4), 'escape')::int, encode(SUBSTRING(mdata, 6, 4), 'escape')::int, 1 FROM deleted_rows;
+          '
+        );
+
+
+
+
+SELECT process_receivers_comms();
+
+
+
+INSERT INTO receivers_comms(mdata, mtype) VALUES('00011234'::text, 1);
+
+shrikant=# SELECT 
+   get_byte(substring::bytea, 4)::bit(8)::int * 256^3 +
+    get_byte(substring::bytea, 3)::bit(8)::int * 256^2 +
+    get_byte(substring::bytea, 2)::bit(8)::int * 256 +
+    get_byte(substring::bytea, 1)::bit(8)::int AS bytes2to5
+FROM (SELECT E'\\x31050000007f0000010000' AS substring) AS subquery;
+ bytes2to5 
+-----------
+         5
+(1 row)
+
+shrikant=# SELECT 
+   get_byte(substring::bytea, 8)::bit(8)::int * 256^3 +
+    get_byte(substring::bytea, 7)::bit(8)::int * 256^2 +
+    get_byte(substring::bytea, 6)::bit(8)::int * 256 +
+    get_byte(substring::bytea, 5)::bit(8)::int AS bytes2to5
+FROM (SELECT E'\\x31050000007f0000010000' AS substring) AS subquery;
+ bytes2to5 
+-----------
+  16777343
+(1 row)
+
+
+
+
+
+
+
 
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
@@ -41,7 +122,139 @@ ALTER TABLE job_scheduler
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
 
-INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES(1, 23666332, 1);
+
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
+
+
+CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
+                            mdata TEXT NOT NULL, 
+                            mtype SMALLINT NOT NULL);
+
+CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
+                            sfd INTEGER NOT NULL,
+                            sipaddr BIGINT NOT NULL, 
+                            scstatus SMALLINT NOT NULL,
+                            sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE logs (logid SERIAL PRIMARY KEY,
+                  log TEXT NOT NULL,
+                   lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
+                    transaction_text TEXT);
+
+
+INSERT INTO transactions (transactionid, transaction_text)
+VALUES (1, 'BEGIN;
+         INSERT INTO recieving_conns (rfd, ripaddr, rcstatus)
+         SELECT SUBSTRING(mdata, 1, 4)::int, SUBSTRING(mdata, 5, 4)::int, 1 FROM receiving_comms WHERE mtype = 1;
+         DELETE FROM receiving_comms WHERE mtype = 1;
+         COMMIT;');
+
+CREATE OR REPLACE FUNCTION process_receivers_comms () 
+RETURNS void AS
+$$
+DECLARE
+    ltransaction_string text;
+BEGIN
+
+    SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
+    EXECUTE ltransaction_string;
+
+END;
+$$
+LANGUAGE 'plpgsql';
+
+CREATE OR REPLACE FUNCTION call_jobs()
+RETURNS void AS
+'
+BEGIN
+    SELECT build_msg();
+END;
+'
+LANGUAGE'plpgsql';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION create_message(
+    message_type text,
+    messaget text,
+    message_source text,
+    message_destination text,
+    message_priority text
+) RETURNS bytea
+AS $$
+DECLARE   
+    hnmessage bytea;
+BEGIN
+    hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea ||  (now())::text::bytea || messaget::bytea;
+    RETURN md5(hnmessage)::bytea || hnmessage;
+END;
+$$;
+LANGUAGE plpgsql
+
+select create_message('01'::text, 'hellogal'::text, 's1'::text, 's2'::text, '05'::text);
+
+select encode(gen_random_uuid::text:bytea, 'escape');
+select encode(now()::text::bytea, 'escape');
+
+
+
+
+
+
+
+
+
+
+
+CREATE TRIGGER tr_extract_senders_comms 
+AFTER INSERT ON senders_comms 
+FOR EACH ROW EXCUTE extract_senders_comms();
+
+CREATE FUNCTION extract_senders_comms() 
+RETURNS void AS
+'
+DECLARE
+
+    lmsgtype integer;
+    lquery text;
+
+BEGIN
+
+    SELECT NEW.mtype into lmsgtype;
+    
+    SELECT query INTO lquery 
+    FROM queries 
+    WHERE queryid = lmsgtype;
+    
+    EXECUTE query;
+    
+END;
+'
+LANGUAGE 'plpgsql';
+
+
+
+
+
+
+
+
 
 CREATE OR REPLACE FUNCTION build_msg() 
 RETURNS void AS
@@ -100,161 +313,23 @@ SELECT build_msg();
 
 
 
+CREATE TRIGGER tr_update_chunk_count 
+AFTER INSERT ON msg_chunk
+FOR EACH ROW EXECUTE update_chunk_count();
 
-
-CREATE FUNCTION f(x integer) RETURNS set of t1 AS 
-'
-BEGIN
-select c1 from t1 limit 4 offset $1;
-return;
-END;
-' 
-LANGUAGE 'plpgsql';
-
-
-
-
-
-
-
-
-
-
-
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
-
-CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
-                              mdata TEXT NOT NULL, 
-                              mtype INTEGER NOT NULL);
-
-
-CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
-                            mdata TEXT NOT NULL, 
-                            mtype SMALLINT NOT NULL);
-
-CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
-                            fd INTEGER NOT NULL,
-                            ipaddr BIGINT NOT NULL, 
-                            scstatus SMALLINT NOT NULL,
-                            sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
-CREATE TABLE logs (logid SERIAL PRIMARY KEY,
-                  log TEXT NOT NULL,
-                   lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
-
-
-CREATE TABLE queries (queryid INTEGER PRIMARY KEY,
-                    query TEXT);
-
-
-
-
-
-CREATE TRIGGER tr_extract_msg_info 
-AFTER INSERT ON new_msg 
-FOR EACH ROW EXCUTE extract_msg_info();
-
-CREATE TRIGGER tr_extract_receivers_comms 
-AFTER INSERT ON receivers_comms 
-FOR EACH ROW EXCUTE extract_receivers_comms();
-
-CREATE FUNCTION extract_receivers_comms () 
-RETURNS void AS
-'
-DECLARE
-
-    lmsgtype integer;
-    lquery text;
-
-BEGIN
-
-    SELECT NEW.mtype into lmsgtype;
-    
-    SELECT query INTO lquery 
-    FROM queries 
-    WHERE queryid = lmsgtype;
-    
-    EXECUTE query;
-    
-END;
-'
-LANGUAGE 'plpgsql';
-
-
-CREATE TRIGGER tr_extract_senders_comms 
-AFTER INSERT ON senders_comms 
-FOR EACH ROW EXCUTE extract_senders_comms();
-
-CREATE FUNCTION extract_senders_comms() 
-RETURNS void AS
-'
-DECLARE
-
-    lmsgtype integer;
-    lquery text;
-
-BEGIN
-
-    SELECT NEW.mtype into lmsgtype;
-    
-    SELECT query INTO lquery 
-    FROM queries 
-    WHERE queryid = lmsgtype;
-    
-    EXECUTE query;
-    
-END;
-'
-LANGUAGE 'plpgsql';
-
-
-
-CREATE OR REPLACE FUNCTION call_jobs()
+CREATE OR REPLACE FUNCTION update_chunk_count()
 RETURNS void AS
 '
 BEGIN
-    SELECT build_msg();
+    INSERT INTO msg_info (original_msgid, parts_received)
+    VALUES (new.original_msgid, 1) 
+    ON CONFLICT (original_msgid)
+    DO UPDATE
+    SET parts_received = parts_received + 1;  
 END;
 '
-LANGUAGE'plpgsql';
+LANGUAGE 'plpgsql'; 
 
-CREATE FUNCTION extract_msg_info() 
-RETURNS void AS
-'
-DECLARE
-    l_nmdata text;
-    l_nmid int;
-    l_query text;
-    
-BEGIN
-    
-    SELECT nmdata, nmgid 
-    INTO l_nmdata, l_nmid 
-    FROM new_msg 
-    WHERE status = 2 
-    LIMIT 1;
-
-    SELECT query 
-    FROM query_table 
-    WHERE queryid = SUBSTRING(l_nmdata, 5, 4)::int 
-    INTO l_query;
-
-    EXECUTE query;
-
-    DELETE FROM new_msg 
-    WHERE nmgid = l_nmid;
-
-END;
-'
-LANGUAGE 'plpgsql';
-
-
-CREATE TRIGGER tr_merge_msg
-AFTER INSERT, UPDATE ON msg_info
-FOR EACH ROW EXECUTE merged_msg();
 
 CREATE FUNCTION merge_msg()
 RETURN void AS
@@ -300,25 +375,47 @@ END;
 '
 LANGUAGE 'plpgsql';
 
-
-
-CREATE TRIGGER tr_update_chunk_count 
-AFTER INSERT ON msg_chunk
-FOR EACH ROW EXECUTE update_chunk_count();
-
-CREATE OR REPLACE FUNCTION update_chunk_count()
+CREATE FUNCTION extract_msg_info() 
 RETURNS void AS
 '
+DECLARE
+    l_nmdata text;
+    l_nmid int;
+    l_query text;
+    
 BEGIN
-    INSERT INTO msg_info (original_msgid, parts_received)
-    VALUES (new.original_msgid, 1) 
-    ON CONFLICT (original_msgid)
-    DO UPDATE
-    SET parts_received = parts_received + 1;  
+    
+    SELECT nmdata, nmgid 
+    INTO l_nmdata, l_nmid 
+    FROM new_msg 
+    WHERE status = 2 
+    LIMIT 1;
+
+    SELECT query 
+    FROM query_table 
+    WHERE queryid = SUBSTRING(l_nmdata, 5, 4)::int 
+    INTO l_query;
+
+    EXECUTE query;
+
+    DELETE FROM new_msg 
+    WHERE nmgid = l_nmid;
+
 END;
 '
-LANGUAGE 'plpgsql'; 
+LANGUAGE 'plpgsql';
 
+
+CREATE TRIGGER tr_merge_msg
+AFTER INSERT, UPDATE ON msg_info
+FOR EACH ROW EXECUTE merged_msg();
+
+
+
+
+CREATE TRIGGER tr_extract_msg_info 
+AFTER INSERT ON new_msg 
+FOR EACH ROW EXCUTE extract_msg_info();
 
 INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk VALUES(
                             SUBSTRING( l_nmdata, 9, 16),
@@ -388,39 +485,11 @@ INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-CREATE OR REPLACE FUNCTION create_message(
-    message_type text,
-    messaget text,
-    message_source text,
-    message_destination text,
-    message_priority text
-) RETURNS bytea
-LANGUAGE plpgsql
-AS $$
-DECLARE   
-    hnmessage bytea;
+CREATE FUNCTION f(x integer) RETURNS set of t1 AS 
+'
 BEGIN
-
-    hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea ||  (now())::text::bytea || messaget::bytea;
-    RETURN md5(hnmessage)::bytea || hnmessage;
+select c1 from t1 limit 4 offset $1;
+return;
 END;
-$$;
-
-
-select create_message('01'::text, 'hellogal'::text, 's1'::text, 's2'::text, '05'::text);
-
-
-
-select encode(gen_random_uuid::text:bytea, 'escape');
-select encode(now()::text::bytea, 'escape');
+' 
+LANGUAGE 'plpgsql';

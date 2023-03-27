@@ -205,7 +205,7 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block , 0);
+    subblock_position = get_subblock(dblks.datar_block, 0);
     
     if (subblock_position >= 0) {
 
@@ -262,11 +262,12 @@ int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
     char msg_type;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock2(dblks.commr_block , 0, 1);
+    subblock_position = get_subblock2(dblks.commr_block, 0, 1);
     
     if (subblock_position >= 0) {
 
         blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
+        memset(blkptr, 0, CPARTITION_SIZE);
 
         msg_type = ipaddress == 0 ? '2' : '1';
         memcpy(blkptr, &msg_type, sizeof(msg_type));
@@ -361,10 +362,9 @@ int detach_memory()
 
     status = detach_memory_block(dblks.datar_block); // detach memory used for data sharing
     status = detach_memory_block(dblks.commr_block); // detach memory used for communication
-
-    /*
-        instead of returning status, status can be checked here and appropriate action can be taken
-    */
+    
+    //    instead of returning status, status can be checked here and appropriate action can be taken
+    
 
     return status;  // return status
 }

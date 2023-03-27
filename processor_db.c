@@ -10,58 +10,59 @@ PGconn *connection;
 
 db_statements dbs[statement_count] = {
     { 
-      .statement_name = "s0", 
-      .statement = "INSERT INTO raw_data (fd, data, data_size) VALUES ($1, $2, $3);",
-      .param_count = 3,
+      .statement_name = "s0",  
+      .statement = "select * from sysinfo;",
+      //.statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(), NULL, 0, 0);",
+      .param_count = 0,
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT fd, data, data_size FROM send_data LIMIT 1 WHERE status = 1;",
+      .statement = "SELECT * from sysinfo;",
       .param_count = 0,
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO receiver_comms (data) VALUES ($1);",
+      .statement = "INSERT INTO receivers_comms (mdata) VALUES ($1);",
       .param_count = 1,
     },
     { 
       .statement_name = "s3", 
-      .statement = "UPDATE send_data SET status = $2 WHERE msgid = $1;",
-      .param_count = 2,
+      .statement = "select * from sysinfo;",
+      .param_count = 0,
     },
     { 
       .statement_name = "s4", 
-      .statement = "SELECT data FROM receiver_comms WHERE destination = 2",
+      .statement = "select * from sysinfo;",
       .param_count = 0,
     },
     { 
       .statement_name = "s5", 
-      .statement = "SELECT * FROM for_sender WHERE status = 2 OR status = 3 LIMIT 1;",
+      .statement = "select * from sysinfo;",
       .param_count = 0,
     },
     { 
       .statement_name = "s6", 
-      .statement = "UPDATE for_sender SET status = 2 WHERE cid = ($1);",
-      .param_count = 1,
+      .statement = "select * from sysinfo;",
+      .param_count = 0,
     },
     { 
       .statement_name = "s7", 
-      .statement = "UPDATE for_sender SET status = 3 WHERE cid = ($1);",
-      .param_count = 1,
+      .statement = "select * from sysinfo;",
+      .param_count = 0,
     },
     { 
       .statement_name = "s8", 
-      .statement = "UPDATE connections_receiving SET status = 2 WHERE fd = ($1);",
-      .param_count = 1,
+      .statement = "select * from sysinfo;",
+      .param_count = 0,
     },
     { 
       .statement_name = "s9", 
-      .statement = "INSERT INTO connections_sending (fd, ipaddr, status) VALUES ($1, $2, $3);",
-      .param_count = 3,
+      .statement = "select * from sysinfo;",
+      .param_count = 0,
     },
     { 
       .statement_name = "s10", 
-      .statement = "UPDATE connections_sending SET status = 0 WHERE fd = ($1);",
+      .statement = "select * from sysinfo;",
       .param_count = 1,
     },
 };
@@ -113,8 +114,8 @@ int store_data_in_database(char *data)
     sprintf(cfd, "%d", *(int*)data);
     data += 4;
 
-    memset(cdata_size, 0, sizeof(cdata_size));
-    sprintf(cdata_size, "%d", *(int *)data);
+   // memset(cdata_size, 0, sizeof(cdata_size));
+    //sprintf(cdata_size, "%d", *(int *)data);
 
     memset(cdata, 0, sizeof(cdata));
     memcpy(cdata, data+4, *(int *)data);
@@ -169,9 +170,9 @@ int store_commr_into_database(char *data)
     PGresult *res = NULL;
 
     const int paramLengths[] = {CPARTITION_SIZE};
-    const int paramFormats[] = {0};
+    const int paramFormats[] = {1};
     int resultFormat = 0;
-    
+   
     const char *const param_values[] = {data};
     
     res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
