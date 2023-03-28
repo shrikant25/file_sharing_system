@@ -31,73 +31,6 @@ CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
                     transaction_text TEXT);
 
 
-
-CREATE OR REPLACE FUNCTION process_receivers_comms () 
-RETURNS void AS
-$$
-DECLARE
-    ltransaction_string text;
-BEGIN
-
-    SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
-    EXECUTE ltransaction_string;
-
-END;
-$$
-LANGUAGE 'plpgsql';
-
-INSERT INTO transactions (transactionid, transaction_text)
-VALUES (1, '
-            WITH deleted_rows AS 
-            ( 
-              DELETE FROM receivers_comms 
-              WHERE mtype = 1 
-              RETURNING mdata
-            )
-            INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
-            SELECT encode(SUBSTRING(mdata, 2, 4), 'escape')::int, encode(SUBSTRING(mdata, 6, 4), 'escape')::int, 1 FROM deleted_rows;
-          '
-        );
-
-
-
-
-SELECT process_receivers_comms();
-
-
-
-INSERT INTO receivers_comms(mdata, mtype) VALUES('00011234'::text, 1);
-
-shrikant=# SELECT 
-   get_byte(substring::bytea, 4)::bit(8)::int * 256^3 +
-    get_byte(substring::bytea, 3)::bit(8)::int * 256^2 +
-    get_byte(substring::bytea, 2)::bit(8)::int * 256 +
-    get_byte(substring::bytea, 1)::bit(8)::int AS bytes2to5
-FROM (SELECT E'\\x31050000007f0000010000' AS substring) AS subquery;
- bytes2to5 
------------
-         5
-(1 row)
-
-shrikant=# SELECT 
-   get_byte(substring::bytea, 8)::bit(8)::int * 256^3 +
-    get_byte(substring::bytea, 7)::bit(8)::int * 256^2 +
-    get_byte(substring::bytea, 6)::bit(8)::int * 256 +
-    get_byte(substring::bytea, 5)::bit(8)::int AS bytes2to5
-FROM (SELECT E'\\x31050000007f0000010000' AS substring) AS subquery;
- bytes2to5 
------------
-  16777343
-(1 row)
-
-
-
-
-
-
-
-
-
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
                         jobdata TEXT NOT NULL,
                         jstate CHAR(5) NOT NULL DEFAULT 'N-1',
@@ -121,6 +54,49 @@ WHERE jidx = 1;
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
+
+CREATE OR REPLACE FUNCTION process_receivers_comms () 
+RETURNS void AS
+$$
+DECLARE
+    ltransaction_string text;
+BEGIN
+
+    SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
+    EXECUTE ltransaction_string;
+
+END;
+$$
+LANGUAGE 'plpgsql';
+
+INSERT INTO transactions (transactionid, transaction_text)
+VALUES (1, '
+            WITH deleted_rows AS 
+            ( 
+              DELETE FROM receivers_comms 
+              WHERE mtype = 1
+              RETURNING mdata
+            )
+            INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
+            SELECT get_byte(mdata, 1)::bit(8)::int + 
+                (get_byte(mdata::bytea, 2)::bit(8)::int << 8) +
+                (get_byte(mdata::bytea, 3)::bit(8)::int << 16) +
+                (get_byte(mdata::bytea, 4)::bit(8)::int << 24), 
+                get_byte(mdata::bytea, 5)::bit(8)::int +
+                (get_byte(mdata::bytea, 6)::bit(8)::int << 8 ) +
+                (get_byte(mdata::bytea, 7)::bit(8)::int << 16) +
+                (get_byte(mdata::bytea, 8)::bit(8)::int << 24),
+                1 FROM deleted_rows;
+          '
+        );
+
+
+
+
+SELECT process_receivers_comms();
+
+
+
 
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
