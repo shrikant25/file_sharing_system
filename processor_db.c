@@ -11,9 +11,11 @@ PGconn *connection;
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "s0",  
-      .statement = "select * from sysinfo;",
-      //.statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(), NULL, 0, 0);",
-      .param_count = 0,
+      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype,\
+                    jsource_ip, jobid, jparent_jobid, jdestination_ip,\
+                    jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(),\
+                    (select jobid from job_scheduler where jidx = 1), 0, 0);",
+      .param_count = 2,
     },
     { 
       .statement_name = "s1", 
@@ -106,28 +108,28 @@ int store_data_in_database(char *data)
 {
     PGresult *res = NULL;
     
-    char cfd[4];
-    char cdata_size[4];
-    char cdata[1024*128];
+//     char cfd[4];
+//     char cdata_size[4];
+//     char cdata[1024*128];
 
-    memset(cfd, 0 , sizeof(cfd));
-    sprintf(cfd, "%d", *(int*)data);
-    data += 4;
+//     memset(cfd, 0 , sizeof(cfd));
+//     sprintf(cfd, "%d", *(int*)data);
+//     data += 4;
 
-   // memset(cdata_size, 0, sizeof(cdata_size));
-    //sprintf(cdata_size, "%d", *(int *)data);
+//    // memset(cdata_size, 0, sizeof(cdata_size));
+//     //sprintf(cdata_size, "%d", *(int *)data);
 
-    memset(cdata, 0, sizeof(cdata));
-    memcpy(cdata, data+4, *(int *)data);
+//     memset(cdata, 0, sizeof(cdata));
+//     memcpy(cdata, data+4, *(int *)data);
 
-    const int paramLengths[] = {sizeof(cfd), *(int *)data, sizeof(cdata_size)};
-    const int paramFormats[] = {0, 0, 0};
+    const int paramLengths[] = {4, DPARTITION_SIZE-4};
+    const int paramFormats[] = {1, 1};
     int resultFormat = 0;
 
-    const char *const param_values[] = {cfd, cdata, cdata_size};
+    const char *const param_values[] = {data, data+4};
     
     res = PQexecPrepared(connection, dbs[0].statement_name, 
-                                    dbs[0].param_count, param_values, NULL, NULL, 0);
+                                    dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
         return -1;

@@ -1,16 +1,18 @@
 
--- launch every second
-SELECT pgcron.schedule('* * * * * *', 'call_jobs;');
--- call jobs function yet to be written
+
+CREATE OR REPLACE FUNCTION call_jobs()
+RETURNS void AS
+$$
+BEGIN
+    RAISE NOTICE'HURRA';
+END;
+$$
+LANGUAGE'plpgsql';
 
 
-DROP TABLE sysinfo, receivers_comms, receiving_conns, senders_comms,
-            sending_conns, logs,  query, job_scheduler; 
+SELECT cron.schedule('* * * * * *', 'select call_jobs();');
 
-
-DROP TABLE receiving_conns, job_scheduler;
-
-DROP TABLE receivers_comms, receiving_conns, transactions;
+DROP TABLE receivers_comms, receiving_conns, transactions, job_scheduler, sysinfo;
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
                               mdata bytea NOT NULL, 
@@ -32,10 +34,10 @@ CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
 
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
-                        jobdata TEXT NOT NULL,
+                        jobdata bytea NOT NULL,
                         jstate CHAR(5) NOT NULL DEFAULT 'N-1',
                         jtype SMALLINT NOT NULL DEFAULT 1,
-                        jsource_ip BIGINT NOT NULL DEFAULT 0,
+                        jsource_ip bytea NOT NULL,
                         jobid UUID UNIQUE NOT NULL,
                         jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE,
                         jdestination_ip BIGINT NOT NULL DEFAULT 0,
@@ -45,7 +47,7 @@ CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY,
 
 INSERT INTO job_scheduler
 (jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
-VALUES('__ROOT__', 'N-0', 0, 0, GEN_RANDOM_UUID(), NULL, 0, 0);
+VALUES('__ROOT__', 'N-0', 0, '0'::bytea, GEN_RANDOM_UUID(), NULL, 0, 0);
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -92,11 +94,7 @@ VALUES (1, '
 
 
 
-
 SELECT process_receivers_comms();
-
-
-
 
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
@@ -142,16 +140,6 @@ BEGIN
 END;
 $$
 LANGUAGE 'plpgsql';
-
-CREATE OR REPLACE FUNCTION call_jobs()
-RETURNS void AS
-'
-BEGIN
-    SELECT build_msg();
-END;
-'
-LANGUAGE'plpgsql';
-
 
 
 
@@ -386,56 +374,10 @@ CREATE TRIGGER tr_merge_msg
 AFTER INSERT, UPDATE ON msg_info
 FOR EACH ROW EXECUTE merged_msg();
 
-
-
-
 CREATE TRIGGER tr_extract_msg_info 
 AFTER INSERT ON new_msg 
 FOR EACH ROW EXCUTE extract_msg_info();
 
-INSERT INTO query VALUES (1, 'INSERT INTO msg_chunk VALUES(
-                            SUBSTRING( l_nmdata, 9, 16),
-                            SUBSTRING( l_nmdata, 25, 8)::bigint,
-                            SUBSTRING( l_nmdata, 33, 8)::bigint,
-                            SUBSTRING( l_nmdata, 41, 4)::int,
-                            SUBSTRING( l_nmdata, 5, 4)::int,
-                            SUBSTRING( l_nmdata, 45, 16),
-                            SUBSTRING( l_nmdata, 61, 4)::int,
-                            SUBSTRING( l_nmdata, 65, 4)::int,
-                            SUBSTRING( l_nmdata, 69, 4)::int,
-                            SUBSTRING( l_nmdata, 73, SUBSTRING(l_mdata, 1, 4)::int - 72)
-                            )'
-                        );
-
-
-INSERT INTO query VALUES (2, 'INSERT INTO msg_info VALUES(
-                            SUBSTRING( l_nmdata, 9, 16),
-                            SUBSTRING( l_nmdata, 25, 8)::bigint,
-                            SUBSTRING( l_nmdata, 33, 8)::bigint,
-                            SUBSTRING( l_nmdata, 41, 4)::int,
-                            SUBSTRING( l_nmdata, 5, 4)::int,
-                            SUBSTRING( l_nmdata, 45, 16),
-                            SUBSTRING( l_nmdata, 61, 4)::int,
-                            SUBSTRING( l_nmdata, 65, 4)::int,
-                            SUBSTRING( l_nmdata, 69, 4)::int
-                            )'
-                        );
-
-INSERT INTO query VALUES (3, 'INSERT INTO get_info VALUES(
-                            SUBSTRING( l_nmdata, 9, 16),
-                            SUBSTRING( l_nmdata, 25, 4)::int,
-                            SUBSTRING( l_nmdata, 29, 4)::int,
-                            SUBSTRING( l_nmdata, 32, SUBSTRING(l_mdata, 1, 4)::int - 72)
-                            )'
-                        );
-
-INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
-                            SUBSTRING( l_nmdata, 9, 16),
-                            SUBSTRING( l_nmdata, 33, 8)::int,
-                            SUBSTRING( l_nmdata, 1, 4)::int,
-                            l_nmdata
-                            )'
-                        );
 
 
 
@@ -443,18 +385,6 @@ INSERT INTO query VALUES (4, 'INSERT INTO get_info VALUES(
 
 
 
-
-
-
-
-
---CREATE TABLE raw_data (rfd INTEGER PRIMARY KEY, 
---                       rdata TEXT NOT NULL, 
---                       rdata_size INTEGER NOT NULL,
---                       rtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
---                       rdpriority INTEGER NOT NULL);
-
--- INSERT INTO raw_data(rfd, rdata, rdata_size, rdpriority) VALUES(1, '0042aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahello0043aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahelloZLMNOP', 90, 5);
 
 
 
@@ -469,3 +399,26 @@ return;
 END;
 ' 
 LANGUAGE 'plpgsql';
+
+INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 0);
+shrikant=# select * from cron.job_run_details;
+shrikant=# delete from cron.job_run_details;
+
+delete from cron.job where jobid = 1;
+
+
+
+
+
+-- inside postgresql.conf
+
+shared_preload_libraries='pg_cron' 
+cron.database_name='shrikant'
+
+-- inside pg_hba.conf
+# "local" is for Unix domain socket connections only
+local   all             all                                     peer
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            trust
+# IPv6 local connections:
+host    all             all             ::1/128                 trust

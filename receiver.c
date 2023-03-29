@@ -146,15 +146,20 @@ void accept_connection()
 void read_socket(struct epoll_event event) 
 {
     char buffer[1024 * 128];
-    ssize_t bytes_read = 0;
+    ssize_t bytes_read;
+    int msg_size = 1024 * 128;
 
     while (1) {
+
+        bytes_read = 0;
+        memset(buffer, 0, sizeof(buffer));
+
         bytes_read = read(event.data.fd, buffer, sizeof(buffer));
         if (bytes_read <=0) 
             return;
         else {
-            while (send_to_processor(event.data.fd, buffer, bytes_read) == -1);
-        }
+                while(send_to_processor(event.data.fd, buffer, msg_size) == -1);  
+        }   
     }
 }
 
@@ -215,12 +220,8 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
         memcpy(blkptr, &socketid, sizeof(socketid));
         
         blkptr += 4;
-        memcpy(blkptr, &data_size, sizeof(data_size));
-        
-        blkptr += 4;
         memcpy(blkptr, data, data_size);
         
-        memset(data, 0, DPARTITION_SIZE);
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
     }
