@@ -1,9 +1,10 @@
 #ifndef PARTN_H
 #define PARTN_H
 
+#include "message.h"
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
-#define DPARTITION_SIZE 1024 * 128 + 4
+#define DPARTITION_SIZE  sizeof(rcondata)
 #define DATA_BLOCK_SIZE DPARTITION_SIZE * TOTAL_PARTITIONS + 3
 #define CPARTITION_SIZE 15
 #define COMM_BLOCK_SIZE CPARTITION_SIZE * TOTAL_PARTITIONS + 4

@@ -15,6 +15,7 @@
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
+#include "message.h"
 
 server_info s_info;
 datablocks dblks;
@@ -119,6 +120,7 @@ void accept_connection()
     int client_fd = -1;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len;
+    rconmsg rcvm;
 
     while (1) { // keep accepting connections as long as there are connections in queue
     
@@ -135,9 +137,16 @@ void accept_connection()
             }
         }
         else{
+            
             make_nonblocking(client_fd);
             add_to_list(client_fd);
-            while (send_message_to_processor(client_fd, client_addr.sin_addr.s_addr) == -1);
+            
+            rcvm.fd = client_fd;
+            rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
+            rcvm.status = 1;
+            
+            while (send_message_to_processor(&rcvm) == -1);
+            memset(&rcvm, 0, sizeof(rcvm));
         }
     }
 }
@@ -145,22 +154,28 @@ void accept_connection()
 
 void read_socket(struct epoll_event event) 
 {
-    char buffer[1024 * 128];
-    ssize_t bytes_read;
-    int msg_size = 1024 * 128;
+    int bytes_read = 0;
+    int dsize = message_size;
+    char *dptr;
 
-    while (1) {
+    rcondata rcond;
+    rcond.fd = event.data.fd;
+    memset(&rcond, 0, sizeof(rcond));
+    dptr = rcond.data;
 
-        bytes_read = 0;
-        memset(buffer, 0, sizeof(buffer));
+    while (dsize > 0) {
 
-        bytes_read = read(event.data.fd, buffer, sizeof(buffer));
-        if (bytes_read <=0) 
-            return;
-        else {
-                while(send_to_processor(event.data.fd, buffer, msg_size) == -1);  
-        }   
+        bytes_read = read(rcond.fd, dptr, dsize);
+        
+        if (bytes_read <= 0)
+            break;
+        
+        dptr += bytes_read;
+        dsize -= bytes_read;   
     }
+    
+    while(send_to_processor(&rcond) == -1);  
+        
 }
 
 
@@ -170,6 +185,7 @@ int run_receiver()
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     char data[CPARTITION_SIZE];
+    rconmsg rcvm;
 
     while (receiver_status) {
         
@@ -188,7 +204,13 @@ int run_receiver()
                 
                 printf("removing from list");
                 remove_from_list(events[i].data.fd);
-                while (send_message_to_processor(events[i].data.fd, 0) == -1);
+                
+                rcvm.fd = events[i].data.fd;
+                rcvm.ipaddr = 0;
+                rcvm.status = 2;
+
+                while (send_message_to_processor(&rcvm) == -1);
+                memset(&rcvm, 0, sizeof(rcvm));
                 continue;
             
             }
@@ -204,7 +226,7 @@ int run_receiver()
 }
  
     
-int send_to_processor(unsigned int socketid, char *data, int data_size)
+int send_to_processor(rcondata *rcond)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -215,12 +237,9 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     if (subblock_position >= 0) {
 
         blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
+        
         memset(blkptr, 0, DPARTITION_SIZE);
-        
-        memcpy(blkptr, &socketid, sizeof(socketid));
-        
-        blkptr += 4;
-        memcpy(blkptr, data, data_size);
+        memcpy(blkptr, rcond, sizeof(rcond));
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
@@ -256,7 +275,7 @@ int read_message_from_processor(char *data)
 }
 */
 
-int send_message_to_processor(unsigned int fd, unsigned long ipaddress)
+int send_message_to_processor(rconmsg *rcvm)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -268,18 +287,9 @@ int send_message_to_processor(unsigned int fd, unsigned long ipaddress)
     if (subblock_position >= 0) {
 
         blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
+        
         memset(blkptr, 0, CPARTITION_SIZE);
-
-        msg_type = ipaddress == 0 ? '2' : '1';
-        memcpy(blkptr, &msg_type, sizeof(msg_type));
-   
-        blkptr++;         
-        memcpy(blkptr, &fd, sizeof(fd));
-         
-        if (msg_type == '1') { 
-            blkptr+=4;
-            memcpy(blkptr, &ipaddress, sizeof(ipaddress));
-        }
+        memcpy(blkptr, rcvm, sizeof(rcvm));
 
         toggle_bit(subblock_position, dblks.commr_block, 3);
     }

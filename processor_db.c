@@ -105,15 +105,19 @@ int prepare_statements()
 }
 
 
-int store_data_in_database(char *data) 
+int store_data_in_database(rcondata *rcond) 
 {
     PGresult *res = NULL;
     
-    const int paramLengths[] = {4, DPARTITION_SIZE-4};
+    char fd[11];
+
+    sprintf(fd, "%d", rcond->fd);
+
+    const int paramLengths[] = {sizeof(fd), sizeof(rcond->data)};
     const int paramFormats[] = {1, 1};
     int resultFormat = 0;
 
-    const char *const param_values[] = {data, data+4};
+    const char *const param_values[] = {fd, rcond->data};
     
     res = PQexecPrepared(connection, dbs[0].statement_name, 
                                     dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
@@ -154,7 +158,7 @@ int retrive_data_from_database(char *data)
 }
 
 
-int store_commr_into_database(rconmsg rcvm) 
+int store_commr_into_database(rconmsg *rcvm) 
 {
     PGresult *res = NULL;
 
@@ -162,11 +166,11 @@ int store_commr_into_database(rconmsg rcvm)
     char ipaddr[11];
     char status [11];
 
-    sprintf(fd, "%d", rcvm.fd);
-    sprintf(ipaddr, "%d", rcvm.ipaddr);
-    sprintf(status, "%d", rcvm.status);
+    sprintf(fd, "%d", rcvm->fd);
+    sprintf(ipaddr, "%d", rcvm->ipaddr);
+    sprintf(status, "%d", rcvm->status);
 
-    const int paramLengths[] = {4, 4, 4};
+    const int paramLengths[] = {sizeof(fd), sizeof(ipaddr), sizeof(ipaddr)};
     const int paramFormats[] = {0, 0, 0};
     int resultFormat = 0;
    

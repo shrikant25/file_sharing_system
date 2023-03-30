@@ -25,6 +25,7 @@ int get_data_from_receiver()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
+    rcondata rcond;
 
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block, 1);
@@ -32,8 +33,11 @@ int get_data_from_receiver()
     if(subblock_position >= 0) {
 
         blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
-         
-        store_data_in_database(blkptr);
+        
+        memset(&rcond, 0, sizeof(rcond));
+        memcpy(&rcond, blkptr, sizeof(rcond));
+
+        store_data_in_database(&rcond);
 
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
@@ -104,7 +108,7 @@ int communicate_with_receiver()
         blkptr = dblks.commr_block + 4 + subblock_position*CPARTITION_SIZE;
         
         memcpy(&rcvm, blkptr, sizeof(rcvm));
-        store_commr_into_database(rcvm);
+        store_commr_into_database(&rcvm);
           
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.commr_block, 3);
