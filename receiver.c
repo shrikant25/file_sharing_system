@@ -173,7 +173,7 @@ int run_receiver()
 
     while (receiver_status) {
         
-        read_message_from_processor(data); // todo
+      //  read_message_from_processor(data); // todo
 
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
@@ -230,7 +230,7 @@ int send_to_processor(unsigned int socketid, char *data, int data_size)
     return subblock_position;
 }
 
-
+/*
 int read_message_from_processor(char *data)
 {
     int subblock_position = -1;
@@ -254,9 +254,9 @@ int read_message_from_processor(char *data)
     sem_post(smlks.sem_lock_commr);
     return subblock_position;
 }
+*/
 
-
-int send_message_to_processor(unsigned int fd, unsigned int ipaddress)
+int send_message_to_processor(unsigned int fd, unsigned long ipaddress)
 {
     int subblock_position = -1;
     char *blkptr = NULL;

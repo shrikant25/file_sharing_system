@@ -42,7 +42,7 @@ int get_data_from_receiver()
     sem_post(smlks.sem_lock_datar);
 }
 
-
+/*
 int give_data_to_sender() 
 {
     int subblock_position = -1;
@@ -67,7 +67,7 @@ int give_data_to_sender()
 
     sem_post(smlks.sem_lock_datas);
 }
-
+*/
 
 int communicate_with_receiver() 
 {
@@ -76,7 +76,7 @@ int communicate_with_receiver()
     char data[CPARTITION_SIZE];
 
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock2(dblks.commr_block, 0, 0);
+ /*   subblock_position = get_subblock2(dblks.commr_block, 0, 0);
     
     if(subblock_position >= 0) {
 
@@ -93,7 +93,7 @@ int communicate_with_receiver()
         blkptr = NULL;
     }
 
-    
+   */ 
     subblock_position = -1;
     subblock_position = get_subblock2(dblks.commr_block, 1, 1);
     
@@ -111,7 +111,7 @@ int communicate_with_receiver()
     sem_post(smlks.sem_lock_commr);   
 }
 
-
+/*
 int communicate_with_sender() 
 {
     int subblock_position = -1;
@@ -154,7 +154,7 @@ int communicate_with_sender()
 
     sem_post(smlks.sem_lock_comms);   
 }
-
+*/
 
 int run_process() 
 {
@@ -168,9 +168,9 @@ int run_process()
     while (process_status) {
 
         communicate_with_receiver();
-        communicate_with_sender();
+       // communicate_with_sender();
         get_data_from_receiver();
-        give_data_to_sender();
+        //give_data_to_sender();
     
     }  
 }

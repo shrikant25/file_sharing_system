@@ -1,5 +1,4 @@
 
-
 CREATE OR REPLACE FUNCTION call_jobs()
 RETURNS void AS
 $$
@@ -16,14 +15,12 @@ DROP TABLE receivers_comms, receiving_conns, transactions, job_scheduler, sysinf
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
                               mdata bytea NOT NULL, 
-                              mtype INTEGER NOT NULL DEFAULT 1);
+                              mtype INTEGER NOT NULL);
 
-CREATE TABLE receiving_conns (rconn SERIAL PRIMARY KEY, 
-                              rfd INTEGER NOT NULL, 
+CREATE TABLE receiving_conns (rfd INTEGER NOT NULL PRIMARY KEY, 
                               ripaddr BIGINT NOT NULL, 
-                              rcstatus INTEGER NOT NULL,
+                              rcstatus CHAR(1) NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
                         ipaddress BIGINT NOT NULL,
@@ -31,7 +28,6 @@ CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
 
 CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
                     transaction_text TEXT);
-
 
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
                         jobdata bytea NOT NULL,
@@ -71,35 +67,31 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-INSERT INTO transactions (transactionid, transaction_text)
-VALUES (1, '
-            WITH deleted_rows AS 
-            ( 
-              DELETE FROM receivers_comms 
-              WHERE mtype = 1
-              RETURNING mdata
-            )
-            INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
-            SELECT get_byte(mdata, 1)::bit(8)::int + 
-                (get_byte(mdata::bytea, 2)::bit(8)::int << 8) +
-                (get_byte(mdata::bytea, 3)::bit(8)::int << 16) +
-                (get_byte(mdata::bytea, 4)::bit(8)::int << 24), 
-                get_byte(mdata::bytea, 5)::bit(8)::int +
-                (get_byte(mdata::bytea, 6)::bit(8)::int << 8 ) +
-                (get_byte(mdata::bytea, 7)::bit(8)::int << 16) +
-                (get_byte(mdata::bytea, 8)::bit(8)::int << 24),
-                1 FROM deleted_rows;
-          '
-        );
+-- INSERT INTO transactions (transactionid, transaction_text)
+-- VALUES (1, '
+--             WITH deleted_rows AS 
+--             ( 
+--               DELETE FROM receivers_comms 
+--               WHERE mtype = 1
+--               RETURNING mdata
+--             )
+--             INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
+--             SELECT get_byte(mdata, 1)::bit(8)::int + 
+--                 (get_byte(mdata::bytea, 2)::bit(8)::int << 8) +
+--                 (get_byte(mdata::bytea, 3)::bit(8)::int << 16) +
+--                 (get_byte(mdata::bytea, 4)::bit(8)::int << 24), 
+--                 get_byte(mdata::bytea, 5)::bit(8)::int +
+--                 (get_byte(mdata::bytea, 6)::bit(8)::int << 8 ) +
+--                 (get_byte(mdata::bytea, 7)::bit(8)::int << 16) +
+--                 (get_byte(mdata::bytea, 8)::bit(8)::int << 24),
+--                 1 FROM deleted_rows;
+--           '
+--         );
 
 
 
 SELECT process_receivers_comms();
 
-
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
 
 
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
@@ -115,43 +107,6 @@ CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY,
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                   log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
-CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
-                    transaction_text TEXT);
-
-
-INSERT INTO transactions (transactionid, transaction_text)
-VALUES (1, 'BEGIN;
-         INSERT INTO recieving_conns (rfd, ripaddr, rcstatus)
-         SELECT SUBSTRING(mdata, 1, 4)::int, SUBSTRING(mdata, 5, 4)::int, 1 FROM receiving_comms WHERE mtype = 1;
-         DELETE FROM receiving_comms WHERE mtype = 1;
-         COMMIT;');
-
-CREATE OR REPLACE FUNCTION process_receivers_comms () 
-RETURNS void AS
-$$
-DECLARE
-    ltransaction_string text;
-BEGIN
-
-    SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
-    EXECUTE ltransaction_string;
-
-END;
-$$
-LANGUAGE 'plpgsql';
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 CREATE OR REPLACE FUNCTION create_message(

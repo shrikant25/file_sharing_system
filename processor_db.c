@@ -24,8 +24,8 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO receivers_comms (mdata) VALUES ($1);",
-      .param_count = 1,
+      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES ($2, $3, $1);",
+      .param_count = 3,
     },
     { 
       .statement_name = "s3", 
@@ -108,20 +108,6 @@ int store_data_in_database(char *data)
 {
     PGresult *res = NULL;
     
-//     char cfd[4];
-//     char cdata_size[4];
-//     char cdata[1024*128];
-
-//     memset(cfd, 0 , sizeof(cfd));
-//     sprintf(cfd, "%d", *(int*)data);
-//     data += 4;
-
-//    // memset(cdata_size, 0, sizeof(cdata_size));
-//     //sprintf(cdata_size, "%d", *(int *)data);
-
-//     memset(cdata, 0, sizeof(cdata));
-//     memcpy(cdata, data+4, *(int *)data);
-
     const int paramLengths[] = {4, DPARTITION_SIZE-4};
     const int paramFormats[] = {1, 1};
     int resultFormat = 0;
@@ -171,11 +157,11 @@ int store_commr_into_database(char *data)
 {
     PGresult *res = NULL;
 
-    const int paramLengths[] = {CPARTITION_SIZE};
-    const int paramFormats[] = {1};
+    const int paramLengths[] = {1, 4, 8};
+    const int paramFormats[] = {0, 1, 1};
     int resultFormat = 0;
    
-    const char *const param_values[] = {data};
+    const char *const param_values[] = {data, data+1, data+5};
     
     res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
    
@@ -189,7 +175,7 @@ int store_commr_into_database(char *data)
     return 0;
 }
 
-
+/*
 int store_comms_into_database(char *data) 
 {
     char msg_id[17];
@@ -224,7 +210,7 @@ int store_comms_into_database(char *data)
     return 0;
 }
 
-
+*/
 int retrive_commr_from_database(char *data) 
 {
     int row_count = 0;
@@ -248,7 +234,7 @@ int retrive_commr_from_database(char *data)
     return -1;
 }
 
-
+/*
 int retrive_comms_from_database(char *data) 
 {
     char cid[4];
@@ -297,7 +283,7 @@ int retrive_comms_from_database(char *data)
 
 }
 
-
+*/
 int close_database_connection() 
 {   
     PQfinish(connection);
