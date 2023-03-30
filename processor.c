@@ -12,6 +12,7 @@
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor.h"
+#include "message.h"
 
 int process_status = 1;
 
@@ -74,6 +75,7 @@ int communicate_with_receiver()
     int subblock_position = -1;
     char *blkptr = NULL;
     char data[CPARTITION_SIZE];
+    rconmsg rcvm;
 
     sem_wait(smlks.sem_lock_commr);         
  /*   subblock_position = get_subblock2(dblks.commr_block, 0, 0);
@@ -101,7 +103,8 @@ int communicate_with_receiver()
 
         blkptr = dblks.commr_block + 4 + subblock_position*CPARTITION_SIZE;
         
-        store_commr_into_database(blkptr);
+        memcpy(&rcvm, blkptr, sizeof(rcvm));
+        store_commr_into_database(rcvm);
           
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.commr_block, 3);

@@ -1,7 +1,7 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 #include <semaphore.h>
-
+#include "message.h"
 
 typedef struct datablocks {     
     char *datar_block;
@@ -35,7 +35,7 @@ void read_socket(struct epoll_event);
 int send_to_processor(unsigned int, char *, int);
 int read_message_from_processor(char *);
 int evaluate_and_perform(char *);
-int send_message_to_processor(unsigned int, unsigned int);
+int send_message_to_processor(rconmsg rcvm);
 int run_receiver();
 int init_receiver();
 int close_receiver();

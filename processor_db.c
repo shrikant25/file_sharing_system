@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "partition.h"
 #include "processor_db.h"
+#include "message.h"
 
 PGconn *connection;
 
@@ -24,7 +25,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES ($2, $3, $1);",
+      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES ($1, $2, $3) ON CONFLICT (rfd) DO UPDATE SET rcstatus = ($3);",
       .param_count = 3,
     },
     { 
@@ -153,15 +154,23 @@ int retrive_data_from_database(char *data)
 }
 
 
-int store_commr_into_database(char *data) 
+int store_commr_into_database(rconmsg rcvm) 
 {
     PGresult *res = NULL;
 
-    const int paramLengths[] = {1, 4, 8};
-    const int paramFormats[] = {0, 1, 1};
+    char fd[11];
+    char ipaddr[11];
+    char status [11];
+
+    sprintf(fd, "%d", rcvm.fd);
+    sprintf(ipaddr, "%d", rcvm.ipaddr);
+    sprintf(status, "%d", rcvm.status);
+
+    const int paramLengths[] = {4, 4, 4};
+    const int paramFormats[] = {0, 0, 0};
     int resultFormat = 0;
    
-    const char *const param_values[] = {data, data+1, data+5};
+    const char *const param_values[] = {fd, ipaddr, status};
     
     res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
    

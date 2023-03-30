@@ -17,9 +17,9 @@ CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY,
                               mdata bytea NOT NULL, 
                               mtype INTEGER NOT NULL);
 
-CREATE TABLE receiving_conns (rfd INTEGER NOT NULL PRIMARY KEY, 
-                              ripaddr BIGINT NOT NULL, 
-                              rcstatus CHAR(1) NOT NULL,
+CREATE TABLE receiving_conns (rfd TEXT NOT NULL PRIMARY KEY, 
+                              ripaddr TEXT NOT NULL, 
+                              rcstatus TEXT NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
@@ -52,6 +52,37 @@ WHERE jidx = 1;
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 CREATE OR REPLACE FUNCTION process_receivers_comms () 
 RETURNS void AS
