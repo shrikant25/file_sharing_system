@@ -155,25 +155,12 @@ void accept_connection()
 void read_socket(struct epoll_event event) 
 {
     int bytes_read = 0;
-    int dsize = message_size;
-    char *dptr;
-
+   
     rcondata rcond;
     rcond.fd = event.data.fd;
     memset(&rcond, 0, sizeof(rcond));
-    dptr = rcond.data;
-
-    while (dsize > 0) {
-
-        bytes_read = read(rcond.fd, dptr, dsize);
-        
-        if (bytes_read <= 0)
-            break;
-        
-        dptr += bytes_read;
-        dsize -= bytes_read;   
-    }
-    
+   
+    bytes_read = read(rcond.fd, rcond.data, 128*1024);
     while(send_to_processor(&rcond) == -1);  
         
 }

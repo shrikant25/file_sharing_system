@@ -141,21 +141,21 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
 
 
 CREATE OR REPLACE FUNCTION create_message(
-    message_type text,
+    message_type char(5),
     messaget text,
-    message_source text,
-    message_destination text,
-    message_priority text
+    message_source char(5),
+    message_destination char(5),
+    message_priority char(5)
 ) RETURNS bytea
-AS $$
-DECLARE   
+AS
+'DECLARE   
     hnmessage bytea;
 BEGIN
     hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea ||  (now())::text::bytea || messaget::bytea;
     RETURN md5(hnmessage)::bytea || hnmessage;
 END;
-$$;
-LANGUAGE plpgsql
+'
+LANGUAGE 'plpgsql';
 
 select create_message('01'::text, 'hellogal'::text, 's1'::text, 's2'::text, '05'::text);
 
@@ -163,7 +163,21 @@ select encode(gen_random_uuid::text:bytea, 'escape');
 select encode(now()::text::bytea, 'escape');
 
 
-
+shrikant=# CREATE OR REPLACE FUNCTION create_message(
+    message_type char(5),
+    messaget text,
+    message_source char(5),
+    message_destination char(5),
+    message_priority char(5)
+) RETURNS bytea
+AS $$
+DECLARE   
+    hnmessage bytea;
+BEGIN
+    hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea || to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget::bytea;
+    RETURN md5(hnmessage)::bytea || hnmessage;
+END;
+$$ LANGUAGE plpgsql;
 
 
 
@@ -408,3 +422,37 @@ local   all             all                                     peer
 host    all             all             127.0.0.1/32            trust
 # IPv6 local connections:
 host    all             all             ::1/128                 trust
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+select md5(substr(data, 33, 79)) from temp1;
+               md5                
+----------------------------------
+ a7a2f7fbfbeee7ac1598aa412dc3ca43
+(1 row)
+
+shrikant=# SELECT                           
+    encode(substr(data, 1, 32),'escape') AS hash,
+    encode(substr(data, 33, 36),'escape') AS uuid,
+    encode(substr(data, 69, 2), 'escape')::text AS message_type,
+    encode(substr(data, 70, 2), 'escape')::text AS message_source,
+    encode(substr(data, 72, 2), 'escape')::text AS message_destination,
+    encode(substr(data, 74, 1),'escape')::text AS message_priority,
+    encode(substr(data, 75, 32), 'escape') AS timestamp,
+    encode(substr(data, 107), 'escape') AS message
+FROM temp1 limit 1;
+               hash               |                 uuid                 | message_type | message_source | message_destination | message_priority |            timestamp             | message 
+----------------------------------+--------------------------------------+--------------+----------------+---------------------+------------------+----------------------------------+---------
+ a7a2f7fbfbeee7ac1598aa412dc3ca43 | 8946df8f-1638-4c61-8b4f-1b9bbd2c8b68 | 1s           | s1             | s2                  | 5                | 2023-03-31 16:05:21.636917+05:30 | hello
+(1 row)
