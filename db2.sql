@@ -140,30 +140,14 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 
-CREATE OR REPLACE FUNCTION create_message(
-    message_type char(5),
-    messaget text,
-    message_source char(5),
-    message_destination char(5),
-    message_priority char(5)
-) RETURNS bytea
-AS
-'DECLARE   
-    hnmessage bytea;
-BEGIN
-    hnmessage :=  gen_random_uuid()::text::bytea || message_type::bytea || message_source::bytea || message_destination::bytea || message_priority::bytea ||  (now())::text::bytea || messaget::bytea;
-    RETURN md5(hnmessage)::bytea || hnmessage;
-END;
-'
-LANGUAGE 'plpgsql';
 
-select create_message('01'::text, 'hellogal'::text, 's1'::text, 's2'::text, '05'::text);
+select create_message('01'::text, 'hello'::text, 's1'::text, 's2'::text, '05'::text);
 
 select encode(gen_random_uuid::text:bytea, 'escape');
 select encode(now()::text::bytea, 'escape');
 
 
-shrikant=# CREATE OR REPLACE FUNCTION create_message(
+CREATE OR REPLACE FUNCTION create_message(
     message_type char(5),
     messaget text,
     message_source char(5),
@@ -182,201 +166,48 @@ $$ LANGUAGE plpgsql;
 
 
 
+INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
+VALUES(
+    (select create_message('01'::text, 'hello'::text, 's1'::text, 's2'::text, '05'::text)),
+     'N-1', 0, '0'::bytea, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 5);
+
+INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) 
+VALUES(
+    (select create_message('01'::text, 'hello'::text, 's1'::text, 's2'::text, '05'::text)),
+     'N-1', 0, '0'::bytea, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 5);
+
+UPDATE job_scheduler set jobdata = substr(jobdata, 2) where jidx > 1 and jidx%2 != 0;
 
 
 
 
-CREATE TRIGGER tr_extract_senders_comms 
-AFTER INSERT ON senders_comms 
-FOR EACH ROW EXCUTE extract_senders_comms();
-
-CREATE FUNCTION extract_senders_comms() 
-RETURNS void AS
-'
-DECLARE
-
-    lmsgtype integer;
-    lquery text;
-
-BEGIN
-
-    SELECT NEW.mtype into lmsgtype;
-    
-    SELECT query INTO lquery 
-    FROM queries 
-    WHERE queryid = lmsgtype;
-    
-    EXECUTE query;
-    
-END;
-'
-LANGUAGE 'plpgsql';
+UPDATE job_scheduler set jstate = 'N-2' where jstate = 'N-1' and encode(substr(jobdata, 1, 32), 'escape') = md5(substr(jobdata, 33));
+UPDATE job_scheduler set jstate = 'D' where jstate = 'N-1' and encode(substr(jobdata, 1, 32), 'escape') != md5(substr(jobdata, 33));
 
 
+UPDATE job_scheduler 
+SET jstate = 
+    CASE 
+        WHEN jstate = 'N-1' AND encode(substr(jobdata, 1, 32), 'escape') = md5(substr(jobdata, 33)) THEN 'N-2'
+        WHEN jstate = 'N-1' AND encode(substr(jobdata, 1, 32), 'escape') != md5(substr(jobdata, 33)) THEN 'D'
+        WHEN jstate = 'N-2' AND encode(substr(jobdatat, 73, 2), 'escape') = (SELECT jdestination_ip FROM job_scheduler WHERE jidx= 1) THEN 'N-3'
+        WHEN jstate = 'N-2' AND encode(substr(jobdatat, 73, 2), 'escape') != (SELECT jdestination_ip FROM job_scheduler WHERE jidx= 1) THEN 'S-1'
+        ELSE jstate
+    END;
 
 
+select md5(substr(data, 33, 79)) from temp1;
 
-
-
-
-
-CREATE OR REPLACE FUNCTION build_msg() 
-RETURNS void AS
-'
-DECLARE
-    lfd int;
-    ldata text;
-    ldata_size int;
-    ldata_read int;
-    lmdata_size int;
-BEGIN
-    
-    SELECT rfd, rdata, rdata_size FROM raw_data into lfd, ldata, ldata_size;
-    ldata_read := 0;
-
-    WHILE ldata_size - ldata_read >= 40 LOOP
-      
-        SELECT into lmdata_size SUBSTRING(ldata, 1+ldata_read, 4)::int;
-        RAISE NOTICE ''v : %'', lmdata_size;
-        IF ldata_size - ldata_read >= lmdata_size THEN
-            
-            INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource_ip, 
-                    jobid, jparent_jobid, jdestination_ip, jpriority) 
-            VALUES (
-                SUBSTRING(ldata, ldata_read+1, lmdata_size),
-                ''N-1'',
-                1,
-                (SELECT ripaddr FROM receiving_conns WHERE rfd = lfd),
-                (SELECT GEN_RANDOM_UUID()),
-                (SELECT jobid FROM job_scheduler WHERE jidx = 1),
-                0,
-                5
-            );
-
-            ldata_read := ldata_read + lmdata_size;
-        END IF;
-    END LOOP;
-
-    IF ldata_read > 0 THEN
-        
-        UPDATE raw_data 
-        SET rdata = SUBSTRING(rdata, ldata_read+1, ldata_size - ldata_read),
-        rdata_size = ldata_size - ldata_read, 
-        rdpriority = 10
-        WHERE rfd = lfd;
-
-    END IF;
-
-END;
-'
-LANGUAGE 'plpgsql';
-
-
-SELECT build_msg();
-
-
-
-
-CREATE TRIGGER tr_update_chunk_count 
-AFTER INSERT ON msg_chunk
-FOR EACH ROW EXECUTE update_chunk_count();
-
-CREATE OR REPLACE FUNCTION update_chunk_count()
-RETURNS void AS
-'
-BEGIN
-    INSERT INTO msg_info (original_msgid, parts_received)
-    VALUES (new.original_msgid, 1) 
-    ON CONFLICT (original_msgid)
-    DO UPDATE
-    SET parts_received = parts_received + 1;  
-END;
-'
-LANGUAGE 'plpgsql'; 
-
-
-CREATE FUNCTION merge_msg()
-RETURN void AS
-'
-DECLARE 
-    msg text;
-    invalid_chunks int[];
-BEGIN
-
-    IF new.total_parts > 0 and new.parts_recieved = new.total_parts THEN
-
-        SELECT array_agg(C.chunk_number)
-        INTO invalid_chunks 
-        FROM (
-            SELECT row_number() over() 
-            as row_numb, md5_elem
-            FROM unnset(NEW.md5_list) 
-            AS md5_elem
-        ) AS M
-        JOIN msg_chunk AS C
-        ON C.chunk_number = M.row_num
-        WHERE C.md5_hash <> M.md5_elem;
-
-        IF array_length(invalid_chunkd) > 0 THEN
-        
-            SELECT handle_invalid_chunks(invalid_chunks);
-        
-        ELSE
-        
-            INSERT INTO msg (msgid, source, size, mdata) 
-            SELECT NEW.original_msgid, 
-                NEW.source,
-                NEW.total_size,
-                string_agg(m.mdata, ''''), 
-            FROM msg_chunk as m 
-            WHERE NEW.original_msgid = m.original_msgid
-            group by m.original_msgid
-            order by m.chunk_number;
-
-        ENDIF;
-    ENDIF;
-END;
-'
-LANGUAGE 'plpgsql';
-
-CREATE FUNCTION extract_msg_info() 
-RETURNS void AS
-'
-DECLARE
-    l_nmdata text;
-    l_nmid int;
-    l_query text;
-    
-BEGIN
-    
-    SELECT nmdata, nmgid 
-    INTO l_nmdata, l_nmid 
-    FROM new_msg 
-    WHERE status = 2 
-    LIMIT 1;
-
-    SELECT query 
-    FROM query_table 
-    WHERE queryid = SUBSTRING(l_nmdata, 5, 4)::int 
-    INTO l_query;
-
-    EXECUTE query;
-
-    DELETE FROM new_msg 
-    WHERE nmgid = l_nmid;
-
-END;
-'
-LANGUAGE 'plpgsql';
-
-
-CREATE TRIGGER tr_merge_msg
-AFTER INSERT, UPDATE ON msg_info
-FOR EACH ROW EXECUTE merged_msg();
-
-CREATE TRIGGER tr_extract_msg_info 
-AFTER INSERT ON new_msg 
-FOR EACH ROW EXCUTE extract_msg_info();
+SELECT                           
+    encode(substr(jobdata, 1, 32),'escape') AS hash,
+    encode(substr(jobdata, 33, 36),'escape') AS uuid,
+    encode(substr(jobdata, 69, 2), 'escape')::text AS message_type,
+    encode(substr(jobdata, 71, 2), 'escape')::text AS message_source,
+    encode(substr(jobdata, 73, 2), 'escape') AS message_destination,
+    encode(substr(jobdata, 75, 2),'escape')::text AS message_priority,
+    encode(substr(jobdata, 76, 32), 'escape') AS timestamp,
+    encode(substr(jobdata, 109), 'escape') AS message
+FROM job_scheduler;
 
 
 
@@ -391,23 +222,27 @@ FOR EACH ROW EXCUTE extract_msg_info();
 
 
 
-CREATE FUNCTION f(x integer) RETURNS set of t1 AS 
-'
-BEGIN
-select c1 from t1 limit 4 offset $1;
-return;
-END;
-' 
-LANGUAGE 'plpgsql';
 
-INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- in c query
+INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-1', 0, $1, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 0);
+
 shrikant=# select * from cron.job_run_details;
 shrikant=# delete from cron.job_run_details;
 
 delete from cron.job where jobid = 1;
-
-
-
 
 
 -- inside postgresql.conf
@@ -432,27 +267,3 @@ host    all             all             ::1/128                 trust
 
 
 
-
-
-
-
-select md5(substr(data, 33, 79)) from temp1;
-               md5                
-----------------------------------
- a7a2f7fbfbeee7ac1598aa412dc3ca43
-(1 row)
-
-shrikant=# SELECT                           
-    encode(substr(data, 1, 32),'escape') AS hash,
-    encode(substr(data, 33, 36),'escape') AS uuid,
-    encode(substr(data, 69, 2), 'escape')::text AS message_type,
-    encode(substr(data, 70, 2), 'escape')::text AS message_source,
-    encode(substr(data, 72, 2), 'escape')::text AS message_destination,
-    encode(substr(data, 74, 1),'escape')::text AS message_priority,
-    encode(substr(data, 75, 32), 'escape') AS timestamp,
-    encode(substr(data, 107), 'escape') AS message
-FROM temp1 limit 1;
-               hash               |                 uuid                 | message_type | message_source | message_destination | message_priority |            timestamp             | message 
-----------------------------------+--------------------------------------+--------------+----------------+---------------------+------------------+----------------------------------+---------
- a7a2f7fbfbeee7ac1598aa412dc3ca43 | 8946df8f-1638-4c61-8b4f-1b9bbd2c8b68 | 1s           | s1             | s2                  | 5                | 2023-03-31 16:05:21.636917+05:30 | hello
-(1 row)
