@@ -54,7 +54,7 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
 
 
 
-DROP TABLE job_scheduler;
+DROP TABLE job_scheduler, sysinfo;
 
 
 CREATE OR REPLACE FUNCTION create_message(
@@ -113,7 +113,7 @@ SET NOT NULL;
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
-    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M26'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M2'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
 
@@ -131,10 +131,14 @@ VALUES(
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
-    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M3'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M2'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
---UPDATE job_scheduler set jobdata = substr(jobdata, 2) where jidx > 1 and jidx%2 != 0;
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
+
+INSERT INTO sysinfo VALUES('M2', '123456', 2);
 
 
 
@@ -146,11 +150,57 @@ SET jstate =
         ELSE jstate
     END;
 
-SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
-
 UPDATE job_scheduler SET jstate = 'N-3' where jstate = 'N-2' AND encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
 UPDATE job_scheduler SET jstate = 'S-1', jdestination = encode(substr(jobdata, 79, 5), 'escape') where jstate = 'N-2' AND encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
 
+
+
+UPDATE job_scheduler set jstate = 'N-4', jtype = encode(substr(jobdata, 69, 5), 'escape')::SMALLINT where jstate = 'N-3';
+
+UPDATE job_scheduler j
+SET j.jstate = 
+  CASE 
+    WHEN LENGTH(j.jdata) > (SELECT systems_capacity FROM sysinfo WHERE system_name = j.jdestination) 
+    THEN 'S-2' 
+    ELSE 'S-3' 
+  END,
+j.jdestination = (SELECT ipaddress FROM sysinfo WHERE system_name = j.jdestination);
+
+INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT 
+    create_message(jtype::text, 
+                    lpad(seqnum::text, 8, '0')::bytea || jobid || length(subdata)::int::text::bytea || subdata, 
+                    jsource::text, 
+                    jdestination::text, 
+                    jpriority::text) AS sent_msg,
+    'S-3', '2', jtype, jsource, substr(sent_msg, 33, 36), jobid, jdestination, jpriority 
+FROM job_scheduler
+JOIN sysinfo 
+    ON job_scheduler.jdestination = sysinfo.system_name
+CROSS JOIN LATERAL substring(jobdata, seqnum * systems_capacity, systems_capacity) subdata,
+    (SELECT length(jobdata) / systems_capacity) len,
+    generate_series(1, len) seqnum
+WHERE jstate = 'S-2';
+
+
+
+
+
+
+
+
+
+--UPDATE job_scheduler set jobdata = substr(jobdata, 2) where jidx > 1 and jidx%2 != 0;
+
+
+
+
+
+
+SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
+
+
+SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
 SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
@@ -164,11 +214,35 @@ SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriori
 --         ELSE jstate
 --     END;
 
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
 
-UPDATE job_scheduler set jstate = 'N-4', jtype = encode(substr(jobdata, 69, 5), 'escape')::SMALLINT where jstate = 'N-3';
+INSERT INTO sysinfo VALUES('M2', '123456', 2);
 
 
-SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
+INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT 
+    create_message(jtype::text, 
+                    lpad(seqnum::text, 8, '0')::bytea || jobid || length(subdata)::int::text::bytea || subdata, 
+                    jsource::text, 
+                    jdestination::text, 
+                    jpriority::text) AS sent_msg,
+    'S-3', '2', jtype, jsource, substr(sent_msg, 33, 36), jobid, jdestination, jpriority 
+FROM job_scheduler
+JOIN sysinfo 
+    ON job_scheduler.jdestination = sysinfo.system_name
+CROSS JOIN LATERAL substring(jobdata, seqnum * systems_capacity, systems_capacity) subdata,
+    (SELECT length(jobdata) / systems_capacity) len,
+    generate_series(1, len) seqnum
+WHERE jstate = 'S-2';
+
+
+
+
+
+
+
 
 
 
@@ -184,66 +258,6 @@ SELECT
     encode(substr(jobdata, 89, 26), 'escape') AS timestamp,
     encode(substr(jobdata, 115), 'escape') AS message
 FROM job_scheduler;
-
-
-WITH msg AS (
-SELECT create_message(type::text, (length(subdata)::bytea || subdata), source::text, destination::text, priority::text) AS data, jtype,
-jsource, jobid, jdestination, jpriority FROM job_scheduler WHERE jstate = 'S-2';
-)
-INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
-VALUES(msg, 'S-3', '2', msg.jtype, msg.jsource, substr(msg.data, 33, 36), msg.jobid, msg.jdestination, msg.jpriority);
-
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
-
-INSERT INTO sysinfo VALUES('M2', '123456', 2);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
