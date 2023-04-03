@@ -59,7 +59,7 @@ DROP TABLE job_scheduler;
 
 CREATE OR REPLACE FUNCTION create_message(
     message_type text,
-    messaget text,
+    messaget bytea,
     message_source text,
     message_destination text,
     message_priority text
@@ -78,7 +78,7 @@ BEGIN
     fixed_destination := lpad(message_destination, 5, ' ');
     fixed_priority := lpad(message_priority, 5, ' ');
     
-    hnmessage := gen_random_uuid()::text::bytea || fixed_type::bytea || fixed_source::bytea || fixed_destination::bytea || fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget::bytea;
+    hnmessage := gen_random_uuid()::text::bytea || fixed_type::bytea || fixed_source::bytea || fixed_destination::bytea || fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget;
     
     RETURN md5(hnmessage)::bytea || hnmessage;
 END;
@@ -101,7 +101,7 @@ CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY,
 
 INSERT INTO job_scheduler
 (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
-VALUES('__ROOT__', 'N-0', 0, ' S-3', GEN_RANDOM_UUID(), NULL, '  S-3', 0);
+VALUES('__ROOT__', 'N-0', 0, '  M3', GEN_RANDOM_UUID(), NULL, '  M3', 0);
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -113,25 +113,25 @@ SET NOT NULL;
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
-    (select create_message('01'::text, 'hello'::text, 'S-1'::text, 'S-26'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M26'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
-    (select create_message('01'::text, 'hello'::text, 'S-2'::text, 'S-3'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M2'::text, 'M3'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES( 
-    (select create_message('01'::text, 'hello'::text, 'S-2'::text, 'S-3'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M2'::text, 'M3'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
-    (select create_message('01'::text, 'hello'::text, 'S-1'::text, 'S-3'::text, '05'::text)),
+    (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M3'::text, '05'::text)),
      'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
 
 --UPDATE job_scheduler set jobdata = substr(jobdata, 2) where jidx > 1 and jidx%2 != 0;
@@ -184,6 +184,97 @@ SELECT
     encode(substr(jobdata, 89, 26), 'escape') AS timestamp,
     encode(substr(jobdata, 115), 'escape') AS message
 FROM job_scheduler;
+
+
+WITH msg AS (
+SELECT create_message(type::text, (length(subdata)::bytea || subdata), source::text, destination::text, priority::text) AS data, jtype,
+jsource, jobid, jdestination, jpriority FROM job_scheduler WHERE jstate = 'S-2';
+)
+INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
+VALUES(msg, 'S-3', '2', msg.jtype, msg.jsource, substr(msg.data, 33, 36), msg.jobid, msg.jdestination, msg.jpriority);
+
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress BIGINT NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
+
+INSERT INTO sysinfo VALUES('M2', '123456', 2);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

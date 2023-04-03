@@ -160,7 +160,7 @@ void read_socket(struct epoll_event event)
     rcond.fd = event.data.fd;
     memset(&rcond, 0, sizeof(rcond));
    
-    bytes_read = read(rcond.fd, rcond.data, 128*1024);
+    bytes_read = read(rcond.fd, rcond.data, 120*1024);
     while(send_to_processor(&rcond) == -1);  
         
 }
