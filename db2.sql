@@ -278,6 +278,12 @@ SELECT mdata, 'S-3', 3, jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, 
 FROM cte_msginfo; 
         
 
+UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
+
+SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
+
+
+
 SELECT                           
     encode(substr(jobdata, 115, 8), 'escape') AS t1,
     encode(substr(jobdata, 123, 36), 'escape') AS t2,
@@ -387,8 +393,8 @@ FROM job_scheduler;
 -- -- in c query
 -- INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource_ip, jobid, jparent_jobid, jdestination_ip, jpriority) VALUES($2, 'N-1', 0, $1, GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), 0, 0);
 
--- select * from cron.job_run_details;
 -- delete from cron.job_run_details;
+-- select * from cron.job_run_details;
 
 -- delete from cron.job where jobid = 1;
 
