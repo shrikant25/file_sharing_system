@@ -214,64 +214,66 @@ SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriori
 
 
 
-
 WITH cte_jobdata AS (
     SELECT 
         jobid, 
         jdestination, 
-        encode(substr(job_scheduler.jobdata, 75, 5), 'escape') as jsource,
+        encode(substr(job_scheduler.jobdata, 74, 5), 'escape') as jsource,
         jpriority,
-        seqnum, length(jobdata), systems_capacity,
+        seqnum, 
+        systems_capacity,
         substring(jobdata, seqnum * systems_capacity, systems_capacity) AS subdata
     FROM job_scheduler
     JOIN sysinfo ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
     CROSS JOIN generate_series(0, length(jobdata) / systems_capacity) AS seqnum
     WHERE jstate = 'S-2'
-), cte_sent_msg AS (
-    SELECT 
-        create_message('2'::text, 
-                        lpad(seqnum::text, 8, '0')::bytea || jobid::text::bytea || length(subdata)::int::text::bytea || subdata, 
-                        jsource::text, 
-                        jdestination, 
-                        jpriority::text) AS sent_msg,
-        jobid, jsource,jdestination, jpriority, seqnum
+), 
+cte_msg AS (
+    SELECT create_message('2'::text, 
+               lpad(seqnum::text, 8, ' ')::bytea || jobid::text::bytea || lpad(length(subdata)::text, 10, ' ')::bytea || subdata, 
+               btrim(jsource::text, ' '), 
+               btrim(jdestination, ' '),
+               jpriority::text) AS msg,
+           jobid, jsource,jdestination, jpriority, seqnum
     FROM cte_jobdata
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT 
-    sent_msg, 'S-3', 2,   jsource, 
-                        encode(substr(sent_msg, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
-FROM cte_sent_msg;
+SELECT msg, 'S-3', 2, jsource, encode(substr(msg, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+FROM cte_msg;
+
+
+
+
 
 SELECT                           
-    encode(substr(jobdata, 1, 32),'escape') AS hash,
-    encode(substr(jobdata, 33, 36),'escape') AS uuid,
-    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
-    encode(substr(jobdata, 75, 5), 'escape') AS message_source,
-    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
-    encode(substr(jobdata, 84, 5),'escape') AS message_priority,
-    encode(substr(jobdata, 89, 26), 'escape') AS tstamp,
     encode(substr(jobdata, 115, 8), 'escape') AS t1,
     encode(substr(jobdata, 123, 36), 'escape') AS t2,
-    encode(substr(jobdata, 159, 5), 'escape') AS t2,
+    encode(substr(jobdata, 159, 10), 'escape') AS t3,
+    encode(substr(jobdata, 169), 'escape') AS mdata
 FROM job_scheduler;
+
+
+
+SELECT                           
+    encode(substr(jobdata, 1, 32), 'escape') AS mhash,
+    encode(substr(jobdata, 33, 36),'escape') AS uuid,
+    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
+    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
+    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
+    encode(substr(jobdata, 84, 5),'escape') AS message_priority, encode(substr(jobdata, 89, 26), 'escape') as tm
+FROM job_scheduler;
+
+
+
+
+
+
+
+
 
 --encode(substr(jobdata, 115), 'escape') AS message
 
 
-
---UPDATE job_scheduler set jobdata = substr(jobdata, 2) where jidx > 1 and jidx%2 != 0;
-SELECT                           
-    encode(substr(jobdata, 33, 36),'escape') AS uuid,
-    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
-    encode(substr(jobdata, 75, 5), 'escape') AS message_source,
-    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
-    encode(substr(jobdata, 84, 5),'escape') AS message_priority,
-    encode(substr(jobdata, 89, 26), 'escape') AS tstamp,
-    encode(substr(jobdata, 115, 8), 'escape') AS t1,
-    encode(substr(jobdata, 123, 36), 'escape') AS t2,
-    encode(substr(jobdata, 159, 2), 'escape') AS t3,length(substr(jobdata, 161)) as t4
-FROM job_scheduler;
 
 
 
@@ -323,33 +325,6 @@ FROM job_scheduler;
 
 
 
-WITH cte_jobdata AS (
-    SELECT 
-        jobid, 
-        jtype, 
-        jsource, 
-        jdestination, 
-        jpriority,
-        seqnum, 
-        substring(jobdata, seqnum * systems_capacity, systems_capacity) AS subdata
-    FROM job_scheduler
-    JOIN sysinfo ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
-    CROSS JOIN generate_series(0, length(jobdata) / systems_capacity) AS seqnum
-    WHERE jstate = 'S-2'
-), cte_sent_msg AS (
-    SELECT 
-        create_message(jtype::text, 
-                        lpad(seqnum::text, 8, '0')::bytea || jobid::text::bytea || length(subdata)::int::text::bytea || subdata, 
-                        jsource::text, 
-                        jdestination::text, 
-                        jpriority::text) AS sent_msg,
-        jobid, jtype, jsource, jdestination, jpriority, seqnum
-    FROM cte_jobdata
-)
-INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT 
-    sent_msg, 'S-3', '2', jsource, encode(substr(sent_msg, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
-FROM cte_sent_msg;
 
 
 
@@ -361,70 +336,6 @@ FROM cte_sent_msg;
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- SELECT process_receivers_comms();
-
--- CREATE OR REPLACE FUNCTION process_receivers_comms () 
--- RETURNS void AS
--- $$
--- DECLARE
---     ltransaction_string text;
--- BEGIN
-
---     SELECT transaction_text into ltransaction_string FROM transactions WHERE transactionid = 1; 
---     EXECUTE ltransaction_string;
-
--- END;
--- $$
--- LANGUAGE 'plpgsql';
-
--- -- INSERT INTO transactions (transactionid, transaction_text)
--- -- VALUES (1, '
--- --             WITH deleted_rows AS 
--- --             ( 
--- --               DELETE FROM receivers_comms 
--- --               WHERE mtype = 1
--- --               RETURNING mdata
--- --             )
--- --             INSERT INTO receiving_conns (rfd, ripaddr, rcstatus)
--- --             SELECT get_byte(mdata, 1)::bit(8)::int + 
--- --                 (get_byte(mdata::bytea, 2)::bit(8)::int << 8) +
--- --                 (get_byte(mdata::bytea, 3)::bit(8)::int << 16) +
--- --                 (get_byte(mdata::bytea, 4)::bit(8)::int << 24), 
--- --                 get_byte(mdata::bytea, 5)::bit(8)::int +
--- --                 (get_byte(mdata::bytea, 6)::bit(8)::int << 8 ) +
--- --                 (get_byte(mdata::bytea, 7)::bit(8)::int << 16) +
--- --                 (get_byte(mdata::bytea, 8)::bit(8)::int << 24),
--- --                 1 FROM deleted_rows;
--- --           '
--- --         );
-
-
--- select md5(substr(data, 33, 79)) from temp1;
-
--- select create_message('01'::text, 'hello'::text, 's1'::text, 's2'::text, '05'::text);
-
--- select encode(gen_random_uuid::text:bytea, 'escape');
--- select encode(now()::text::bytea, 'escape');
 
 
 -- -- in c query
@@ -459,22 +370,6 @@ FROM cte_sent_msg;
 
 
 
-
-
-
-
-insert into temp1(data) select create_message('N-1', 'helo', 'S-3', 'S-44', '3');
-
-SELECT                           
-    encode(substr(jobdata, 1, 32),'escape') AS hash,
-    encode(substr(jobdata, 33, 36),'escape') AS uuid,
-    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
-    encode(substr(jobdata, 75, 5), 'escape') AS message_source,
-    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
-    encode(substr(jobdata, 84, 5),'escape') AS message_priority,
-    encode(substr(jobdata, 89, 26), 'escape') AS timestamp,
-    encode(substr(jobdata, 115), 'escape') AS message
-FROM job_scheduler;
 
 
 
