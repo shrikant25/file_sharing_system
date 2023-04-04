@@ -215,26 +215,34 @@ SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriori
 
 
 WITH cte_jobdata AS (
+
     SELECT 
         jobid, 
         jdestination, 
         encode(substr(job_scheduler.jobdata, 74, 5), 'escape') as jsource,
         jpriority,
         seqnum, 
-        systems_capacity,
         substring(jobdata, seqnum * systems_capacity, systems_capacity) AS subdata
+    
     FROM job_scheduler
-    JOIN sysinfo ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
-    CROSS JOIN generate_series(0, length(jobdata) / systems_capacity) AS seqnum
+    JOIN sysinfo 
+    ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
+    CROSS JOIN generate_series(0, (length(jobdata) -1)/ systems_capacity) AS seqnum
     WHERE jstate = 'S-2'
+
 ), 
 cte_msg AS (
-    SELECT create_message('2'::text, 
-               lpad(seqnum::text, 8, ' ')::bytea || jobid::text::bytea || lpad(length(subdata)::text, 10, ' ')::bytea || subdata, 
-               btrim(jsource::text, ' '), 
-               btrim(jdestination, ' '),
-               jpriority::text) AS msg,
-           jobid, jsource,jdestination, jpriority, seqnum
+    SELECT  
+            create_message('2'::text, 
+                lpad(seqnum::text, 8, ' ')::bytea || jobid::text::bytea || lpad(length(subdata)::text, 10, ' ')::bytea || subdata, 
+                btrim(jsource, ' '), 
+                btrim(jdestination, ' '),
+                jpriority::text) AS msg,
+            jobid, 
+            jsource,
+            jdestination, 
+            jpriority, 
+            seqnum
     FROM cte_jobdata
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
@@ -244,6 +252,31 @@ FROM cte_msg;
 
 
 
+
+
+WITH cte_msginfo as(
+
+    SELECT
+        create_message(
+                '3'::text,
+                jobid::text::bytea || lpad(length(jobdata)::text, 10, ' ')::bytea || lpad((length(jobdata) / systems_capacity)::text, 10, ' ')::bytea,
+                btrim(encode(substr(job_scheduler.jobdata, 74, 5), 'escape'), ' '), 
+                btrim(jdestination, ' '),
+                jpriority::text
+        )as mdata, 
+        jobid, 
+        jdestination, 
+        encode(substr(job_scheduler.jobdata, 74, 5), 'escape') as jsource,
+        jpriority
+        FROM job_scheduler
+    JOIN sysinfo 
+    ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
+    WHERE jstate = 'S-2'
+)
+INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT mdata, 'S-3', 3, jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+FROM cte_msginfo; 
+        
 
 SELECT                           
     encode(substr(jobdata, 115, 8), 'escape') AS t1,
