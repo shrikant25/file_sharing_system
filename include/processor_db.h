@@ -1,7 +1,7 @@
 #ifndef PROCESSOR_DB_H
 #define PROCESSOR_DB_H
 
-#include "message.h"
+#include "partition.h"
 
 typedef struct db_statements {
     char statement_name[4];

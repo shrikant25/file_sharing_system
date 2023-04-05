@@ -11,7 +11,10 @@ LANGUAGE'plpgsql';
 
 SELECT cron.schedule('* * * * * *', 'select call_jobs();');
 
-DROP TABLE receivers_comms, receiving_conns, transactions, job_scheduler, sysinfo;
+
+
+
+DROP TABLE logs, receivers_comms, receiving_conns, transactions, job_scheduler, sysinfo, senders_comms, sending_conns;
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
                               mdata bytea NOT NULL, 
@@ -30,10 +33,6 @@ CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
                     transaction_text TEXT);
 
 
-
-
-
-
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
                             mdata TEXT NOT NULL, 
                             mtype SMALLINT NOT NULL);
@@ -50,11 +49,6 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
 
 
 
-
-
-
-
-DROP TABLE job_scheduler, sysinfo;
 
 
 CREATE OR REPLACE FUNCTION create_message(
@@ -110,6 +104,15 @@ WHERE jidx = 1;
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
+
+SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
+
+
+
+
+
+
+
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
@@ -252,8 +255,6 @@ FROM cte_msg;
 
 
 
-
-
 WITH cte_msginfo as(
 
     SELECT
@@ -273,6 +274,7 @@ WITH cte_msginfo as(
     ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
     WHERE jstate = 'S-2'
 )
+
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
 SELECT mdata, 'S-3', 3, jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
 FROM cte_msginfo; 

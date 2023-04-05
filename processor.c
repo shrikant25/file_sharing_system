@@ -12,7 +12,6 @@
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor.h"
-#include "message.h"
 
 int process_status = 1;
 

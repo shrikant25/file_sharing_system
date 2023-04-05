@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "partition.h"
 #include "processor_db.h"
-#include "message.h"
+
 
 PGconn *connection;
 
@@ -13,7 +13,7 @@ db_statements dbs[statement_count] = {
     { 
       .statement_name = "s0",  
       .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype,\
-                    jsource_ip, jobid, jparent_jobid, jdestination_ip,\
+                    jsource, jobid, jparent_jobid, jdestination,\
                     jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(),\
                     (select jobid from job_scheduler where jidx = 1), 0, 0);",
       .param_count = 2,
@@ -114,7 +114,7 @@ int store_data_in_database(rcondata *rcond)
     sprintf(fd, "%d", rcond->fd);
 
     const int paramLengths[] = {sizeof(fd), sizeof(rcond->data)};
-    const int paramFormats[] = {1, 1};
+    const int paramFormats[] = {0, 1};
     int resultFormat = 0;
 
     const char *const param_values[] = {fd, rcond->data};

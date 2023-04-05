@@ -1,7 +1,7 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 #include <semaphore.h>
-#include "message.h"
+#include "partition.h"
 
 typedef struct datablocks {     
     char *datar_block;

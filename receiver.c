@@ -15,7 +15,7 @@
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
-#include "message.h"
+
 
 server_info s_info;
 datablocks dblks;
@@ -59,6 +59,13 @@ void create_socket()
         perror("setsokopt");
         return;
     }
+
+    optval = 128 *1024;
+    if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
+        perror("setsokopt");
+        return;
+    }
+
 
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // set family
@@ -152,26 +159,14 @@ void accept_connection()
 }
 
 
-void read_socket(struct epoll_event event) 
-{
-    int bytes_read = 0;
-   
-    rcondata rcond;
-    rcond.fd = event.data.fd;
-    memset(&rcond, 0, sizeof(rcond));
-   
-    bytes_read = read(rcond.fd, rcond.data, 120*1024);
-    while(send_to_processor(&rcond) == -1);  
-        
-}
-
-
 int run_receiver() 
 {
     int i;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
-    char data[CPARTITION_SIZE];
+    int bytes_read = 0;
+    rcondata rcond;
+
     rconmsg rcvm;
 
     while (receiver_status) {
@@ -204,8 +199,20 @@ int run_receiver()
             else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) 
                 accept_connection();
             
-            else if (events[i].events & EPOLLIN)
-                read_socket(events[i]);
+            else if (events[i].events & EPOLLIN){
+
+                memset(&rcond, 0, MESSAGE_SIZE);
+                rcond.fd = events[i].data.fd;
+                bytes_read = 0;
+
+                while (bytes_read < MESSAGE_SIZE) {
+                    
+                    bytes_read += read(rcond.fd, rcond.data+bytes_read, MESSAGE_SIZE);
+                
+                }
+
+                send_to_processor(&rcond);
+            }
             
         }
 
@@ -226,7 +233,7 @@ int send_to_processor(rcondata *rcond)
         blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
-        memcpy(blkptr, rcond, sizeof(rcond));
+        memcpy(blkptr, rcond, sizeof(rcondata));
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 1);
