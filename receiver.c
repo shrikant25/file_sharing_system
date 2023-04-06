@@ -15,7 +15,7 @@
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
-
+#include <syslog.h>
 
 server_info s_info;
 datablocks dblks;
@@ -80,16 +80,6 @@ void create_socket()
 }
 
 
-void create_epoll() 
-{
-    s_info.epoll_fd = epoll_create1(0); // create epoll instance
-    if (s_info.epoll_fd == -2) {
-        perror("failed to create epoll instance");
-        return;
-    }
-}
-
-
 void add_to_list(int active_fd) 
 {
     struct epoll_event event;
@@ -134,12 +124,14 @@ void accept_connection()
         client_addr_len = sizeof(client_addr);
         
         client_fd = accept(s_info.servsoc_fd, (struct sockaddr *)&client_addr, &client_addr_len);
-       
+        
         if (client_fd < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) // no connections are present
+            if (errno == EAGAIN || errno == EWOULDBLOCK) { // no connections are present
+                syslog(LOG_NOTICE, "connection not present %d", client_fd);
                 return;
+            }
             else {
-                perror("error while acceping client connection"); // some other error occured
+                syslog(LOG_NOTICE, "error accepting connection %d", client_fd);; // some other error occured
                 return;
             }
         }
@@ -151,7 +143,7 @@ void accept_connection()
             rcvm.fd = client_fd;
             rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
             rcvm.status = 1;
-            
+            syslog(LOG_NOTICE, "connection accepted");
             while (send_message_to_processor(&rcvm) == -1);
             memset(&rcvm, 0, sizeof(rcvm));
         }
@@ -175,7 +167,7 @@ int run_receiver()
 
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
-            perror("epoll wait failed");
+            syslog(LOG_NOTICE, "epoll wait failed");
             return -1;
         }
 
@@ -184,7 +176,7 @@ int run_receiver()
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
                 
-                printf("removing from list");
+                syslog(LOG_NOTICE, "removig from epoll list %d", events[i].data.fd);
                 remove_from_list(events[i].data.fd);
                 
                 rcvm.fd = events[i].data.fd;
@@ -227,9 +219,9 @@ int send_to_processor(rcondata *rcond)
     
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block, 0);
-    
-    if (subblock_position >= 0) {
 
+    if (subblock_position >= 0) {
+        syslog(LOG_NOTICE, "got subblock %d", subblock_position);
         blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
@@ -293,51 +285,20 @@ int send_message_to_processor(rconmsg *rcvm)
 }
 
 
-int init_receiver()
-{
-    s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
-    s_info.port = 7000; // server port
- 
-    create_socket(); // create socket
-    make_nonblocking(s_info.servsoc_fd); // make the server socket file descriptor as non blocking
- 
-    // somaxconn is defined in socket.h
-    if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
-        perror("failed to listen on port");
-        return 1;
-    }
- 
-    create_epoll(); // create
-    add_to_list(s_info.servsoc_fd); // add socket file descriptor to epoll list
-}
-
-
-int close_receiver()
-{
-    close(s_info.epoll_fd); // close epoll instance
-    shutdown(s_info.servsoc_fd, 2); // close server socket
- 
-    return 0;
-}
-
-
-int initialize_locks()
-{
+int main(void) 
+{   
     // get lock variable for lock on data sharing memory
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
 
     // get lock variable for lock on message sharing memory
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED)
+    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){
+        syslog(LOG_NOTICE, "failed to get variabale");
         return -1;
-
-    return 0;
-}
-
-
-int get_shared_memeory()
-{
+    }
+    
+    
     // filename and projectid are present in shared_memory.h
     // block sizes are present in partition.h
 
@@ -347,43 +308,42 @@ int get_shared_memeory()
     // attach memroy block for message sharing
     dblks.commr_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
 
-    if (!(dblks.datar_block && dblks.commr_block))
-        return -1;
+    if (!(dblks.datar_block && dblks.commr_block)) {
+        syslog(LOG_NOTICE, "failed to get shared memory");
+    }
     
-    return 0;
-}
-
-
-int uninitialize_locks()
-{    
+    
+    
+    s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
+    s_info.port = 7000; // server port
+ 
+    create_socket(); // create socket
+    make_nonblocking(s_info.servsoc_fd); // make the server socket file descriptor as non blocking
+ 
+    // somaxconn is defined in socket.h
+    if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
+        syslog(LOG_NOTICE, "failed to listen on port %d", s_info.servsoc_fd);
+        return 1;
+    }
+ 
+    
+    s_info.epoll_fd = epoll_create1(0); // create epoll instance
+    if (s_info.epoll_fd == -2) {
+        syslog(LOG_NOTICE, "failed to create epoll instance");
+        return -1;
+    }
+    add_to_list(s_info.servsoc_fd); // add socket file descriptor to epoll list
+    
+    
+    run_receiver(); // recieve connections, data and communicate with database
+ 
+    
+    close(s_info.epoll_fd); // close epoll instance
+    shutdown(s_info.servsoc_fd, 2); // close server socket
     sem_close(smlks.sem_lock_commr); // unlink lock used for communication
     sem_close(smlks.sem_lock_datar); // unlink lock used for data sharing
-}
-
-
-int detach_memory()
-{
-    int status = 0;
-
-    status = detach_memory_block(dblks.datar_block); // detach memory used for data sharing
-    status = detach_memory_block(dblks.commr_block); // detach memory used for communication
-    
-    //    instead of returning status, status can be checked here and appropriate action can be taken
-    
-
-    return status;  // return status
-}
-
-
-int main(void) 
-{   
-    initialize_locks(); // link variables to use as locks
-    get_shared_memeory(); // connect to shared memory
-    init_receiver(); // creates server instance
-    run_receiver(); // recieve connections, data and communicate with database
-    close_receiver(); // close server instance
-    uninitialize_locks(); // unlink variables from locks
-    detach_memory(); // detach memory
+    detach_memory_block(dblks.datar_block); // detach memory used for data sharing
+    detach_memory_block(dblks.commr_block); // detach memory used for communication
     
     return 0;
 }

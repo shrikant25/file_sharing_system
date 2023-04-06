@@ -2,14 +2,14 @@
 #define PARTN_H
 
 
-#define MESSAGE_SIZE 1024 * 128
+#define MESSAGE_SIZE (1024 * 128)
 
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
-#define DPARTITION_SIZE MESSAGE_SIZE + 4
-#define DATA_BLOCK_SIZE DPARTITION_SIZE * TOTAL_PARTITIONS + 3
+#define DPARTITION_SIZE (MESSAGE_SIZE + 4)
+#define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 3)
 #define CPARTITION_SIZE 15
-#define COMM_BLOCK_SIZE CPARTITION_SIZE * TOTAL_PARTITIONS + 4
+#define COMM_BLOCK_SIZE (CPARTITION_SIZE * TOTAL_PARTITIONS + 4)
 
 // (1024 * 4 + 4) * 80 + 3
 // 3 bytes extra for bitmap   __

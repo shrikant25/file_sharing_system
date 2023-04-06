@@ -3,8 +3,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <unistd.h>
 #include "shared_memory.h"
-
+#include <errno.h>
 
 int get_shared_block(char *filename, int size, unsigned char project_id) 
 {
@@ -15,15 +16,22 @@ int get_shared_block(char *filename, int size, unsigned char project_id)
         return -1;
     }
 
-    return shmget(key, size, 0644 | IPC_CREAT);
+    size_t page_size = sysconf(_SC_PAGESIZE);
+    size_t rounded_size = ((size + page_size - 1) / page_size) * page_size;
+
+    int id = shmget(key, rounded_size, 0600 | IPC_CREAT);
+    if(id == -1)
+        fprintf(stderr, "errno %d\n", errno);
+
+    return id;
 }
 
 
 char *attach_memory_block(char *filename, int size, unsigned char project_id) 
-{ 
+{   
     char *result;
     int shared_block_id = get_shared_block(filename, size, project_id);
-
+    
     if (shared_block_id == -1) {
         return NULL;
     }
