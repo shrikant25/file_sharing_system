@@ -2,101 +2,101 @@
 #include "partition.h"
 #include <stdio.h>
 
-// state = 0 means empty position, state = 1 means filled position
-int get_subblock(char *block, int state) 
-{
+// // state = 0 means empty position, state = 1 means filled position
+// int get_subblock(char *block, int state) 
+// {
 
-    int i;
-    unsigned int bmap = 0;
-    memcpy(&bmap, block, 3); // retrive bitmap
+//     int i, j;
+//     char bmap[TOTAL_PARTITIONS/8] = 0;
+//     memcpy(&bmap, block, TOTAL_PARTITIONS/8); // retrive bitmap
     
-    for(i = 0; i<TOTAL_PARTITIONS; i++) {
-
-        if (state == ((bmap>>i) & 1) )
-            return i;
-        
-    }
+//     for(i = 0; i<TOTAL_PARTITIONS/8; i++) {
+//         for(j = 0; j<8; j++) {
+//             if (state == ((bmap[i]>>j) & 1) )
+//                 return i;
+//         }
+//     }
        
-    return -1;
-}
+//     return -1;
+// }
 
-
-int get_subblock2(char *block, int state, int sub_block) 
+// 1 = bitmap present at start representing TOTAL_PARTITIONS blocks 
+// 2 = bitmap present at start representing TOTAL_PARTITIONS/2 blocks
+// 3 = bitmap present at start but take next TOTAL_PARTITIONS/2 blocks
+int get_subblock(char *block, int state, int type) 
 {
 
-    int i;
-    int begin = 0;
-    int end = 0;
-    unsigned int bmap = 0;
- 
-    if (sub_block == 0) {
-        memcpy(&bmap, block, 2); // retrive bitmap
-        begin = 0;
-        end = 40;
-    }
-    else {
-        memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 2);
-        begin = 40;
-        end = TOTAL_PARTITIONS;
-    }
+    int i, j, begin, end;
+    int bmap_size = TOTAL_PARTITIONS/8;
+    char bmap[bmap_size];
+    memcpy(&bmap, block, bmap_size); // retrive bitmap
+    
+    begin = 0;
+    end = bmap_size;
 
-    for (i = begin; i<end; i++) {
-        if (state == ((bmap>>i) & 1) )
-            return i;
-        
+    if (type == 1) 
+        end = bmap_size/2;
+    else if(type == 2)
+        begin = bmap_size/2;
+
+    for (i = begin; i<end; i++){
+        for (j = 0; j<8; j++) {
+            if (state == ((bmap[i]>>j) & 1) )
+                return i*8+j;
+        }
     }
-       
     return -1;
 }
 
-// 1 = bitmap present at start representing 80 blocks 
-// 2 = bitmap present at start representing 40 blocks
-// 3 = bitmap present at middle representing 40 blocks
-void toggle_bit(int idx, char *block, int block_type) 
+// 1 = bitmap present at start representing TOTAL_PARTITIONS blocks 
+// 2 = bitmap present at start representing TOTAL_PARTITIONS/2 blocks
+// 3 = bitmap present at start but take next TOTAL_PARTITIONS/2 blocks
+void toggle_bit(int idx, char *block, int type) 
 {    
-    unsigned int bmap = 0;
+    int bmap_size = TOTAL_PARTITIONS/8;
+    char bmap[bmap_size];
 
-    if (block_type == 1) { 
+//    if (type == 1) { 
 
-        memcpy(&bmap, block, 3); // retrive bitmap    
-        bmap ^= 1<<idx;  // toggle bit
-        memcpy(block, &bmap, 3);  // store bitmap
+    memcpy(&bmap, block, bmap_size); // retrive bitmap    
+    bmap[idx/8] ^= 1<<(idx%8);  // toggle bit
+    memcpy(block, &bmap, bmap_size);  // store bitmap
 
-    }
-    else if (block_type == 2) {
+//     }
+//     else if (block_type == 2) {
 
-        memcpy(&bmap, block, 2); // retrive bitmap    
-        bmap ^= 1<<idx;  // toggle bit
-        memcpy(block, &bmap, 2);  // store bitmap
+//         memcpy(&bmap, block, 2); // retrive bitmap    
+//         bmap ^= 1<<idx;  // toggle bit
+//         memcpy(block, &bmap, 2);  // store bitmap
 
-    }
-    else if (block_type == 3) {
+//    }
+    // else if (block_type == 3) {
 
-        memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 2); // retrive bitmap    
-        bmap ^= 1<<idx;  // toggle bit
-        memcpy(block+COMM_BLOCK_SIZE/2, &bmap, 2);  // store bitmap
+    //     memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 2); // retrive bitmap    
+    //     bmap ^= 1<<idx;  // toggle bit
+    //     memcpy(block+COMM_BLOCK_SIZE/2, &bmap, 2);  // store bitmap
 
-    }
+    // }
 }
 
 
-void set_all_bits(char *block, int block_type) 
+void set_all_bits(char *block, int type) 
 {
-    if (block_type == 1) 
-        memset(block, 0xFFFFFFFF, 3);
-    else if (block_type == 2)
-        memset(block, 0xFFFFFFFF, 2);
-    else if (block_type == 3)
-        memset(block+COMM_BLOCK_SIZE/2, 0xFFFFFFFF, 2);
+    if (type == 1) 
+        memset(block, 0xFFFFFFFF, 5);
+    else if (type == 2)
+        memset(block+5, 0xFFFFFFFF, 5);
+    else if (type == 3)
+        memset(block, 0xFFFFFFFF, 10);
 }
 
 
-void unset_all_bits(char *block, int block_type) 
+void unset_all_bits(char *block, int type) 
 {
-    if (block_type == 1) 
-        memset(block, 0, 3);
-    else if (block_type == 2)
-        memset(block, 0, 2);
-    else if (block_type == 3)
-        memset(block+COMM_BLOCK_SIZE/2, 0, 2);
+    if (type == 1) 
+        memset(block, 0, 5);
+    else if (type == 2)
+        memset(block+5, 0, 5);
+    else if (type == 3)
+        memset(block, 0, 10);
 }

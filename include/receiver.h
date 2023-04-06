@@ -37,11 +37,5 @@ int read_message_from_processor(char *);
 int evaluate_and_perform(char *);
 int send_message_to_processor(rconmsg *);
 int run_receiver();
-int init_receiver();
-int close_receiver();
-int initialize_locks();
-int get_shared_memory();
-int uninitialize_locks();
-int detach_memory();
 
 #endif //RCEIVER_H

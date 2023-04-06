@@ -48,21 +48,21 @@ void create_socket()
     
     s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0); // create socket for servet
     if (s_info.servsoc_fd == -1) {
-        perror("socket error");
-        exit(1);
+        syslog(LOG_NOTICE, "creating socket failed");
+        return;
     }
 
     // if incase the process dies, then after restart if the socket is already in use
     // then bind to that socket
     optval = 1;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        perror("setsokopt");
+        syslog(LOG_NOTICE, "setting socket as resuable failed");
         return;
     }
 
     optval = 128 *1024;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
-        perror("setsokopt");
+        syslog(LOG_NOTICE, "setting size of receiving buffer failed");
         return;
     }
 
@@ -218,17 +218,17 @@ int send_to_processor(rcondata *rcond)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block, 0);
+    subblock_position = get_subblock(dblks.datar_block, 0, 3);
 
     if (subblock_position >= 0) {
         syslog(LOG_NOTICE, "got subblock %d", subblock_position);
-        blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
+        blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
         memcpy(blkptr, rcond, sizeof(rcondata));
         
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 1);
+        toggle_bit(subblock_position, dblks.datar_block, 3);
     }
 
     sem_post(smlks.sem_lock_datar);
@@ -242,18 +242,18 @@ int read_message_from_processor(char *data)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock2(dblks.commr_block, 1, 0);
+    subblock_position = get_subblock2(dblks.commr_block, 1, 1);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 2 + subblock_position * CPARTITION_SIZE;
+        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(data, 0, CPARTITION_SIZE);
         
         memcpy(data, blkptr, CPARTITION_SIZE);
         memset(blkptr, 0, CPARTITION_SIZE);
         
         blkptr = NULL; 
-        toggle_bit(subblock_position, dblks.commr_block, 2);
+        toggle_bit(subblock_position, dblks.commr_block, 1);
     }
     
     sem_post(smlks.sem_lock_commr);
@@ -268,16 +268,16 @@ int send_message_to_processor(rconmsg *rcvm)
     char msg_type;
     
     sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock2(dblks.commr_block, 0, 1);
+    subblock_position = get_subblock(dblks.commr_block, 0, 2);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 4 + subblock_position * CPARTITION_SIZE;
+        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         
         memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, rcvm, sizeof(rcvm));
 
-        toggle_bit(subblock_position, dblks.commr_block, 3);
+        toggle_bit(subblock_position, dblks.commr_block, 2);
     }
     
     sem_post(smlks.sem_lock_commr);
@@ -310,6 +310,7 @@ int main(void)
 
     if (!(dblks.datar_block && dblks.commr_block)) {
         syslog(LOG_NOTICE, "failed to get shared memory");
+        return -1;
     }
     
     
@@ -323,7 +324,7 @@ int main(void)
     // somaxconn is defined in socket.h
     if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
         syslog(LOG_NOTICE, "failed to listen on port %d", s_info.servsoc_fd);
-        return 1;
+        return -1;
     }
  
     

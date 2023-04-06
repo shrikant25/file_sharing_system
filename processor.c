@@ -1,3 +1,4 @@
+#include <syslog.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,11 +28,11 @@ int get_data_from_receiver()
     rcondata rcond;
 
     sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block, 1);
+    subblock_position = get_subblock(dblks.datar_block, 1, 3);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + 3 + subblock_position * DPARTITION_SIZE;
+        blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(&rcond, 0, sizeof(rcond));
         memcpy(&rcond, blkptr, sizeof(rcond));
@@ -39,7 +40,7 @@ int get_data_from_receiver()
         store_data_in_database(&rcond);
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 1);
+        toggle_bit(subblock_position, dblks.datar_block, 3);
     
     }
 
@@ -54,17 +55,17 @@ int give_data_to_sender()
     char data[DPARTITION_SIZE];
 
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dblks.datas_block , 0);
+    subblock_position = get_subblock(dblks.datas_block , 0, 3);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block + 3 + subblock_position * DPARTITION_SIZE;
+        blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         memset(data, 0, DPARTITION_SIZE);
         
         if (retrive_data_from_database(data) != -1) {
             memcpy(blkptr, data, DPARTITION_SIZE);
             memset(data, 0, DPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.datas_block, 1);
+            toggle_bit(subblock_position, dblks.datas_block, 3);
         }
         blkptr = NULL;
     }
@@ -81,18 +82,18 @@ int communicate_with_receiver()
     rconmsg rcvm;
 
     sem_wait(smlks.sem_lock_commr);         
- /*   subblock_position = get_subblock2(dblks.commr_block, 0, 0);
+ /*   subblock_position = get_subblock(dblks.commr_block, 0, 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block  + 2 + subblock_position * CPARTITION_SIZE;
+        blkptr = dblks.commr_block  + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1) {
 
             memcpy(blkptr, data, CPARTITION_SIZE);
             memset(data, 0, CPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.commr_block, 2);
+            toggle_bit(subblock_position, dblks.commr_block, 1);
 
         }
         blkptr = NULL;
@@ -100,17 +101,17 @@ int communicate_with_receiver()
 
    */ 
     subblock_position = -1;
-    subblock_position = get_subblock2(dblks.commr_block, 1, 1);
+    subblock_position = get_subblock(dblks.commr_block, 1, 2);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + 4 + subblock_position*CPARTITION_SIZE;
+        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
         memcpy(&rcvm, blkptr, sizeof(rcvm));
         store_commr_into_database(&rcvm);
           
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.commr_block, 3);
+        toggle_bit(subblock_position, dblks.commr_block, 2);
     
     }
 
@@ -125,28 +126,28 @@ int communicate_with_sender()
     char data[CPARTITION_SIZE];
 
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock2(dblks.comms_block, 0, 0);
+    subblock_position = get_subblock(dblks.comms_block, 0, 1);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 2 + subblock_position*CPARTITION_SIZE;
+        blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         if (retrive_comms_from_database(data) == -1){
             memcpy(blkptr, data, CPARTITION_SIZE);
             memset(data, 0, CPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.comms_block, 2);
+            toggle_bit(subblock_position, dblks.comms_block, 1);
         }
 
         blkptr = NULL;
     }
     
     subblock_position = -1;
-    subblock_position = get_subblock2(dblks.comms_block, 1, 1);
+    subblock_position = get_subblock2(dblks.comms_block, 1, 2);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 4 + subblock_position*CPARTITION_SIZE;
+        blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         memcpy(data, blkptr, CPARTITION_SIZE);
@@ -154,7 +155,7 @@ int communicate_with_sender()
         
         memset(data, 0, CPARTITION_SIZE);  
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.comms_block, 3);
+        toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
 
@@ -192,7 +193,7 @@ int main(void)
     dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
 
     if (!(dblks.datar_block && dblks.commr_block && dblks.datas_block && dblks.comms_block)) {
-        printf("failed to get shared memory");
+        syslog(LOG_NOTICE,"failed to get shared memory");
         return -1; 
     }
 

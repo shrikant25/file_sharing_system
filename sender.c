@@ -10,6 +10,7 @@
 #include "shared_memory.h"
 #include <string.h>
 #include <unistd.h>
+#include <syslog.h>
 
 datablocks dblks;
 semlocks smlks;
@@ -61,57 +62,8 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
         return -1;
     }
 
-        printf("Error connecting to server\n");
+    syslog(LOG_NOTICE,"Error connecting to server");
     return network_socket;
-}
-
-
-int close_connection(unsigned int network_sokcet) 
-{
-    close(network_sokcet);
-}
-
-
-int get_shared_memory()
-{
-    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
-
-    if (!(dblks.datas_block && dblks.comms_block)) 
-        return -1; 
-    return 0;
-}
-
-
-int detach_memory()
-{
-    int status = 0;
-    
-    status = detach_memory_block(dblks.datas_block);
-    status = detach_memory_block(dblks.comms_block);
-
-    return status;
-}
-
-
-int initialize_locks() 
-{
-    int status = 0;
-
-    smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
-    smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
-
-    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
-        status = -1;
-
-    return status;
-}
-
-
-int uninitialize_locks()
-{
-    sem_close(smlks.sem_lock_datas);
-    sem_close(smlks.sem_lock_comms);
 }
 
 
@@ -149,7 +101,7 @@ int evaluate_and_take_action(char *data)
         
         ptr += 16; //internal cid
         connection_socket = atoi(ptr);
-        close_connection(connection_socket);
+        close(network_sokcet);
     }
     else
         return -1;
@@ -164,11 +116,11 @@ int read_message(char *data)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock2(dblks.comms_block, 1, 0);
+    subblock_position = get_subblock(dblks.comms_block, 1, 1);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 2 + subblock_position * CPARTITION_SIZE;
+        blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(data, 0, CPARTITION_SIZE);
         
         memcpy(data, blkptr, CPARTITION_SIZE);
@@ -176,7 +128,7 @@ int read_message(char *data)
         // if returns -1 then handle appropriately
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.comms_block, 2);
+        toggle_bit(subblock_position, dblks.comms_block, 1);
     
     }
 
@@ -190,11 +142,11 @@ int get_data_from_processor(int *fd, char *data, int *data_size)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dblks.datas_block , 1);
+    subblock_position = get_subblock(dblks.datas_block , 1, 3);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.datas_block + 3 + subblock_position * DPARTITION_SIZE;
+        blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         memset(data, 0, DPARTITION_SIZE);
 
         *fd = atoi(blkptr);
@@ -207,7 +159,7 @@ int get_data_from_processor(int *fd, char *data, int *data_size)
         
         memset(blkptr, 0, DPARTITION_SIZE);
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datas_block, 1);
+        toggle_bit(subblock_position, dblks.datas_block, 3);
     
     }
 
@@ -231,16 +183,16 @@ int send_message(char *cid, int data)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
-    subblock_position = get_subblock2(dblks.comms_block, 0, 1);
+    subblock_position = get_subblock(dblks.comms_block, 0, 2);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.comms_block + 4 + subblock_position * CPARTITION_SIZE;
+        blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, cid, 16);
         blkptr += 16;
         memcpy(blkptr, &data, sizeof(int));
-        toggle_bit(subblock_position, dblks.comms_block, 3);
+        toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
 
@@ -270,11 +222,26 @@ int run_sender()
 
 int main(void) 
 {
-    initialize_locks();
-    get_shared_memory();
-    run_sender();
-    uninitialize_locks();
-    detach_memory();   
+ 
+    smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
+    smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
+    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
+        return -1;
+ 
+    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
+
+    if (!(dblks.datas_block && dblks.comms_block)) 
+        return -1; 
+    
+ 
+    run_sender();
+    
+    sem_close(smlks.sem_lock_datas);
+    sem_close(smlks.sem_lock_comms);
+    detach_memory_block(dblks.datas_block);
+    detach_memory_block(dblks.comms_block);
+    
     return 0;
 }
