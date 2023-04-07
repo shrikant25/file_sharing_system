@@ -14,7 +14,22 @@ SELECT cron.schedule('* * * * * *', 'select call_jobs();');
 
 
 
-DROP TABLE logs, receivers_comms, receiving_conns, transactions, job_scheduler, sysinfo, senders_comms, sending_conns;
+DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, senders_comms, sending_conns;
+
+
+
+CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
+                        jobdata bytea NOT NULL,
+                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
+                        jtype TEXT NOT NULL DEFAULT '1',
+                        jsource TEXT NOT NULL,
+                        jobid UUID UNIQUE NOT NULL,
+                        jparent_jobid UUID REFERENCES job_scheduler(jobid) 
+                            ON UPDATE CASCADE ON DELETE CASCADE,
+                        jdestination TEXT NOT NULL DEFAULT 0,
+                        jpriority  TEXT NOT NULL DEFAULT '10',
+                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
                               mdata bytea NOT NULL, 
@@ -25,30 +40,27 @@ CREATE TABLE receiving_conns (rfd TEXT NOT NULL PRIMARY KEY,
                               rcstatus TEXT NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
-
-CREATE TABLE transactions (transactionid INTEGER PRIMARY KEY,
-                    transaction_text TEXT);
-
-
-CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
-                            mdata TEXT NOT NULL, 
-                            mtype SMALLINT NOT NULL);
 
 CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
-                            sfd INTEGER NOT NULL,
-                            sipaddr BIGINT NOT NULL, 
-                            scstatus SMALLINT NOT NULL,
+                            sfd Text NOT NULL,
+                            sipaddr Text NOT NULL, 
+                            scstatus Text NOT NULL,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
+CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
+                            mdata Text NOT NULL, 
+                            mtype Text NOT NULL);
+
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
-                  log TEXT NOT NULL,
+                   log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 
 
+
+CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
+                        ipaddress Text NOT NULL,
+                        systems_capacity INTEGER NOT NULL);
 
 
 CREATE OR REPLACE FUNCTION create_message(
@@ -72,7 +84,9 @@ BEGIN
     fixed_destination := lpad(message_destination, 5, ' ');
     fixed_priority := lpad(message_priority, 5, ' ');
     
-    hnmessage := gen_random_uuid()::text::bytea || fixed_type::bytea || fixed_source::bytea || fixed_destination::bytea || fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget;
+    hnmessage := gen_random_uuid()::text::bytea || fixed_type::bytea || 
+                fixed_source::bytea || fixed_destination::bytea || 
+                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget;
     
     RETURN md5(hnmessage)::bytea || hnmessage;
 END;
@@ -80,22 +94,13 @@ $$
 LANGUAGE 'plpgsql';
 
 
-
-CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
-                        jobdata bytea NOT NULL,
-                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
-                        jtype SMALLINT NOT NULL DEFAULT 1,
-                        jsource TEXT NOT NULL,
-                        jobid UUID UNIQUE NOT NULL,
-                        jparent_jobid UUID REFERENCES job_scheduler(jobid) ON UPDATE CASCADE ON DELETE CASCADE,
-                        jdestination TEXT NOT NULL DEFAULT 0,
-                        jpriority  TEXT NOT NULL DEFAULT 10,
-                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
+INSERT INTO sysinfo VALUES('   M2', '123456', 50);
 
 INSERT INTO job_scheduler
-(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
-VALUES('__ROOT__', 'N-0', 0, '   M3', GEN_RANDOM_UUID(), NULL, '   M3', 0);
+    (jobdata, jstate, jtype, jsource, 
+        jobid, jparent_jobid, jdestination, jpriority) 
+VALUES('__ROOT__', 'N-0', '0', '   M3', 
+    GEN_RANDOM_UUID(), NULL, '   M3', 0);
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -108,40 +113,45 @@ SET NOT NULL;
 SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
 
-
-
-
-
-
-
-INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
+INSERT INTO job_scheduler(jobdata, jstate, 
+    jtype, jsource, jobid, jparent_jobid, 
+    jdestination, jpriority) 
 VALUES(
     (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M2'::text, '05'::text)),
-     'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
+            'N-1', '0', '0', GEN_RANDOM_UUID(), 
+     (select jobid 
+     from job_scheduler 
+     where jidx = 1), '0', '5');
 
 
-INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
+INSERT INTO job_scheduler(jobdata, jstate, 
+    jtype, jsource, jobid, jparent_jobid, 
+    jdestination, jpriority) 
 VALUES(
     (select create_message('01'::text, 'hello'::bytea, 'M2'::text, 'M3'::text, '05'::text)),
-     'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
+     'N-1', '0', '0', GEN_RANDOM_UUID(), 
+     (select jobid 
+     from job_scheduler 
+     where jidx = 1), '0', '5');
 
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES( 
     (select create_message('01'::text, 'hello'::bytea, 'M2'::text, 'M3'::text, '05'::text)),
-     'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
+     'N-1', '0', '0', GEN_RANDOM_UUID(), 
+     (select jobid 
+     from job_scheduler 
+     where jidx = 1), '0', '5');
 
 
 INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) 
 VALUES(
     (select create_message('01'::text, 'hello'::bytea, 'M1'::text, 'M2'::text, '05'::text)),
-     'N-1', 0, '0', GEN_RANDOM_UUID(), (select jobid from job_scheduler where jidx = 1), '0', 5);
+     'N-1', '0', '0', GEN_RANDOM_UUID(), 
+     (select jobid 
+     from job_scheduler 
+     where jidx = 1), '0', '5');
 
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
-
-INSERT INTO sysinfo VALUES('   M2', '123456', 50);
 
 
 
@@ -153,12 +163,31 @@ SET jstate =
         ELSE jstate
     END;
 
-UPDATE job_scheduler SET jstate = 'N-3' where jstate = 'N-2' AND encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
-UPDATE job_scheduler SET jstate = 'S-1', jdestination = encode(substr(jobdata, 79, 5), 'escape') where jstate = 'N-2' AND encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
+UPDATE job_scheduler 
+SET jstate = 'N-3' 
+WHERE jstate = 'N-2' 
+AND 
+encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
+
+UPDATE job_scheduler 
+SET jstate = 'S-1', 
+jdestination = encode(substr(jobdata, 79, 5), 'escape') 
+WHERE jstate = 'N-2' 
+AND 
+encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
+
+
+SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
 
 
-UPDATE job_scheduler set jstate = 'N-4', jtype = encode(substr(jobdata, 69, 5), 'escape')::SMALLINT where jstate = 'N-3';
+UPDATE job_scheduler 
+SET jstate = 'N-4', 
+jtype = encode(substr(jobdata, 69, 5), 'escape')
+WHERE jstate = 'N-3';
+
+
+
 UPDATE job_scheduler AS js
 SET jstate = (
     SELECT 
@@ -180,33 +209,53 @@ WHERE jstate = 'S-1';
 --                 ELSE jstate
 --             END;
 
-UPDATE job_scheduler SET jdestination = (SELECT ipaddress FROM sysinfo WHERE system_name = jdestination) WHERE jstate IN('S-3', 'S-2');
 
 
 
+UPDATE job_scheduler AS js
+SET jstate = 'S-2', 
+jdestination = (SELECT ipaddress 
+                FROM sysinfo 
+                WHERE system_name = js.jdestination) 
+WHERE jstate = 'S-1' 
+AND 
+LENGTH(jobdata) > (SELECT systems_capacity 
+                    FROM sysinfo 
+                    WHERE system_name = js.jdestination);
 
 
 
+UPDATE job_scheduler AS js
+SET jstate = 'S-3', 
+jdestination = (SELECT ipaddress 
+                FROM sysinfo 
+                WHERE system_name = js.jdestination) 
+WHERE jstate = 'S-1' 
+AND 
+LENGTH(jobdata) <= (SELECT systems_capacity 
+                    FROM sysinfo 
+                    WHERE system_name = js.jdestination);
+
+
+UPDATE job_scheduler 
+SET jdestination = (SELECT ipaddress 
+                    FROM sysinfo 
+                    WHERE system_name = jdestination) 
+WHERE jstate IN('S-3', 'S-2');
 
 
 SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
+--take unique ip from all messages at s-3 stage, insert into sending_conns with status closed, create a message for sender to open location,
+--if already present and status = closed, create a message for sender to open location
 
-
-
-
-
-
-
-
-
-UPDATE job_scheduler AS js
-SET jstate = 'S-2', jdestination = (SELECT ipaddress FROM sysinfo WHERE system_name = js.jdestination) 
-WHERE jstate = 'S-1' AND LENGTH(jobdata) > (SELECT systems_capacity FROM sysinfo WHERE system_name = js.jdestination);
-
-UPDATE job_scheduler AS js
-SET jstate = 'S-3', jdestination = (SELECT ipaddress FROM sysinfo WHERE system_name = js.jdestination) 
-WHERE jstate = 'S-1' AND LENGTH(jobdata) <= (SELECT systems_capacity FROM sysinfo WHERE system_name = js.jdestination);
+-- INSERT into senders_comms (mdata, mtype) 
+-- SELECT array_to_string(array_agg(jdestination::text),','), '1'  
+-- FROM job_scheduler 
+-- WHERE jstate = 'S-3' 
+-- AND jdestination 
+-- NOT IN 
+-- (SELECT sipaddr FROM sending_conns);   
 
 
 
@@ -249,7 +298,7 @@ cte_msg AS (
     FROM cte_jobdata
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT msg, 'S-3', 2, jsource, encode(substr(msg, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+SELECT msg, 'S-3', '2', jsource, encode(substr(msg, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
 FROM cte_msg;
 
 
@@ -274,13 +323,17 @@ WITH cte_msginfo as(
     ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
     WHERE jstate = 'S-2'
 )
-
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT mdata, 'S-3', 3, jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+SELECT mdata, 'S-3', '3', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
 FROM cte_msginfo; 
         
 
 UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
+
+
+
+
+
 
 SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority, jcreation_time FROM job_scheduler;
 
@@ -316,7 +369,46 @@ SELECT
     encode(substr(jobdata, 115, 36), 'escape') AS parent_job_id,
     encode(substr(jobdata, 151, 10), 'escape') AS data_length,
     encode(substr(jobdata, 161, 10), 'escape') AS chunk_count
-FROM job_scheduler WHERE jtype = 3;
+FROM job_scheduler WHERE jtype = '3';
+
+
+INSERT INTO senders_comms (mdata, mtype)
+SELECT DISTINCT string_agg(DISTINCT js.jdestination::text, ','), '1'
+FROM job_scheduler js
+WHERE js.jstate = 'S-3'
+AND NOT EXISTS (
+  SELECT 1
+  FROM sending_conns sc
+  WHERE sc.sipaddr = js.jdestination
+);
+
+INSERT into sending_conns (sfd, sipaddr, scstatus) 
+SELECT DISTINCT '-1'::text, jdestination, '1'::text  
+FROM job_scheduler js 
+WHERE js.jstate = 'S-3' 
+AND NOT EXISTS (
+  SELECT 1 
+  FROM sending_conns sc
+  WHERE sc.sipaddr = js.jdestination
+);   
+select *  from senders_comms;
+select * from sending_conns;
+
+
+UPDATE sending_conns 
+SET sfd = ($1), scstatus = ($2) 
+WHERE scipddr = ($3);
+
+SELECT jobdata 
+FROM job_scheduler js 
+WHERE js.jstate = 'S-3'
+AND 
+EXISTS (SELECT  1 
+        FROM sending_conns sc 
+        WHERE sc.sipaddr = js.jdestination 
+        AND sc.scstatus = '2'::Text)
+ORDER BY jpriority DESC
+LIMIT 1;
 
 
 
@@ -350,14 +442,6 @@ SELECT jidx, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriori
 --         WHEN jstate = 'N-2' AND encode(substr(jobdata, 79, 5), 'escape') != (SELECT jsource FROM job_scheduler WHERE jidx= 1) THEN 'S-1'
 --         ELSE jstate
 --     END;
-
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
-
-INSERT INTO sysinfo VALUES('M2', '123456', 2);
-
-
 
 
 

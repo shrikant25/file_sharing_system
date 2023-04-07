@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
     for (i = 0; i<num; i++) {
         
         pid = fork();
+//	sleep(1);
         result = 0;
 
         if (pid < 0) {

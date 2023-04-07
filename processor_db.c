@@ -14,7 +14,7 @@ db_statements dbs[statement_count] = {
       .statement_name = "s0",  
       .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype,\
                     jsource, jobid, jparent_jobid, jdestination,\
-                    jpriority) VALUES($2, 'N-0', 0, $1, GEN_RANDOM_UUID(),\
+                    jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(),\
                     (select jobid from job_scheduler where jidx = 1), 0, 0);",
       .param_count = 2,
     },
