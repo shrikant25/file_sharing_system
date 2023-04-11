@@ -17,7 +17,6 @@ SELECT cron.schedule('* * * * * *', 'select call_jobs();');
 DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, senders_comms, sending_conns;
 
 
-
 CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
                         jobdata bytea NOT NULL,
                         jstate CHAR(5) NOT NULL DEFAULT 'N-1',
@@ -41,22 +40,22 @@ CREATE TABLE receiving_conns (rfd TEXT NOT NULL PRIMARY KEY,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 
+
 CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
-                            sfd Text NOT NULL,
-                            sipaddr Text NOT NULL, 
-                            scstatus Text NOT NULL,
+                            sfd INTEGER NOT NULL,
+                            sipaddr BIGINT NOT NULL, 
+                            scstatus SMALLINT NOT NULL,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
                             mdata Text NOT NULL, 
-                            mtype Text NOT NULL);
+                            mtype SMALLINT NOT NULL);
+
+
 
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-
-
-
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
                         ipaddress Text NOT NULL,
@@ -212,29 +211,29 @@ WHERE jstate = 'S-1';
 
 
 
-UPDATE job_scheduler AS js
-SET jstate = 'S-2', 
-jdestination = (SELECT ipaddress 
-                FROM sysinfo 
-                WHERE system_name = js.jdestination) 
-WHERE jstate = 'S-1' 
-AND 
-LENGTH(jobdata) > (SELECT systems_capacity 
-                    FROM sysinfo 
-                    WHERE system_name = js.jdestination);
+-- UPDATE job_scheduler AS js
+-- SET jstate = 'S-2', 
+-- jdestination = (SELECT ipaddress 
+--                 FROM sysinfo 
+--                 WHERE system_name = js.jdestination) 
+-- WHERE jstate = 'S-1' 
+-- AND 
+-- LENGTH(jobdata) > (SELECT systems_capacity 
+--                     FROM sysinfo 
+--                     WHERE system_name = js.jdestination);
 
 
 
-UPDATE job_scheduler AS js
-SET jstate = 'S-3', 
-jdestination = (SELECT ipaddress 
-                FROM sysinfo 
-                WHERE system_name = js.jdestination) 
-WHERE jstate = 'S-1' 
-AND 
-LENGTH(jobdata) <= (SELECT systems_capacity 
-                    FROM sysinfo 
-                    WHERE system_name = js.jdestination);
+-- UPDATE job_scheduler AS js
+-- SET jstate = 'S-3', 
+-- jdestination = (SELECT ipaddress 
+--                 FROM sysinfo 
+--                 WHERE system_name = js.jdestination) 
+-- WHERE jstate = 'S-1' 
+-- AND 
+-- LENGTH(jobdata) <= (SELECT systems_capacity 
+--                     FROM sysinfo 
+--                     WHERE system_name = js.jdestination);
 
 
 UPDATE job_scheduler 
@@ -372,25 +371,41 @@ SELECT
 FROM job_scheduler WHERE jtype = '3';
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 INSERT INTO senders_comms (mdata, mtype)
-SELECT DISTINCT string_agg(DISTINCT js.jdestination::text, ','), '1'
+SELECT DISTINCT string_agg(DISTINCT js.jdestination::text, ','), 1
 FROM job_scheduler js
 WHERE js.jstate = 'S-3'
 AND NOT EXISTS (
   SELECT 1
   FROM sending_conns sc
-  WHERE sc.sipaddr = js.jdestination
+  WHERE sc.sipaddr::text = js.jdestination
 );
 
 INSERT into sending_conns (sfd, sipaddr, scstatus) 
-SELECT DISTINCT '-1'::text, jdestination, '1'::text  
+SELECT DISTINCT -1, jdestination::BIGINT, 1  
 FROM job_scheduler js 
 WHERE js.jstate = 'S-3' 
 AND NOT EXISTS (
   SELECT 1 
   FROM sending_conns sc
-  WHERE sc.sipaddr = js.jdestination
+  WHERE sc.sipaddr::text = js.jdestination
 );   
+
+
 select *  from senders_comms;
 select * from sending_conns;
 
@@ -405,9 +420,9 @@ WHERE js.jstate = 'S-3'
 AND 
 EXISTS (SELECT  1 
         FROM sending_conns sc 
-        WHERE sc.sipaddr = js.jdestination 
-        AND sc.scstatus = '2'::Text)
-ORDER BY jpriority DESC
+        WHERE sc.sipaddr::text = js.jdestination 
+        AND sc.scstatus = 2)
+    ORDER BY jpriority DESC
 LIMIT 1;
 
 

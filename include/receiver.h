@@ -32,10 +32,10 @@ void add_to_list(int);
 void remove_from_list(int); 
 void accept_connection(); 
 void read_socket(struct epoll_event);
-int send_to_processor(rcondata *);
+int send_to_processor(nmdata *);
 int read_message_from_processor(char *);
 int evaluate_and_perform(char *);
-int send_message_to_processor(rconmsg *);
+int send_message_to_processor(receivers_msg *);
 int run_receiver();
 
 #endif //RCEIVER_H

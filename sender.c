@@ -211,10 +211,10 @@ int run_sender()
 
         read_message(data);
         if (get_data_from_processor(&fd, data, &data_size)) {
+            
             status = send_data_over_network(fd, data, data_size);
-            if (status == -1) {
-                send_message()
-            }
+            send_message();
+            
         }
     }
 }

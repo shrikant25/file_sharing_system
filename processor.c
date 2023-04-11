@@ -25,7 +25,7 @@ int get_data_from_receiver()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    rcondata rcond;
+    newmsg_data rcond;
 
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block, 1, 3);
@@ -47,7 +47,7 @@ int get_data_from_receiver()
     sem_post(smlks.sem_lock_datar);
 }
 
-/*
+
 int give_data_to_sender() 
 {
     int subblock_position = -1;
@@ -55,7 +55,7 @@ int give_data_to_sender()
     char data[DPARTITION_SIZE];
 
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dblks.datas_block , 0, 3);
+    subblock_position = get_subblock(dblks.datas_block, 0, 3);
     
     if(subblock_position >= 0) {
 
@@ -72,14 +72,14 @@ int give_data_to_sender()
 
     sem_post(smlks.sem_lock_datas);
 }
-*/
+
 
 int communicate_with_receiver() 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     char data[CPARTITION_SIZE];
-    rconmsg rcvm;
+    receivers_message rcvm;
 
     sem_wait(smlks.sem_lock_commr);         
  /*   subblock_position = get_subblock(dblks.commr_block, 0, 1);
@@ -118,12 +118,12 @@ int communicate_with_receiver()
     sem_post(smlks.sem_lock_commr);   
 }
 
-/*
+
 int communicate_with_sender() 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    char data[CPARTITION_SIZE];
+    senders_message smsg;
 
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 0, 1);
@@ -132,10 +132,9 @@ int communicate_with_sender()
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
-        memset(data, 0, CPARTITION_SIZE);
-        if (retrive_comms_from_database(data) == -1){
-            memcpy(blkptr, data, CPARTITION_SIZE);
-            memset(data, 0, CPARTITION_SIZE);  
+        memset(&smsg, 0, sizeof(senders_message));
+        if (retrive_comms_from_database(&smsg) != -1){
+            memcpy(blkptr, &smsg, sizeof(senders_message));
             toggle_bit(subblock_position, dblks.comms_block, 1);
         }
 
@@ -143,17 +142,16 @@ int communicate_with_sender()
     }
     
     subblock_position = -1;
-    subblock_position = get_subblock2(dblks.comms_block, 1, 2);
+    subblock_position = get_subblock(dblks.comms_block, 1, 2);
     
     if (subblock_position >= 0) {
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
-        memset(data, 0, CPARTITION_SIZE);
-        memcpy(data, blkptr, CPARTITION_SIZE);
-        store_comms_into_database(data);
+        memset(&smsg, 0, sizeof(senders_message));
+        memcpy(&smsg, blkptr, sizeof(senders_message));
+        store_comms_into_database(&smsg);
         
-        memset(data, 0, CPARTITION_SIZE);  
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
@@ -161,7 +159,7 @@ int communicate_with_sender()
 
     sem_post(smlks.sem_lock_comms);   
 }
-*/
+
 
 int run_process() 
 {
