@@ -158,11 +158,11 @@ int send_message_to_processor(int type, int data1, int data2)
     int subblock_position = -1;
     char *blkptr = NULL;
     senders_message smsg;
-    smsg->type = type;
+    smsg.type = type;
 
-    if (smsg->type == 3){
-        smsg->data1 = data;
-        smsg->data2 = status;
+    if (smsg.type == 3){
+        smsg.data1 = data1;
+        smsg.data2 = data2;
     }
 
     sem_wait(smlks.sem_lock_comms);         
@@ -195,7 +195,7 @@ int run_sender()
         if (get_data_from_processor(&fd, data, &data_size)) {
             
             status = send_data_over_network(fd, data, data_size);
-            send_message_to_processor();
+            send_message_to_processor(4, fd, status);
             
         }
     }

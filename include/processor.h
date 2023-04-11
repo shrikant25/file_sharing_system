@@ -3,12 +3,11 @@
 
 #include <semaphore.h>
 
-int get_data_from_receiver();
-int give_data_to_receiver();
-int communicate_with_receiver();
-int communicate_with_sender();
 int run_process();
-
+int communicate_with_sender();
+int communicate_with_receiver();
+int give_data_to_sender();
+int get_data_from_receiver();
 
 typedef struct datablocks {
 

@@ -24,18 +24,14 @@ typedef struct server_info{
 
 }server_info;
 
-
-void make_nonblocking(int);
-void create_socket();
-void create_epoll();
-void add_to_list(int);
-void remove_from_list(int); 
-void accept_connection(); 
-void read_socket(struct epoll_event);
-int send_to_processor(nmdata *);
-int read_message_from_processor(char *);
-int evaluate_and_perform(char *);
-int send_message_to_processor(receivers_msg *);
 int run_receiver();
+void accept_connection();
+void remove_from_list(int);
+void add_to_list(int);
+void create_socket();
+void make_nonblocking(int);
+int send_to_processor(newmsg_data *);
+int read_message_from_processor(char *);
+int send_message_to_processor(receivers_message *);
 
 #endif //RCEIVER_H

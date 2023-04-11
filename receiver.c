@@ -117,7 +117,7 @@ void accept_connection()
     int client_fd = -1;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len;
-    receivers_msg rcvm;
+    receivers_message rcvm;
 
     while (1) { // keep accepting connections as long as there are connections in queue
     
@@ -157,9 +157,9 @@ int run_receiver()
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     int bytes_read = 0;
-    nmdata rcond;
+    newmsg_data rcond;
 
-    receivers_msg rcvm;
+    receivers_message rcvm;
 
     while (receiver_status) {
         
@@ -212,7 +212,7 @@ int run_receiver()
 }
  
     
-int send_to_processor(nmdata *rcond)
+int send_to_processor(newmsg_data *rcond)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -225,7 +225,7 @@ int send_to_processor(nmdata *rcond)
         blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
-        memcpy(blkptr, rcond, sizeof(nmdata));
+        memcpy(blkptr, rcond, sizeof(newmsg_data));
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 3);
@@ -261,7 +261,7 @@ int read_message_from_processor(char *data)
 }
 */
 
-int send_message_to_processor(receivers_msg *rcvm)
+int send_message_to_processor(receivers_message *rcvm)
 {
     int subblock_position = -1;
     char *blkptr = NULL;

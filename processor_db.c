@@ -4,6 +4,7 @@
 #include "partition.h"
 #include "processor_db.h"
 #include <syslog.h>
+#include <stdlib.h>
 
 PGconn *connection;
 
@@ -199,23 +200,24 @@ int store_comms_into_database(senders_message *smsg)
 {
     PGresult* res = NULL;
     char type[5];
-    char data[10];;
+    char data1[10];
+    char data2[10];
 
-    memcpy(type, smsg->type, sizeof(smsg->type));
-    memcpy(data, smsg->data1, sizeof(smsg->data1));
+    sprintf(type, "%d", smsg->type);
+    sprintf(data1, "%d", smsg->data1);
 
     if (smsg->type == 3) {    
 
-        memcpy(data, smsg->data2, sizeof(smsg->data2));
+        sprintf(data2, "%d", smsg->data2);
 
-        const char *param_values[] = {smsg->data1, smsg->data2};
-        const int paramLengths[] = {sizeof(smsg->data1), sizeof(smsg->data2)};
+        const char *param_values[] = {data1, data2};
+        const int paramLengths[] = {strlen(data1), strlen(data2)};
         const int paramFormats[] = {0, 0, 0};
         int resultFormat = 0;
 
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
     }
-    else if(type == 4) {
+    else if(smsg->type == 4) {
         // todo message status is type 4
     }
 
@@ -271,13 +273,13 @@ int retrive_comms_from_database(senders_message *smsg)
     row_count = PQntuples(res);
     if (row_count > 0) {
     
-        memcpy(smsg->type, atoi(PQgetvalue(res, 0, 0)), PQgetlength(res, 0, 0));
+        smsg->type = atoi(PQgetvalue(res, 0, 0));
         if (smsg->type == 1) { 
-            memcpy(smsg->data1, atoi(PQgetvalue(res, 0, 1)), PQgetlength(res, 0, 1));
-            memcpy(smsg->data2, atoi(PQgetvalue(res, 0, 2)), PQgetlength(res, 0, 2));
+           smsg->data1 = atoi(PQgetvalue(res, 0, 1));
+           smsg->data2 = atoi(PQgetvalue(res, 0, 2));
         }
         else if(smsg->type == 2) {
-            memcpy(smsg->data1, atoi(PQgetvalue(res, 0, 1)), PQgetlength(res, 0, 1));
+            smsg->data1 = atoi(PQgetvalue(res, 0, 1));
         }
 
         status = 0;
