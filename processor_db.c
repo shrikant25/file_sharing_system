@@ -194,28 +194,30 @@ int store_commr_into_database(receivers_message *rcvm)
     return 0;
 }
 
-/*
+
 int store_comms_into_database(senders_message *smsg) 
 {
     PGresult* res = NULL;
     char type[5];
-    unsigned int fd;
-    unsigned int ipaddr;
+    char data[10];;
 
     memcpy(type, smsg->type, sizeof(smsg->type));
-    if (type == 1) {
-        memcpy(ipaddr, smsg->ipaddr, sizeof(smsg->ipaddr));
-    }
-    else if(type == 2) {
-        memcpy(fd, smsg->fd, sizeof(smsg->fd));
-    }
+    memcpy(data, smsg->data1, sizeof(smsg->data1));
 
-    const char *param_values[] = {type, data};
-    const int paramLengths[] = {sizeof(type), sizeof(data)};
-    const int paramFormats[] = {0, 0};
-    int resultFormat = 0;
+    if (smsg->type == 3) {    
 
-    res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
+        memcpy(data, smsg->data2, sizeof(smsg->data2));
+
+        const char *param_values[] = {smsg->data1, smsg->data2};
+        const int paramLengths[] = {sizeof(smsg->data1), sizeof(smsg->data2)};
+        const int paramFormats[] = {0, 0, 0};
+        int resultFormat = 0;
+
+        res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    }
+    else if(type == 4) {
+        // todo message status is type 4
+    }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
@@ -226,7 +228,7 @@ int store_comms_into_database(senders_message *smsg)
 
     return 0;
 }
-*/
+
 
 /*
 int retrive_commr_from_database(char *data) 

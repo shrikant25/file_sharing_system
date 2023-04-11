@@ -146,7 +146,7 @@ EXISTS (SELECT  1
     ORDER BY jpriority DESC
 LIMIT 1;
 
-
+UPDATE sending_conns SET scstatus = ($2) WHERE sipaddr = ($1); 
 
 
 
