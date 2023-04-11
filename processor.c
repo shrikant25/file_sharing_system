@@ -163,13 +163,7 @@ int communicate_with_sender()
 
 int run_process() 
 {
-    unset_all_bits(dblks.commr_block, 2);
-    unset_all_bits(dblks.commr_block, 3);
-    unset_all_bits(dblks.comms_block, 2);
-    unset_all_bits(dblks.comms_block, 3);
-    unset_all_bits(dblks.datas_block, 1);
-    unset_all_bits(dblks.datar_block, 1);
-
+   
     while (process_status) {
 
         communicate_with_receiver();
@@ -211,7 +205,16 @@ int main(void)
 
     connect_to_database();
     prepare_statements();   
+    
+    unset_all_bits(dblks.commr_block, 2);
+    unset_all_bits(dblks.commr_block, 3);
+    unset_all_bits(dblks.comms_block, 2);
+    unset_all_bits(dblks.comms_block, 3);
+    unset_all_bits(dblks.datas_block, 1);
+    unset_all_bits(dblks.datar_block, 1);
+    
     run_process(); 
+    
     close_database_connection();    
 
     sem_close(smlks.sem_lock_datar);

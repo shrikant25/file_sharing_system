@@ -431,6 +431,43 @@ LIMIT 1;
 
 
 
+SELECT                           
+    encode(substr(jobdata, 115, 8), 'escape') AS t1,
+    encode(substr(jobdata, 123, 36), 'escape') AS t2,
+    encode(substr(jobdata, 159, 10), 'escape') AS t3,
+    encode(substr(jobdata, 169), 'escape') AS mdata
+FROM job_scheduler;
+
+
+
+SELECT                           
+    encode(substr(jobdata, 1, 32), 'escape') AS mhash,
+    encode(substr(jobdata, 33, 36),'escape') AS uuid,
+    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
+    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
+    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
+    encode(substr(jobdata, 84, 5), 'escape') AS message_priority, encode(substr(jobdata, 89, 26), 'escape') as tm
+FROM job_scheduler;
+
+
+
+SELECT                           
+    encode(substr(jobdata, 1, 32), 'escape') AS mhash,
+    encode(substr(jobdata, 33, 36),'escape') AS uuid,
+    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
+    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
+    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
+    encode(substr(jobdata, 84, 5), 'escape') AS message_priority, 
+    encode(substr(jobdata, 89, 26), 'escape') AS tm,
+    encode(substr(jobdata, 115, 36), 'escape') AS parent_job_id,
+    encode(substr(jobdata, 151, 10), 'escape') AS data_length,
+    encode(substr(jobdata, 161, 10), 'escape') AS chunk_count
+FROM job_scheduler WHERE jtype = '3';
+
+
+
+
+
 
 --encode(substr(jobdata, 115), 'escape') AS message
 

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "partition.h"
 #include "processor_db.h"
-
+#include <syslog.h>
 
 PGconn *connection;
 
@@ -12,20 +12,26 @@ PGconn *connection;
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "s0",  
-      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype,\
-                    jsource, jobid, jparent_jobid, jdestination,\
-                    jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(),\
+      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, \
+                    jsource, jobid, jparent_jobid, jdestination, \
+                    jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(), \
                     (select jobid from job_scheduler where jidx = 1), 0, 0);",
       .param_count = 2,
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT * from sysinfo;",
+      .statement = "SELECT jobdata FROM job_scheduler js \
+                    WHERE js.jstate = 'S-3' AND \
+                    EXISTS (SELECT  1 FROM sending_conns sc \
+                    WHERE sc.sipaddr = js.jdestination \
+                    AND sc.scstatus = '2') \
+                    ORDER BY jpriority DESC LIMIT 1;",
       .param_count = 0,
     },
     { 
       .statement_name = "s2", 
-      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) VALUES ($1, $2, $3) ON CONFLICT (rfd) DO UPDATE SET rcstatus = ($3);",
+      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) \
+                    VALUES ($1, $2, $3) ON CONFLICT (rfd) DO UPDATE SET rcstatus = ($3);",
       .param_count = 3,
     },
     { 
@@ -40,7 +46,8 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s5", 
-      .statement = "select * from sysinfo;",
+      .statement = "WITH sdata AS(SELECT scommid FROM senders_comms WHERE mtype IN(1, 2) LIMIT 1) \
+                    DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata;",
       .param_count = 0,
     },
     { 
@@ -105,7 +112,7 @@ int prepare_statements()
 }
 
 
-int store_data_in_database(rcondata *rcond) 
+int store_data_in_database(newmsg_data *rcond) 
 {
     PGresult *res = NULL;
     
@@ -140,7 +147,7 @@ int retrive_data_from_database(char *data)
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("retriving failed: %s\n", PQerrorMessage(connection));
+        syslog(LOG_NOTICE,"retriving failed: %s", PQerrorMessage(connection));
         return -1;
     }    
 
@@ -148,7 +155,6 @@ int retrive_data_from_database(char *data)
     if (row_count > 0) {
         memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
         memcpy(data+4, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
-        memcpy(data+8, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
         PQclear(res);
         return 0;
     }
@@ -158,7 +164,7 @@ int retrive_data_from_database(char *data)
 }
 
 
-int store_commr_into_database(rconmsg *rcvm) 
+int store_commr_into_database(receivers_message *rcvm) 
 {
     PGresult *res = NULL;
 
@@ -189,29 +195,27 @@ int store_commr_into_database(rconmsg *rcvm)
 }
 
 /*
-int store_comms_into_database(char *data) 
+int store_comms_into_database(senders_message *smsg) 
 {
-    char msg_id[17];
-    char msg_status[5]; 
-    unsigned char *ptr = data;
     PGresult* res = NULL;
+    char type[5];
+    unsigned int fd;
+    unsigned int ipaddr;
 
-    if (*ptr == 1) {
+    memcpy(type, smsg->type, sizeof(smsg->type));
+    if (type == 1) {
+        memcpy(ipaddr, smsg->ipaddr, sizeof(smsg->ipaddr));
+    }
+    else if(type == 2) {
+        memcpy(fd, smsg->fd, sizeof(smsg->fd));
+    }
 
-        ptr++;
-        memcpy(msg_id, ptr, 16);   
+    const char *param_values[] = {type, data};
+    const int paramLengths[] = {sizeof(type), sizeof(data)};
+    const int paramFormats[] = {0, 0};
+    int resultFormat = 0;
 
-        ptr += 16;
-        sprintf(msg_status, "%u", *(int *)ptr);
-
-        const char *param_values[] = {msg_id, msg_status};
-        const int paramLengths[] = {sizeof(msg_id), sizeof(msg_status)};
-        const int paramFormats[] = {0, 0};
-        int resultFormat = 0;
-
-        res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
-
-    } 
+    res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("Insert failed: %s\n", PQerrorMessage(connection));
@@ -222,8 +226,9 @@ int store_comms_into_database(char *data)
 
     return 0;
 }
-
 */
+
+/*
 int retrive_commr_from_database(char *data) 
 {
     int row_count = 0;
@@ -246,57 +251,42 @@ int retrive_commr_from_database(char *data)
     PQclear(res);
     return -1;
 }
+*/
 
-/*
-int retrive_comms_from_database(char *data) 
+int retrive_comms_from_database(senders_message *smsg) 
 {
-    char cid[4];
     int row_count = 0;
     PGresult *res = NULL;
+    int status = -1;
 
     res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("retriving failed: %s\n", PQerrorMessage(connection));
-        return -1;
+        syslog(LOG_NOTICE,"retriving failed: %s\n", PQerrorMessage(connection));
+        return status;
     }    
 
     row_count = PQntuples(res);
     if (row_count > 0) {
     
-        memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-        memcpy(cid, data, 4);
-        memcpy(data+4, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+        memcpy(smsg->type, atoi(PQgetvalue(res, 0, 0)), PQgetlength(res, 0, 0));
+        if (smsg->type == 1) { 
+            memcpy(smsg->data1, atoi(PQgetvalue(res, 0, 1)), PQgetlength(res, 0, 1));
+            memcpy(smsg->data2, atoi(PQgetvalue(res, 0, 2)), PQgetlength(res, 0, 2));
+        }
+        else if(smsg->type == 2) {
+            memcpy(smsg->data1, atoi(PQgetvalue(res, 0, 1)), PQgetlength(res, 0, 1));
+        }
 
-        PQclear(res);
-    
-        // update this row from database
-        const char *param_values[] = {cid};
-        const int paramLengths[] = {sizeof(cid)};
-        const int paramFormats[] = {0};
-        int resultFormat = 0;     
-        
-        res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values, paramLengths, paramFormats, resultFormat);
+        status = 0;
 
-        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            printf("updation after retriving failed: %s\n", PQerrorMessage(connection));
-            PQclear(res);
-   
-            return -1;
-        }   
-
-        PQclear(res);
-
-        return 0;
-    
     }
 
     PQclear(res);
-    return -1;
-
+    return status;
 }
 
-*/
+
 int close_database_connection() 
 {   
     PQfinish(connection);

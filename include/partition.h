@@ -31,8 +31,8 @@ typedef struct newmsg_data {
 
 typedef struct senders_message {
     unsigned int type;
-    unsigned int fd;
-    unsigned int ipaddr;
+    unsigned int data1;
+    unsigned int data2;
 }senders_message;
 
 

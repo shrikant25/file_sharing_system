@@ -67,41 +67,17 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
 }
 
 
-int evaluate_and_take_action(char *data)
+int evaluate_and_take_action(senders_message *smsg)
 {
-    int msg_status = -1;
-    unsigned char *ptr = data;
-    unsigned int port_number = -1;
-    unsigned int ipaddress = -1;
-    int connection_socket = -1;
-    char cid[17];
-
-    if (*ptr == 1) {
+    if (smsg->type == 1) {
         // ippaddres
         // in this case create a connection
-        ptr++;
-        memcpy(cid, ptr, 16);
-        
-        ptr += 16;
-        port_number = atoi(ptr);
-       
-        ptr += 4;
-        ipaddress = atoi(ptr);
-       
-        connection_socket = create_connection(port_number, ipaddress);
-        
         // communicate to database
-        send_message(cid, connection_socket);
+        send_message_to_processor(3, smsg->data1, create_connection(smsg->data2, smsg->data1));
 
     }
-    else if (*ptr == 2) {
-        
-        ptr++;
-        memcpy(cid, ptr, 16);
-        
-        ptr += 16; //internal cid
-        connection_socket = atoi(ptr);
-        close(network_sokcet);
+    else if(smsg->type == 2) {
+        close(smsg->data1);
     }
     else
         return -1;
@@ -110,7 +86,7 @@ int evaluate_and_take_action(char *data)
 } 
 
 
-int read_message(char *data) 
+int get_message_from_processor(senders_message *smsg) 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -121,10 +97,10 @@ int read_message(char *data)
     if (subblock_position >= 0) {
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
-        memset(data, 0, CPARTITION_SIZE);
+        memset(smsg, 0, sizeof(senders_message));
         
-        memcpy(data, blkptr, CPARTITION_SIZE);
-        evaluate_and_take_action(data);
+        memcpy(smsg, blkptr, sizeof(senders_message));
+        evaluate_and_take_action(smsg);
         // if returns -1 then handle appropriately
 
         blkptr = NULL;
@@ -177,11 +153,18 @@ int send_data_over_network(unsigned int socketid, char *data, int data_size)
 }
 
 
-int send_message(char *cid, int data) 
+int send_message_to_processor(int type, int data1, int data2) 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    
+    senders_message smsg;
+    smsg->type = type;
+
+    if (smsg->type == 3){
+        smsg->data1 = data;
+        smsg->data2 = status;
+    }
+
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 0, 2);
     
@@ -189,9 +172,7 @@ int send_message(char *cid, int data)
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(blkptr, 0, CPARTITION_SIZE);
-        memcpy(blkptr, cid, 16);
-        blkptr += 16;
-        memcpy(blkptr, &data, sizeof(int));
+        memcpy(blkptr, &smsg, sizeof(senders_message));
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
@@ -203,17 +184,18 @@ int send_message(char *cid, int data)
 int run_sender() 
 {
     int fd = 0;
+    senders_message smsg;
     char data[CPARTITION_SIZE];
     int data_size;
     int status = 0;
 
     while (sender_status) {
 
-        read_message(data);
+        get_message_from_processor(&smsg);
         if (get_data_from_processor(&fd, data, &data_size)) {
             
             status = send_data_over_network(fd, data, data_size);
-            send_message();
+            send_message_to_processor();
             
         }
     }

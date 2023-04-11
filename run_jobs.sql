@@ -1,3 +1,4 @@
+
 UPDATE job_scheduler 
 SET jstate = 
     CASE 
@@ -44,7 +45,7 @@ WHERE jstate = 'S-1';
 
 
 UPDATE job_scheduler 
-SET jdestination = (SELECT ipaddress 
+SET jdestination = (SELECT ipaddress::text 
                     FROM sysinfo 
                     WHERE system_name = jdestination) 
 WHERE jstate IN('S-3', 'S-2');
@@ -115,18 +116,6 @@ FROM cte_msginfo;
 
 UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
 
-
-
-INSERT INTO senders_comms (mdata, mtype)
-SELECT DISTINCT string_agg(DISTINCT js.jdestination::text, ','), 1
-FROM job_scheduler js
-WHERE js.jstate = 'S-3'
-AND NOT EXISTS (
-  SELECT 1
-  FROM sending_conns sc
-  WHERE sc.sipaddr::text = js.jdestination
-);
-
 INSERT into sending_conns (sfd, sipaddr, scstatus) 
 SELECT DISTINCT -1, jdestination::BIGINT, 1  
 FROM job_scheduler js 
@@ -137,6 +126,13 @@ AND NOT EXISTS (
   WHERE sc.sipaddr::text = js.jdestination
 );   
 
+
+INSERT INTO senders_comms (mdata1, mdata2, mtype)
+SELECT si.ipaddress, si.port, 1 
+FROM sysinfo si
+JOIN sending_conns sc 
+ON si.ipaddress = sc.sipaddr
+WHERE sc.scstatus = 1;
 
 
 SELECT jobdata 
@@ -150,45 +146,6 @@ EXISTS (SELECT  1
     ORDER BY jpriority DESC
 LIMIT 1;
 
-
-
-UPDATE sending_conns 
-SET sfd = ($1), scstatus = ($2) 
-WHERE scipddr = ($3);
-
-
-SELECT                           
-    encode(substr(jobdata, 115, 8), 'escape') AS t1,
-    encode(substr(jobdata, 123, 36), 'escape') AS t2,
-    encode(substr(jobdata, 159, 10), 'escape') AS t3,
-    encode(substr(jobdata, 169), 'escape') AS mdata
-FROM job_scheduler;
-
-
-
-SELECT                           
-    encode(substr(jobdata, 1, 32), 'escape') AS mhash,
-    encode(substr(jobdata, 33, 36),'escape') AS uuid,
-    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
-    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
-    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
-    encode(substr(jobdata, 84, 5), 'escape') AS message_priority, encode(substr(jobdata, 89, 26), 'escape') as tm
-FROM job_scheduler;
-
-
-
-SELECT                           
-    encode(substr(jobdata, 1, 32), 'escape') AS mhash,
-    encode(substr(jobdata, 33, 36),'escape') AS uuid,
-    encode(substr(jobdata, 69, 5), 'escape') AS message_type,
-    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
-    encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
-    encode(substr(jobdata, 84, 5), 'escape') AS message_priority, 
-    encode(substr(jobdata, 89, 26), 'escape') AS tm,
-    encode(substr(jobdata, 115, 36), 'escape') AS parent_job_id,
-    encode(substr(jobdata, 151, 10), 'escape') AS data_length,
-    encode(substr(jobdata, 161, 10), 'escape') AS chunk_count
-FROM job_scheduler WHERE jtype = '3';
 
 
 

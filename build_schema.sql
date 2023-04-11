@@ -24,8 +24,6 @@ CREATE TABLE receiving_conns (rfd TEXT NOT NULL PRIMARY KEY,
                               rcstatus TEXT NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-
-
 CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
                             sfd INTEGER NOT NULL,
                             sipaddr BIGINT NOT NULL, 
@@ -33,17 +31,17 @@ CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
-                            mdata Text NOT NULL, 
+                            mdata1 BIGINT NOT NULL,
+                            mdata2 INTEGER NOT NULL, 
                             mtype SMALLINT NOT NULL);
-
-
 
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress Text NOT NULL,
+                        ipaddress BIGINT NOT NULL,
+                        port INTEGER NOT NULL,
                         systems_capacity INTEGER NOT NULL);
 
 
@@ -77,8 +75,6 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-
-INSERT INTO sysinfo VALUES('   M2', '123456', 50);
 
 INSERT INTO job_scheduler
     (jobdata, jstate, jtype, jsource, 

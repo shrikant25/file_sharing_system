@@ -38,3 +38,6 @@ VALUES(
      (select jobid 
      from job_scheduler 
      where jidx = 1), '0', '5');
+
+
+INSERT INTO sysinfo VALUES('   M2', 123456, 4000, 50);
