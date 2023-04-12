@@ -157,14 +157,12 @@ int run_receiver()
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     int bytes_read = 0;
-    newmsg_data rcond;
-
+    newmsg_data nmsg;
     receivers_message rcvm;
 
     while (receiver_status) {
         
       //  read_message_from_processor(data); // todo
-
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
             syslog(LOG_NOTICE, "epoll wait failed");
@@ -193,17 +191,17 @@ int run_receiver()
             
             else if (events[i].events & EPOLLIN){
 
-                memset(&rcond, 0, MESSAGE_SIZE);
-                rcond.fd = events[i].data.fd;
+                memset(&nmsg, 0, MESSAGE_SIZE);
+                nmsg.data1 = events[i].data.fd;
                 bytes_read = 0;
 
                 while (bytes_read < MESSAGE_SIZE) {
                     
-                    bytes_read += read(rcond.fd, rcond.data+bytes_read, MESSAGE_SIZE);
+                    bytes_read += read(nmsg.data1, nmsg.data+bytes_read, MESSAGE_SIZE);
                 
                 }
 
-                send_to_processor(&rcond);
+                send_to_processor(&nmsg);
             }
             
         }
@@ -212,7 +210,7 @@ int run_receiver()
 }
  
     
-int send_to_processor(newmsg_data *rcond)
+int send_to_processor(newmsg_data *nmsg)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -225,7 +223,7 @@ int send_to_processor(newmsg_data *rcond)
         blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
-        memcpy(blkptr, rcond, sizeof(newmsg_data));
+        memcpy(blkptr, nmsg, sizeof(newmsg_data));
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 3);

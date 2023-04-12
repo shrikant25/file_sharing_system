@@ -8,7 +8,7 @@
 
 PGconn *connection;
 
-#define statement_count 7
+#define statement_count 6
 
 db_statements dbs[statement_count] = {
     { 
@@ -59,16 +59,6 @@ db_statements dbs[statement_count] = {
       .statement_name = "s5", 
       .statement = "WITH sdata AS(SELECT scommid FROM senders_comms WHERE mtype IN(1, 2) LIMIT 1) \
                     DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata1, mdata2;",
-      .param_count = 0,
-    },
-    { 
-      .statement_name = "s6", 
-      .statement = "select * from sysinfo;",
-      .param_count = 0,
-    },
-    { 
-      .statement_name = "s7", 
-      .statement = "select * from sysinfo;",
       .param_count = 0,
     },
 };

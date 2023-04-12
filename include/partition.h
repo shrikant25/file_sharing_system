@@ -5,7 +5,7 @@
 
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
-#define DPARTITION_SIZE (MESSAGE_SIZE + 4)
+#define DPARTITION_SIZE (MESSAGE_SIZE + 8)
 #define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 10)
 #define CPARTITION_SIZE 15
 #define COMM_BLOCK_SIZE (CPARTITION_SIZE * TOTAL_PARTITIONS + 10)
@@ -27,7 +27,7 @@ typedef struct receivers_message {
 typedef struct newmsg_data {
     unsigned int data1;
     unsigned int data2;
-    unsigned char data[MESSAGE_SIZE];
+    char data[MESSAGE_SIZE];
 }newmsg_data;
 
 typedef struct senders_message {

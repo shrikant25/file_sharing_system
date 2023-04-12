@@ -124,8 +124,8 @@ int get_data_from_processor(newmsg_data *nmsg)
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
-        memset(nmsg, 0, sizoef(newmsg_data));
-        memcpy(nmsg, blkptr, sizeof(newmsg_data);)
+        memset(nmsg, 0, sizeof(newmsg_data));
+        memcpy(nmsg, blkptr, sizeof(newmsg_data));
         memset(blkptr, 0, DPARTITION_SIZE);
         
         blkptr = NULL;
@@ -139,10 +139,10 @@ int get_data_from_processor(newmsg_data *nmsg)
 }
 
 
-int send_data_over_network(nemsg_data *nmsg) 
+int send_data_over_network(newmsg_data *nmsg) 
 {
     int shortRetval = -1;  
-    shortRetval = send(nmsg.data1, nmsg.data, sizeof(nmsg.data), 0);
+    shortRetval = send(nmsg->data1, nmsg->data, sizeof(nmsg->data), 0);
     return shortRetval;
 }
 
@@ -154,7 +154,7 @@ int send_message_to_processor(int type, int data1, int data2)
     senders_message smsg;
     smsg.type = type;
 
-    smsg.type == 3
+    smsg.type == 3;
     smsg.data1 = data1;
     smsg.data2 = data2;
     
@@ -207,8 +207,7 @@ int main(void)
 
     if (!(dblks.datas_block && dblks.comms_block)) 
         return -1; 
-    
- 
+
     run_sender();
     
     sem_close(smlks.sem_lock_datas);

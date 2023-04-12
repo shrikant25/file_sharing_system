@@ -30,7 +30,7 @@ int get_data_from_receiver()
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block, 1, 3);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
         blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
@@ -57,7 +57,7 @@ int give_data_to_sender()
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 0, 3);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         memset(nmsg.data, 0, DPARTITION_SIZE);
@@ -102,7 +102,7 @@ int communicate_with_receiver()
     subblock_position = -1;
     subblock_position = get_subblock(dblks.commr_block, 1, 2);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
         blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
