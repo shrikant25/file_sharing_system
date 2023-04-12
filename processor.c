@@ -52,7 +52,7 @@ int give_data_to_sender()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    char data[DPARTITION_SIZE];
+    newmsg_data nmsg;
 
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 0, 3);
@@ -60,11 +60,10 @@ int give_data_to_sender()
     if(subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        memset(data, 0, DPARTITION_SIZE);
+        memset(nmsg.data, 0, DPARTITION_SIZE);
         
-        if (retrive_data_from_database(data) != -1) {
-            memcpy(blkptr, data, DPARTITION_SIZE);
-            memset(data, 0, DPARTITION_SIZE);  
+        if (retrive_data_from_database(&nmsg) != -1) {
+            memcpy(blkptr, nmsg.data, sizeof(nmsg.data)); 
             toggle_bit(subblock_position, dblks.datas_block, 3);
         }
         blkptr = NULL;
@@ -166,10 +165,10 @@ int run_process()
    
     while (process_status) {
 
-        communicate_with_receiver();
-       // communicate_with_sender();
-        get_data_from_receiver();
-        //give_data_to_sender();
+        //communicate_with_receiver();
+        communicate_with_sender();
+        //get_data_from_receiver();
+        give_data_to_sender();
     
     }  
 }

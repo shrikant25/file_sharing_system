@@ -112,7 +112,7 @@ int get_message_from_processor(senders_message *smsg)
 }
 
 
-int get_data_from_processor(int *fd, char *data, int *data_size)
+int get_data_from_processor(newmsg_data *nmsg)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -123,17 +123,11 @@ int get_data_from_processor(int *fd, char *data, int *data_size)
     if(subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        memset(data, 0, DPARTITION_SIZE);
-
-        *fd = atoi(blkptr);
-
-        blkptr += 4;
-        *data_size = atoi(blkptr);
-
-        blkptr += 4;
-        memcpy(data, blkptr, *data_size);
         
+        memset(nmsg, 0, sizoef(newmsg_data));
+        memcpy(nmsg, blkptr, sizeof(newmsg_data);)
         memset(blkptr, 0, DPARTITION_SIZE);
+        
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datas_block, 3);
     
@@ -145,10 +139,10 @@ int get_data_from_processor(int *fd, char *data, int *data_size)
 }
 
 
-int send_data_over_network(unsigned int socketid, char *data, int data_size) 
+int send_data_over_network(nemsg_data *nmsg) 
 {
     int shortRetval = -1;  
-    shortRetval = send(socketid, data, data_size, 0);
+    shortRetval = send(nmsg.data1, nmsg.data, sizeof(nmsg.data), 0);
     return shortRetval;
 }
 
@@ -160,11 +154,10 @@ int send_message_to_processor(int type, int data1, int data2)
     senders_message smsg;
     smsg.type = type;
 
-    if (smsg.type == 3){
-        smsg.data1 = data1;
-        smsg.data2 = data2;
-    }
-
+    smsg.type == 3
+    smsg.data1 = data1;
+    smsg.data2 = data2;
+    
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 0, 2);
     
@@ -185,18 +178,16 @@ int run_sender()
 {
     int fd = 0;
     senders_message smsg;
-    char data[CPARTITION_SIZE];
-    int data_size;
+    newmsg_data nmsg;
     int status = 0;
 
     while (sender_status) {
 
         get_message_from_processor(&smsg);
-        if (get_data_from_processor(&fd, data, &data_size)) {
-            
-            status = send_data_over_network(fd, data, data_size);
-            send_message_to_processor(4, fd, status);
-            
+
+        if (get_data_from_processor(&nmsg)) {            
+            status = send_data_over_network(&nmsg);
+            send_message_to_processor(4, nmsg.data2, status);
         }
     }
 }

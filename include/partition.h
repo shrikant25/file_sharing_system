@@ -25,7 +25,8 @@ typedef struct receivers_message {
 }receivers_message;
 
 typedef struct newmsg_data {
-    unsigned int fd;
+    unsigned int data1;
+    unsigned int data2;
     unsigned char data[MESSAGE_SIZE];
 }newmsg_data;
 

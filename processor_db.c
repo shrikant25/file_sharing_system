@@ -8,7 +8,7 @@
 
 PGconn *connection;
 
-#define statement_count 11
+#define statement_count 7
 
 db_statements dbs[statement_count] = {
     { 
@@ -21,7 +21,8 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT jobdata FROM job_scheduler js \
+      .statement = "SELECT sc.sfd, js.jobid, js.jobdata\
+                    FROM job_scheduler js \
                     WHERE js.jstate = 'S-3' AND \
                     EXISTS (SELECT  1 FROM sending_conns sc \
                     WHERE sc.sipaddr = js.jdestination \
@@ -37,18 +38,27 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s3", 
-      .statement = "select * from sysinfo;",
-      .param_count = 0,
+      .statement = "UPDATE sending_conns SET scstatus = ($2) WHERE sipaddr = ($1);",
+      .param_count = 2,
     },
     { 
       .statement_name = "s4", 
-      .statement = "select * from sysinfo;",
+      .statement = "UPDATE job_scheduler \
+                    SET jstatus = (\
+                        SELECT\
+                            CASE\
+                                WHEN ($1) != -1 THEN 'C'\
+                                ELSE 'D'\
+                            END\
+                        )\
+                    WHERE jobid = ($2)\
+                    );",
       .param_count = 0,
     },
     { 
       .statement_name = "s5", 
       .statement = "WITH sdata AS(SELECT scommid FROM senders_comms WHERE mtype IN(1, 2) LIMIT 1) \
-                    DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata;",
+                    DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata1, mdata2;",
       .param_count = 0,
     },
     { 
@@ -60,21 +70,6 @@ db_statements dbs[statement_count] = {
       .statement_name = "s7", 
       .statement = "select * from sysinfo;",
       .param_count = 0,
-    },
-    { 
-      .statement_name = "s8", 
-      .statement = "select * from sysinfo;",
-      .param_count = 0,
-    },
-    { 
-      .statement_name = "s9", 
-      .statement = "select * from sysinfo;",
-      .param_count = 0,
-    },
-    { 
-      .statement_name = "s10", 
-      .statement = "select * from sysinfo;",
-      .param_count = 1,
     },
 };
 
@@ -113,19 +108,19 @@ int prepare_statements()
 }
 
 
-int store_data_in_database(newmsg_data *rcond) 
+int store_data_in_database(newmsg_data *nmsg) 
 {
     PGresult *res = NULL;
     
     char fd[11];
 
-    sprintf(fd, "%d", rcond->fd);
+    sprintf(fd, "%d", nmsg->data1);
 
-    const int paramLengths[] = {sizeof(fd), sizeof(rcond->data)};
+    const int paramLengths[] = {sizeof(nmsg->data1), sizeof(nmsg->data)};
     const int paramFormats[] = {0, 1};
     int resultFormat = 0;
 
-    const char *const param_values[] = {fd, rcond->data};
+    const char *const param_values[] = {fd, nmsg->data};
     
     res = PQexecPrepared(connection, dbs[0].statement_name, 
                                     dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
@@ -140,26 +135,26 @@ int store_data_in_database(newmsg_data *rcond)
 }
 
 
-int retrive_data_from_database(char *data) 
+int retrive_data_from_database(newmsg_data *nmsg) 
 {
     int row_count;
+    int status = -1;
     PGresult *res = NULL;
 
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         syslog(LOG_NOTICE,"retriving failed: %s", PQerrorMessage(connection));
-        return -1;
     }    
-
-    row_count = PQntuples(res);
-    if (row_count > 0) {
-        memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-        memcpy(data+4, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
-        PQclear(res);
-        return 0;
+    else {
+        row_count = PQntuples(res);
+        if (row_count > 0) {
+            nmsg->data1 = atoi(PQgetvalue(res, 0, 0));
+            nmsg->data2 = atoi(PQgetvalue(res, 0, 1));
+            memcpy(nmsg->data, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
+            return 0;
+        }
     }
-
     PQclear(res);
     return -1;   
 }
@@ -177,7 +172,7 @@ int store_commr_into_database(receivers_message *rcvm)
     sprintf(ipaddr, "%d", rcvm->ipaddr);
     sprintf(status, "%d", rcvm->status);
 
-    const int paramLengths[] = {sizeof(fd), sizeof(ipaddr), sizeof(ipaddr)};
+    const int paramLengths[] = {sizeof(fd), sizeof(ipaddr), sizeof(status)};
     const int paramFormats[] = {0, 0, 0};
     int resultFormat = 0;
    
@@ -205,20 +200,19 @@ int store_comms_into_database(senders_message *smsg)
 
     sprintf(type, "%d", smsg->type);
     sprintf(data1, "%d", smsg->data1);
+    sprintf(data2, "%d", smsg->data2);
+
+    const char *param_values[] = {data1, data2};
+    const int paramLengths[] = {strlen(data1), strlen(data2)};
+    const int paramFormats[] = {0, 0, 0};
+    int resultFormat = 0;
+
 
     if (smsg->type == 3) {    
-
-        sprintf(data2, "%d", smsg->data2);
-
-        const char *param_values[] = {data1, data2};
-        const int paramLengths[] = {strlen(data1), strlen(data2)};
-        const int paramFormats[] = {0, 0, 0};
-        int resultFormat = 0;
-
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
     }
     else if(smsg->type == 4) {
-        // todo message status is type 4
+        res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, param_values, paramLengths, paramFormats, resultFormat);
     }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {

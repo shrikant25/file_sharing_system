@@ -2,30 +2,30 @@
 DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, senders_comms, sending_conns;
 
 
-CREATE TABLE job_scheduler (jidx SERIAL PRIMARY KEY, 
-                        jobdata bytea NOT NULL,
-                        jstate CHAR(5) NOT NULL DEFAULT 'N-1',
-                        jtype TEXT NOT NULL DEFAULT '1',
-                        jsource TEXT NOT NULL,
-                        jobid UUID UNIQUE NOT NULL,
-                        jparent_jobid UUID REFERENCES job_scheduler(jobid) 
-                            ON UPDATE CASCADE ON DELETE CASCADE,
-                        jdestination TEXT NOT NULL DEFAULT 0,
-                        jpriority  TEXT NOT NULL DEFAULT '10',
-                        jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
+                            jobdata bytea NOT NULL,
+                            jstate CHAR(5) NOT NULL DEFAULT 'N-1',
+                            jtype TEXT NOT NULL DEFAULT '1',
+                            jsource TEXT NOT NULL,
+                            jparent_jobid UUID 
+                                REFERENCES job_scheduler(jobid) 
+                                ON UPDATE CASCADE 
+                                ON DELETE CASCADE,
+                            jdestination TEXT NOT NULL DEFAULT 0,
+                            jpriority  TEXT NOT NULL DEFAULT '10',
+                            jcreation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
                               mdata bytea NOT NULL, 
                               mtype INTEGER NOT NULL);
 
-CREATE TABLE receiving_conns (rfd TEXT NOT NULL PRIMARY KEY, 
-                              ripaddr TEXT NOT NULL, 
-                              rcstatus TEXT NOT NULL,
+CREATE TABLE receiving_conns (rfd INTEGER PRIMARY KEY, 
+                              ripaddr BIGINT NOT NULL, 
+                              rcstatus SMALLINT NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE sending_conns (sconnid SERIAL PRIMARY KEY, 
-                            sfd INTEGER NOT NULL,
+CREATE TABLE sending_conns (sfd INTEGER PRIMARY KEY,
                             sipaddr BIGINT NOT NULL, 
                             scstatus SMALLINT NOT NULL,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
@@ -39,10 +39,19 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE sysinfo (system_name CHAR(10) PRIMARY key,
-                        ipaddress BIGINT NOT NULL,
-                        port INTEGER NOT NULL,
-                        systems_capacity INTEGER NOT NULL);
+CREATE TABLE sysinfo (system_name CHAR(10),
+                      ipaddress BIGINT NOT NULL,
+                      port INTEGER NOT NULL,
+                      CONSTRAIT pk_sysinfo 
+                      PRIMARY KEY(system_name, ipaddress));
+
+CREATE TABLE system_capacity(system_name CHAR(10),
+                             system_capacity INTEGER,
+                             CONSTRAIT fk_sys_capacity 
+                             FOREIGN KEY (system_name, ipaddress)
+                             REFERENCES  sysinfo(system_name, ipaddress) 
+                             ON DELETE CASCADE 
+                             ON UPDATE CASCADE);
 
 
 CREATE OR REPLACE FUNCTION create_message(
