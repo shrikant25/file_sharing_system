@@ -105,8 +105,8 @@ int main(void)
 {
     int status = 0;
 
-    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
+    dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
 
     if (!( dblks.datas_block && dblks.comms_block)) {
         syslog(LOG_NOTICE,"failed to get shared memory");
