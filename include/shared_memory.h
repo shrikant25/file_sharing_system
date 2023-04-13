@@ -12,7 +12,8 @@
 #define PROJECT_ID_DATAS 13
 #define PROJECT_ID_COMMS 14
 
-#define FILENAME "processor"
+#define FILENAME_R "processor_r"
+#define FILENAME_S "processor_s"
 
 char *attach_memory_block(char *, int, unsigned char);
 int detach_memory_block(char *);

@@ -16,17 +16,16 @@ db_statements dbs[statement_count] = {
       .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, \
                     jsource, jobid, jparent_jobid, jdestination, \
                     jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(), \
-                    (select jobid from job_scheduler where jidx = 1), 0, 0);",
+                    (select jobid from job_scheduler where jparent_jobid = jobid), 0, 0);",
       .param_count = 2,
     },
     { 
       .statement_name = "s1", 
       .statement = "SELECT sc.sfd, js.jobid, js.jobdata\
-                    FROM job_scheduler js \
-                    WHERE js.jstate = 'S-3' AND \
-                    EXISTS (SELECT  1 FROM sending_conns sc \
-                    WHERE sc.sipaddr = js.jdestination \
-                    AND sc.scstatus = '2') \
+                    FROM job_scheduler js, sending_conns sc \
+                    WHERE js.jstate = 'S-3' \
+                    AND sc.sipaddr::text = js.jdestination \
+                    AND sc.scstatus = 2 \
                     ORDER BY jpriority DESC LIMIT 1;",
       .param_count = 0,
     },
@@ -44,15 +43,14 @@ db_statements dbs[statement_count] = {
     { 
       .statement_name = "s4", 
       .statement = "UPDATE job_scheduler \
-                    SET jstatus = (\
+                    SET jstate = (\
                         SELECT\
                             CASE\
                                 WHEN ($1) != -1 THEN 'C'\
                                 ELSE 'D'\
                             END\
                         )\
-                    WHERE jobid = ($2)\
-                    );",
+                    WHERE jobid = ($2);",
       .param_count = 0,
     },
     { 
@@ -216,30 +214,29 @@ int store_comms_into_database(senders_message *smsg)
 }
 
 
-/*
 int retrive_commr_from_database(char *data) 
 {
-    int row_count = 0;
-    PGresult *res = NULL;
+    // int row_count = 0;
+    // PGresult *res = NULL;
 
-    res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, NULL, NULL, NULL, 0);
+    // res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, NULL, NULL, NULL, 0);
 
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("retriving failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }    
+    // if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    //     printf("retriving failed: %s\n", PQerrorMessage(connection));
+    //     return -1;
+    // }    
 
-    row_count = PQntuples(res);
-    if (row_count > 0) {
-        memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-        PQclear(res);
-        return 0;
-    }
+    // row_count = PQntuples(res);
+    // if (row_count > 0) {
+    //     memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+    //     PQclear(res);
+    //     return 0;
+    // }
 
-    PQclear(res);
+    // PQclear(res);
     return -1;
 }
-*/
+
 
 int retrive_comms_from_database(senders_message *smsg) 
 {

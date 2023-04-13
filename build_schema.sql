@@ -1,5 +1,5 @@
 
-DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, senders_comms, sending_conns;
+DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
 
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -39,19 +39,17 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE sysinfo (system_name CHAR(10),
-                      ipaddress BIGINT NOT NULL,
-                      port INTEGER NOT NULL,
-                      CONSTRAIT pk_sysinfo 
-                      PRIMARY KEY(system_name, ipaddress));
+CREATE TABLE systems(system_name CHAR(10) PRIMARY KEY);
 
-CREATE TABLE system_capacity(system_name CHAR(10),
-                             system_capacity INTEGER,
-                             CONSTRAIT fk_sys_capacity 
-                             FOREIGN KEY (system_name, ipaddress)
-                             REFERENCES  sysinfo(system_name, ipaddress) 
-                             ON DELETE CASCADE 
-                             ON UPDATE CASCADE);
+CREATE TABLE sysinfo (system_name CHAR(10),
+                      ipaddress BIGINT UNIQUE,
+                      port INTEGER NOT NULL,
+                      system_capacity INTEGER,
+                      CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
+                      CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
+                        REFERENCES  systems(system_name) 
+                        ON DELETE CASCADE 
+                        ON UPDATE CASCADE);
 
 
 CREATE OR REPLACE FUNCTION create_message(
@@ -93,7 +91,7 @@ VALUES('__ROOT__', 'N-0', '0', '   M3',
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
-WHERE jidx = 1;
+WHERE jobdata = '__ROOT__';
 
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid

@@ -459,10 +459,11 @@ SELECT
     encode(substr(jobdata, 79, 5), 'escape') AS message_destination,
     encode(substr(jobdata, 84, 5), 'escape') AS message_priority, 
     encode(substr(jobdata, 89, 26), 'escape') AS tm,
-    encode(substr(jobdata, 115, 36), 'escape') AS parent_job_id,
-    encode(substr(jobdata, 151, 10), 'escape') AS data_length,
-    encode(substr(jobdata, 161, 10), 'escape') AS chunk_count
-FROM job_scheduler WHERE jtype = '3';
+    encode(substr(jobdata, 115, 8), 'escape') AS chunk_count,
+    encode(substr(jobdata, 123, 36), 'escape') AS jobid,
+    encode(substr(jobdata, 159, 10), 'escape') AS datalength,
+    encode(substr(jobdata, 169), 'escape') AS data 
+FROM job_scheduler WHERE jtype = 'S-3';
 
 
 

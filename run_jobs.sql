@@ -17,7 +17,7 @@ UPDATE job_scheduler
 SET jstate = 'N-3' 
 WHERE jstate = 'N-2' 
 AND 
-encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
+encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jobid = jparent_jobid);
 
 
 -- if message is for some other system, then update the state to S-1 
@@ -26,7 +26,7 @@ SET jstate = 'S-1',
 jdestination = encode(substr(jobdata, 79, 5), 'escape') 
 WHERE jstate = 'N-2' 
 AND 
-encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jidx= 1);
+encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jobid = jparent_jobid);
 
 
 -- identify the type, and update the state to N-4
@@ -38,26 +38,59 @@ WHERE jstate = 'N-3';
 
 -- jobs that have larger size then receivers capacity, update them to state S-2 
 -- or else update them to state S-3
+
 UPDATE job_scheduler AS js
 SET jstate = (
     SELECT 
         CASE 
-            WHEN LENGTH(jobdata) > systems_capacity 
+            WHEN LENGTH(jobdata) > (SELECT MAX(system_capacity)
+                                    FROM sysinfo si 
+                                    JOIN systems sy ON si.system_name = sy.system_name
+                                    WHERE sy.system_name = js.jdestination)                        
             THEN 'S-2'
             ELSE 'S-3'
         END
-    FROM sysinfo
-    WHERE system_name = js.jdestination
-)
-WHERE jstate = 'S-1';
-
+) WHERE jstate = 'S-1';
 
 -- replace the system name with its ip address 
+
 UPDATE job_scheduler 
-SET jdestination = (SELECT ipaddress::text 
+SET jdestination = (
+    SELECT
+        CASE
+            WHEN LENGTH(jobdata) > MAX(system_capacity)
+            THEN (
+                SELECT ipaddress::text 
+                FROM sysinfo sy 
+                JOIN (
+                    SELECT system_name, MAX(system_capacity) AS max_capacity 
                     FROM sysinfo 
-                    WHERE system_name = jdestination) 
-WHERE jstate IN('S-3', 'S-2');
+                    GROUP BY system_name
+                ) sy2 ON sy.system_name = sy2.system_name AND sy.system_capacity = sy2.max_capacity
+                WHERE sy.system_name = job_scheduler.jdestination
+                LIMIT 1
+            )
+            ELSE (
+                SELECT ipaddress::text 
+                FROM (
+                    SELECT ipaddress, system_capacity 
+                    FROM sysinfo 
+                    WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
+                    ORDER BY system_capacity ASC
+                ) ip 
+                GROUP BY system_capacity, ipaddress 
+                ORDER BY system_capacity DESC 
+                LIMIT 1
+            )
+        END
+    FROM sysinfo 
+    WHERE sysinfo.system_name = job_scheduler.jdestination
+) 
+WHERE jstate IN ('S-3', 'S-2');
+
+
+
+
 
 
 -- cte_jobdata = splits the messages into smaller chunks based on capacity of receiver
@@ -68,17 +101,16 @@ WITH cte_jobdata AS (
     SELECT 
         jobid, 
         jdestination, 
-        encode(substr(job_scheduler.jobdata, 74, 5), 'escape') as jsource,
+        encode(substr(js.jobdata, 74, 5), 'escape') as jsource,
         jpriority,
         seqnum, 
-        substring(jobdata, (seqnum * systems_capacity +1)::int, systems_capacity) AS subdata
+        substring(jobdata, (seqnum * (system_capacity-114) +1)::int, (system_capacity-114)) AS subdata
     
-    FROM job_scheduler
-    JOIN sysinfo 
-    ON encode(substr(job_scheduler.jobdata, 79, 5), 'escape') = sysinfo.system_name
-    CROSS JOIN generate_series(0, ceil(length(jobdata)::decimal/ systems_capacity)-1) AS seqnum
-    WHERE jstate = 'S-2'
-
+    FROM job_scheduler js
+    JOIN sysinfo si
+    ON encode(substr(js.jobdata, 79, 5), 'escape') = si.system_name
+    CROSS JOIN generate_series(0, ceil(length(js.jobdata)::decimal/ (si.system_capacity -114))-1) AS seqnum
+    WHERE js.jstate = 'S-2' and si.ipaddress::text = js.jdestination
 ), 
 cte_msg AS (
     SELECT  
@@ -108,7 +140,7 @@ WITH cte_msginfo as(
         create_message(
                 '3'::text,
                 jobid::text::bytea || lpad(length(jobdata)::text, 10, ' ')::bytea || 
-                    lpad((ceil(length(jobdata)::decimal/ systems_capacity))::text, 10, ' ')::bytea,
+                    lpad((ceil(length(jobdata)::decimal/ (system_capacity -114)))::text, 10, ' ')::bytea,
                 btrim(encode(substr(job_scheduler.jobdata, 74, 5), 'escape'), ' '), 
                 btrim(jdestination, ' '),
                 jpriority::text
@@ -157,11 +189,13 @@ SELECT jobdata
 FROM job_scheduler js 
 WHERE js.jstate = 'S-3'
 AND 
-EXISTS (SELECT  1 
-        FROM sending_conns sc 
-        WHERE sc.sipaddr::text = js.jdestination 
-        AND sc.scstatus = 2)
-    ORDER BY jpriority DESC
+EXISTS (
+    SELECT  1 
+    FROM sending_conns sc 
+    WHERE sc.sipaddr::text = js.jdestination 
+    AND sc.scstatus = 2
+)
+ORDER BY jpriority DESC
 LIMIT 1;
 
 

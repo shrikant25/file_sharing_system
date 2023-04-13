@@ -301,10 +301,10 @@ int main(void)
     // block sizes are present in partition.h
 
     // attach memroy block for data sharing
-    dblks.datar_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAR);
+    dblks.datar_block = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, PROJECT_ID_DATAR);
     
     // attach memroy block for message sharing
-    dblks.commr_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
+    dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
 
     if (!(dblks.datar_block && dblks.commr_block)) {
         syslog(LOG_NOTICE, "failed to get shared memory");
