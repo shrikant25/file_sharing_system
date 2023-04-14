@@ -69,7 +69,7 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
     }
 
     syslog(LOG_NOTICE,"Error connecting to server");
-    return network_socket;
+    return connection_status;
 }
 
 
@@ -102,7 +102,7 @@ int get_data_from_processor(newmsg_data *nmsg)
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 1, 3);
     
-    if(subblock_position >= 0) {
+    if (subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
@@ -166,8 +166,8 @@ int run_sender()
 
     while (sender_status) {
         
-        memset(smsg, 0, sizeof(smsg));
-        memset(nmsg, 0, sizeof(nmsg));
+        memset(&smsg, 0, sizeof(smsg));
+        memset(&nmsg, 0, sizeof(nmsg));
 
         if (get_message_from_processor(&smsg) != -1) {
             if (smsg.type == 1) {

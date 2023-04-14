@@ -21,7 +21,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT sc.sfd, js.jobid, js.jobdata\
+      .statement = "SELECT sc.sfd, js.jidx, js.jobdata\
                     FROM job_scheduler js, sending_conns sc \
                     WHERE js.jstate = 'S-3' \
                     AND sc.sipaddr::text = js.jdestination \
@@ -37,8 +37,8 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s3", 
-      .statement = "UPDATE sending_conns SET scstatus = ($2) WHERE sipaddr = ($1);",
-      .param_count = 2,
+      .statement = "UPDATE sending_conns SET scstatus = ($3), sfd = ($2)  WHERE sipaddr = ($1);",
+      .param_count = 3,
     },
     { 
       .statement_name = "s4", 
@@ -46,11 +46,11 @@ db_statements dbs[statement_count] = {
                     SET jstate = (\
                         SELECT\
                             CASE\
-                                WHEN ($1) != -1 THEN 'C'\
+                                WHEN ($2) != -1 THEN 'C'\
                                 ELSE 'D'\
                             END\
                         )\
-                    WHERE jobid = ($2);",
+                    WHERE jidx = ($1);",
       .param_count = 2,
     },
     { 
@@ -182,25 +182,39 @@ int store_commr_into_database(receivers_message *rcvm)
 int store_comms_into_database(senders_message *smsg) 
 {
     PGresult* res = NULL;
-    char type[5];
-    char data1[10];
-    char data2[10];
-
-    sprintf(type, "%d", smsg->type);
-    sprintf(data1, "%d", smsg->data1);
-    sprintf(data2, "%d", smsg->data2);
-
-    const char *param_values[] = {data1, data2};
-    const int paramLengths[] = {strlen(data1), strlen(data2)};
-    const int paramFormats[] = {0, 0, 0};
     int resultFormat = 0;
 
+    char data1[10];
+    char data2[10];
+    char data3[10];
+
+    sprintf(data1, "%d", smsg->data1);
 
     if (smsg->type == 3) {    
+
+        if (smsg->data2 != -1) {
+            sprintf(data2, "%d", smsg->data2);        
+            sprintf(data3, "%d", 2);
+        }
+        else{
+            sprintf(data2, "%d", -1);
+            sprintf(data3, "%d", 1);
+        }
+
+        const char *param_values[] = {data1, data2, data3};
+        const int paramLengths[] = {strlen(data1), strlen(data2), strlen(data3)};
+        const int paramFormats[] = {0, 0, 0};
+        
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
     }
     else if(smsg->type == 4) {
+        
+        sprintf(data2, "%d", smsg->data2);
+        const char *param_values[] = {data1, data2};
+        const int paramLengths[] = {strlen(data1), strlen(data2)};
+        const int paramFormats[] = {0, 0};
         res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    
     }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
