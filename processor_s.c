@@ -37,7 +37,7 @@ int give_data_to_sender()
         memset(nmsg.data, 0, DPARTITION_SIZE);
         
         if (retrive_data_from_database(&nmsg) != -1) {
-            memcpy(blkptr, nmsg, sizeof(nmsg)); 
+            memcpy(blkptr, &nmsg, sizeof(newmsg_data)); 
             toggle_bit(subblock_position, dblks.datas_block, 3);
         }
         blkptr = NULL;

@@ -2,7 +2,8 @@
 DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
 
 
-CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
+CREATE TABLE job_scheduler (jidx SERIAL UNIQUE NOT NULL,
+                            jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
                             jstate CHAR(5) NOT NULL DEFAULT 'N-1',
                             jtype TEXT NOT NULL DEFAULT '1',
