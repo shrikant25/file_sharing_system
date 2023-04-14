@@ -183,7 +183,7 @@ int run_sender()
         }
         if (get_data_from_processor(&nmsg)!= -1) {            
             status = send_data_over_network(&nmsg);
-            send_message_to_processor(4, nmsg.data2, status);
+            send_message_to_processor(4, nmsg.data2, status == -1 ? -1 : 1);
         }
     }
 }
