@@ -5,7 +5,6 @@
 
 
 int create_connection(unsigned short int, unsigned int); 
-int evaluate_and_take_action(senders_message *);
 int get_message_from_processor(senders_message *); 
 int get_data_from_processor(newmsg_data *);
 int send_data_over_network(newmsg_data *); 

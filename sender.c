@@ -10,6 +10,7 @@
 #include "shared_memory.h"
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include <syslog.h>
 
 datablocks dblks;
@@ -47,7 +48,7 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
         
         in order to connect to local machine address can be 0000 or constant INADDR_ANY
     */
-    server_address.sin_addr.s_addr = ip_address; 
+    server_address.sin_addr.s_addr = htonl(ip_address); 
 
     /*
         function to connect to remote machine
@@ -57,6 +58,11 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
 
         connect returns a integer that will indicate wether connection was succesfull or not
     */
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    setsockopt(network_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
+
     connection_status = connect(network_socket, (struct sockaddr *)&server_address, sizeof(server_address));
     if (connection_status == -1) {
         return -1;
@@ -65,25 +71,6 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
     syslog(LOG_NOTICE,"Error connecting to server");
     return network_socket;
 }
-
-
-int evaluate_and_take_action(senders_message *smsg)
-{
-    if (smsg->type == 1) {
-        // ippaddres
-        // in this case create a connection
-        // communicate to database
-        send_message_to_processor(3, smsg->data1, create_connection(smsg->data2, smsg->data1));
-
-    }
-    else if(smsg->type == 2) {
-        close(smsg->data1);
-    }
-    else
-        return -1;
-    
-    return 0;
-} 
 
 
 int get_message_from_processor(senders_message *smsg) 
@@ -98,17 +85,12 @@ int get_message_from_processor(senders_message *smsg)
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(smsg, 0, sizeof(senders_message));
-        
         memcpy(smsg, blkptr, sizeof(senders_message));
-        evaluate_and_take_action(smsg);
-        // if returns -1 then handle appropriately
-
-        blkptr = NULL;
         toggle_bit(subblock_position, dblks.comms_block, 1);
-    
-    }
 
+    }
     sem_post(smlks.sem_lock_comms);
+    return subblock_position;       
 }
 
 
@@ -118,7 +100,7 @@ int get_data_from_processor(newmsg_data *nmsg)
     char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datas);         
-    subblock_position = get_subblock(dblks.datas_block , 1, 3);
+    subblock_position = get_subblock(dblks.datas_block, 1, 3);
     
     if(subblock_position >= 0) {
 
@@ -171,6 +153,7 @@ int send_message_to_processor(int type, int data1, int data2)
     }
 
     sem_post(smlks.sem_lock_comms);
+    return subblock_position;
 }
 
 
@@ -182,10 +165,23 @@ int run_sender()
     int status = 0;
 
     while (sender_status) {
+        
+        memset(smsg, 0, sizeof(smsg));
+        memset(nmsg, 0, sizeof(nmsg));
 
-        get_message_from_processor(&smsg);
+        if (get_message_from_processor(&smsg) != -1) {
+            if (smsg.type == 1) {
+                // ippaddres
+                // in this case create a connection
+                // communicate to database
+                send_message_to_processor(3, smsg.data1, create_connection(smsg.data2, smsg.data1));
 
-        if (get_data_from_processor(&nmsg)) {            
+            }
+            else if(smsg.type == 2) {
+                close(smsg.data1);
+            }
+        }
+        if (get_data_from_processor(&nmsg)!= -1) {            
             status = send_data_over_network(&nmsg);
             send_message_to_processor(4, nmsg.data2, status);
         }

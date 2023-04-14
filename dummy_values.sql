@@ -40,6 +40,4 @@ VALUES(
      where jparent_jobid = jobid), '0', '5');
 
 INSERT into systems VALUES('   M2');
-INSERT INTO sysinfo VALUES('   M2', 123456, 4000, 150);
-INSERT INTO sysinfo VALUES('   M2', 123457, 4001, 155);
-INSERT INTO sysinfo VALUES('   M2', 123458, 4002, 149);
+INSERT INTO sysinfo VALUES('   M2', 2130706433, 6000, 150);
