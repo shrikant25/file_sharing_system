@@ -2,6 +2,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 
 int main(int argc, char *argv[]) 
@@ -18,7 +20,7 @@ int main(int argc, char *argv[])
     for (i = 0; i<num; i++) {
         
         pid = fork();
-//	sleep(1);
+
         result = 0;
 
         if (pid < 0) {
@@ -33,6 +35,12 @@ int main(int argc, char *argv[])
             exit(0);
         }
     }
-	printf("parent dead");
+    
+    // parent waits for all child processes to terminate
+    for (i = 0; i < num; i++) {
+        wait(NULL);
+    }
+    
+    printf("parent dead");
     exit(0);
 }

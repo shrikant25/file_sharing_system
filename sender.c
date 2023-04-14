@@ -202,8 +202,8 @@ int main(void)
     if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
         return -1;
  
-    dblks.datas_block = attach_memory_block(FILENAME, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
+    dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
 
     if (!(dblks.datas_block && dblks.comms_block)) 
         return -1; 

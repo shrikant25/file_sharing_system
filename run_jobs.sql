@@ -198,16 +198,3 @@ EXISTS (
 ORDER BY jpriority DESC
 LIMIT 1;
 
-
-
-
-
-
-
-
-
-
-
-
-
-

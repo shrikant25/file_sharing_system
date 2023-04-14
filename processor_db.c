@@ -51,7 +51,7 @@ db_statements dbs[statement_count] = {
                             END\
                         )\
                     WHERE jobid = ($2);",
-      .param_count = 0,
+      .param_count = 2,
     },
     { 
       .statement_name = "s5", 
