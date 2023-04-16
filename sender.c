@@ -5,13 +5,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h> // contains structures to store address information
-#include "sender.h"
-#include "partition.h"
-#include "shared_memory.h"
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <syslog.h>
+#include "sender.h"
+#include "partition.h"
+#include "shared_memory.h"
+
 
 datablocks dblks;
 semlocks smlks;
@@ -73,10 +74,9 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
 }
 
 
-int get_message_from_processor(senders_message *smsg) 
+int get_message_from_processor(char * blkptr) 
 {
     int subblock_position = -1;
-    char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 1, 1);
@@ -84,8 +84,6 @@ int get_message_from_processor(senders_message *smsg)
     if (subblock_position >= 0) {
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
-        memset(smsg, 0, sizeof(senders_message));
-        memcpy(smsg, blkptr, sizeof(senders_message));
         toggle_bit(subblock_position, dblks.comms_block, 1);
 
     }
@@ -94,10 +92,9 @@ int get_message_from_processor(senders_message *smsg)
 }
 
 
-int get_data_from_processor(newmsg_data *nmsg)
+int get_data_from_processor(char *blkptr)
 {
     int subblock_position = -1;
-    char *blkptr = NULL;
     
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 1, 3);
@@ -105,12 +102,6 @@ int get_data_from_processor(newmsg_data *nmsg)
     if (subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        
-        memset(nmsg, 0, sizeof(newmsg_data));
-        memcpy(nmsg, blkptr, sizeof(newmsg_data));
-        memset(blkptr, 0, DPARTITION_SIZE);
-        
-        blkptr = NULL;
         toggle_bit(subblock_position, dblks.datas_block, 3);
     
     }
@@ -121,25 +112,11 @@ int get_data_from_processor(newmsg_data *nmsg)
 }
 
 
-int send_data_over_network(newmsg_data *nmsg) 
-{
-    int shortRetval = -1;  
-    shortRetval = send(nmsg->data1, nmsg->data, sizeof(nmsg->data), 0);
-    return shortRetval;
-}
-
-
-int send_message_to_processor(int type, int data1, int data2) 
+int send_message_to_processor(int type, void *msg) 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    senders_message smsg;
-    smsg.type = type;
 
-    smsg.type == 3;
-    smsg.data1 = data1;
-    smsg.data2 = data2;
-    
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 0, 2);
     
@@ -147,7 +124,13 @@ int send_message_to_processor(int type, int data1, int data2)
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(blkptr, 0, CPARTITION_SIZE);
-        memcpy(blkptr, &smsg, sizeof(senders_message));
+
+        if (type == 3) {
+            memcpy(blkptr, (connection_status *)msg, sizeof(open_connection));
+        }
+        else if(type == 4) {
+            memcpy(blkptr, (message_status *)msg, sizeof(message_status));
+        }
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
@@ -159,31 +142,51 @@ int send_message_to_processor(int type, int data1, int data2)
 
 int run_sender() 
 {
-    int fd = 0;
-    senders_message smsg;
-    newmsg_data nmsg;
-    int status = 0;
+    char *blkptr;
+    open_connection opncn; 
+    close_connection clscn;
+    connection_status cncsts;
+    message_status msgsts;
+    send_message *sndmsg;
 
     while (sender_status) {
-        
-        memset(&smsg, 0, sizeof(smsg));
-        memset(&nmsg, 0, sizeof(nmsg));
 
-        if (get_message_from_processor(&smsg) != -1) {
-            if (smsg.type == 1) {
-                // ippaddres
-                // in this case create a connection
-                // communicate to database
-                send_message_to_processor(3, smsg.data1, create_connection(smsg.data2, smsg.data1));
+        memset(blkptr, 0, CPARTITION_SIZE);
+        
+        if (get_message_from_processor(blkptr) != -1) {
+            if (*(int *)blkptr == 1) {
+
+                memset(&opncn, 0, sizeof(open_connection));
+                memcpy(&opncn, blkptr, sizeof(open_connection));
+
+                memset(&cncsts, 0, sizeof(connection_status));
+                cncsts.type = 3;
+                cncsts.fd = create_connection(opncn.port, opncn.ipaddress);
+                cncsts.ipaddress = opncn.ipaddress;
+                
+                send_message_to_processor(3, (void *)&cncsts);
 
             }
-            else if(smsg.type == 2) {
-                close(smsg.data1);
+            else if(*(int *)blkptr == 2) {
+
+                memset(&clscn, 0, sizeof(close_connection));
+                memcpy(&clscn, blkptr, sizeof(close_connection));
+                close(clscn.fd);
             }
         }
-        if (get_data_from_processor(&nmsg)!= -1) {            
-            status = send_data_over_network(&nmsg);
-            send_message_to_processor(4, nmsg.data2, status == -1 ? -1 : 1);
+
+        memset(blkptr, 0, sizeof(DPARTITION_SIZE));
+        
+        if (get_data_from_processor(blkptr)!= -1) {
+
+            sndmsg = (send_message *)blkptr;
+            memset(&msgsts, 0, sizeof(message_status));
+            
+            msgsts.type = 4;
+            msgsts.status = send(sndmsg->fd, sndmsg->data, strlen(sndmsg->data), 0);
+            strncpy(msgsts.uuid, sndmsg->uuid, strlen(sndmsg->uuid));
+
+            send_message_to_processor(4, (void *)&sndmsg);
         }
     }
 }

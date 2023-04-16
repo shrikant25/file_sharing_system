@@ -5,10 +5,9 @@
 
 
 int create_connection(unsigned short int, unsigned int); 
-int get_message_from_processor(senders_message *); 
-int get_data_from_processor(newmsg_data *);
-int send_data_over_network(newmsg_data *); 
-int send_message_to_processor(int, int, int); 
+int get_message_from_processor(char *); 
+int get_data_from_processor(char *);
+int send_message_to_processor(int, void *); 
 int run_sender(); 
 
 typedef struct datablocks {     

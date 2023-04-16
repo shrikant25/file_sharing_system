@@ -21,7 +21,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s1", 
-      .statement = "SELECT sc.sfd, js.jidx, js.jobdata\
+      .statement = "SELECT sc.sfd, js.jobid, js.jobdata\
                     FROM job_scheduler js, sending_conns sc \
                     WHERE js.jstate = 'S-3' \
                     AND sc.sipaddr::text = js.jdestination \
@@ -46,11 +46,11 @@ db_statements dbs[statement_count] = {
                     SET jstate = (\
                         SELECT\
                             CASE\
-                                WHEN ($2) != -1 THEN 'C'\
+                                WHEN ($2) > 0 THEN 'C'\
                                 ELSE 'D'\
                             END\
                         )\
-                    WHERE jidx = ($1);",
+                    WHERE jobid = ($1);",
       .param_count = 2,
     },
     { 
@@ -65,7 +65,7 @@ db_statements dbs[statement_count] = {
 //if mitigation fails then return -1
 int connect_to_database() 
 {   
-    connection = PQconnectdb("user=shrikant dbname=shrikant");
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
     if (PQstatus(connection) == CONNECTION_BAD) {
         fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
         // mitigate
@@ -123,11 +123,12 @@ int store_data_in_database(newmsg_data *nmsg)
 }
 
 
-int retrive_data_from_database(newmsg_data *nmsg) 
+int retrive_data_from_database(char *blkptr) 
 {
     int row_count;
     int status = -1;
     PGresult *res = NULL;
+    send_message *sndmsg = (send_message *)blkptr;
 
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, 
                                     NULL, NULL, NULL, 0);
@@ -135,11 +136,12 @@ int retrive_data_from_database(newmsg_data *nmsg)
         syslog(LOG_NOTICE,"retriving failed: %s", PQerrorMessage(connection));
     }    
     else {
+
         row_count = PQntuples(res);
         if (row_count > 0) {
-            nmsg->data1 = atoi(PQgetvalue(res, 0, 0));
-            nmsg->data2 = atoi(PQgetvalue(res, 0, 1));
-            memcpy(nmsg->data, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
+            sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
+            strncpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+            strncpy(sndmsg->data, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
             return 0;
         }
     }
@@ -179,26 +181,22 @@ int store_commr_into_database(receivers_message *rcvm)
 }
 
 
-int store_comms_into_database(senders_message *smsg) 
+int store_comms_into_database(char *blkptr) 
 {
-    PGresult* res = NULL;
     int resultFormat = 0;
+    char data1[11];
+    char data2[11];
+    char data3[11];
+    PGresult* res = NULL;
+    
+    if(*(int *)blkptr == 3){
+        
+        connection_status *cncsts = (connection_status *)blkptr;
+        sprintf(data1, "%d", cncsts->ipaddress);        
+        sprintf(data2, "%d", cncsts->fd);
 
-    char data1[10];
-    char data2[10];
-    char data3[10];
-
-    sprintf(data1, "%d", smsg->data1);
-
-    if (smsg->type == 3) {    
-
-        if (smsg->data2 != -1) {
-            sprintf(data2, "%d", smsg->data2);        
+        if (cncsts->fd >= 0) {
             sprintf(data3, "%d", 2);
-        }
-        else{
-            sprintf(data2, "%d", -1);
-            sprintf(data3, "%d", 1);
         }
 
         const char *param_values[] = {data1, data2, data3};
@@ -206,10 +204,16 @@ int store_comms_into_database(senders_message *smsg)
         const int paramFormats[] = {0, 0, 0};
         
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
+  
     }
-    else if(smsg->type == 4) {
+    
+    else if(*(int *)blkptr == 4) {
         
-        sprintf(data2, "%d", smsg->data2);
+        message_status *msgsts = (message_status *)blkptr;
+        
+        strncpy(data1, msgsts->uuid, strlen(msgsts->uuid));
+        sprintf(data2, "%d", msgsts->status);
+
         const char *param_values[] = {data1, data2};
         const int paramLengths[] = {strlen(data1), strlen(data2)};
         const int paramFormats[] = {0, 0};
@@ -252,11 +256,11 @@ int retrive_commr_from_database(char *data)
 }
 
 
-int retrive_comms_from_database(senders_message *smsg) 
+int retrive_comms_from_database(char *blkptr) 
 {
-    int row_count = 0;
     PGresult *res = NULL;
     int status = -1;
+    int type;
 
     res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, NULL, NULL, NULL, 0);
 
@@ -265,16 +269,23 @@ int retrive_comms_from_database(senders_message *smsg)
         return status;
     }    
 
-    row_count = PQntuples(res);
-    if (row_count > 0) {
-    
-        smsg->type = atoi(PQgetvalue(res, 0, 0));
-        if (smsg->type == 1) { 
-           smsg->data1 = atoi(PQgetvalue(res, 0, 1));
-           smsg->data2 = atoi(PQgetvalue(res, 0, 2));
+    if (PQntuples(res) > 0) {
+        
+        type = atoi(PQgetvalue(res, 0, 0));
+
+        if (type == 1){
+           
+            open_connection *opncn = (open_connection *)blkptr;
+            opncn->type = atoi(PQgetvalue(res, 0, 0));
+            opncn->ipaddress = atoi(PQgetvalue(res, 0, 1)); 
+            opncn->port = atoi(PQgetvalue(res, 0, 2));
+            
         }
-        else if(smsg->type == 2) {
-            smsg->data1 = atoi(PQgetvalue(res, 0, 1));
+        else if(type == 2) {
+            
+            close_connection *clscn = (close_connection *)blkptr;
+            clscn->type = atoi(PQgetvalue(res, 0, 0));
+            clscn->fd = atoi(PQgetvalue(res, 0, 1));
         }
 
         status = 0;

@@ -5,9 +5,9 @@
 
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80
-#define DPARTITION_SIZE (MESSAGE_SIZE + 8)
+#define DPARTITION_SIZE (MESSAGE_SIZE + 42)
 #define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 10)
-#define CPARTITION_SIZE 15
+#define CPARTITION_SIZE 20
 #define COMM_BLOCK_SIZE (CPARTITION_SIZE * TOTAL_PARTITIONS + 10)
 
 // (1024 * 128 + 4) * 80 + 10
@@ -30,11 +30,35 @@ typedef struct newmsg_data {
     char data[MESSAGE_SIZE];
 }newmsg_data;
 
-typedef struct senders_message {
-    unsigned int type;
-    unsigned int data1;
-    unsigned int data2;
-}senders_message;
+typedef struct open_connection {
+    unsigned char type;
+    unsigned int port;
+    unsigned int ipaddress;
+}open_connection;
+
+typedef struct close_connection {
+    unsigned char type;
+    unsigned int fd;
+}close_connection;
+
+typedef struct connection_status {
+    unsigned char type;
+    unsigned int fd;
+    unsigned int ipaddress; // identity can be ipaddress or fd, depends where the message is being used
+}connection_status;
+
+typedef struct send_message {
+    unsigned char type;
+    unsigned int fd;
+    char uuid[37];
+    char data[MESSAGE_SIZE];
+}send_message;
+
+typedef struct message_status {
+    unsigned char type;
+    unsigned char status;
+    char uuid[37];
+}message_status;
 
 
 int get_subblock(char *, int, int);

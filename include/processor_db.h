@@ -12,11 +12,11 @@ typedef struct db_statements {
 int connect_to_database();
 int prepare_statements();
 int store_data_in_database(newmsg_data *);
-int retrive_data_from_database(newmsg_data *);
+int retrive_data_from_database(char *);
 int store_commr_into_database(receivers_message *);
-int store_comms_into_database(senders_message *);
+int store_comms_into_database(char *);
 int retrive_commr_from_database(char *);
-int retrive_comms_from_database(senders_message *);
+int retrive_comms_from_database(char *);
 int close_database_connection();
 
 #endif // PROCESSOR_DB_H

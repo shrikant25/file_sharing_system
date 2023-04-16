@@ -26,7 +26,6 @@ int give_data_to_sender()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    newmsg_data nmsg;
 
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 0, 3);
@@ -34,10 +33,8 @@ int give_data_to_sender()
     if (subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        memset(nmsg.data, 0, DPARTITION_SIZE);
         
-        if (retrive_data_from_database(&nmsg) != -1) {
-            memcpy(blkptr, &nmsg, sizeof(newmsg_data)); 
+        if (retrive_data_from_database(blkptr) != -1) { 
             toggle_bit(subblock_position, dblks.datas_block, 3);
         }
         blkptr = NULL;
@@ -51,7 +48,6 @@ int communicate_with_sender()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    senders_message smsg;
 
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 0, 1);
@@ -60,9 +56,7 @@ int communicate_with_sender()
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
-        memset(&smsg, 0, sizeof(senders_message));
-        if (retrive_comms_from_database(&smsg) != -1){
-            memcpy(blkptr, &smsg, sizeof(senders_message));
+        if (retrive_comms_from_database(blkptr) != -1){
             toggle_bit(subblock_position, dblks.comms_block, 1);
         }
 
@@ -75,12 +69,7 @@ int communicate_with_sender()
     if (subblock_position >= 0) {
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        
-        memset(&smsg, 0, sizeof(senders_message));
-        memcpy(&smsg, blkptr, sizeof(senders_message));
-        store_comms_into_database(&smsg);
-        
-        blkptr = NULL;
+        store_comms_into_database(blkptr);
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
