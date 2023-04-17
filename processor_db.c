@@ -50,7 +50,7 @@ db_statements dbs[statement_count] = {
                                 ELSE 'D'\
                             END\
                         )\
-                    WHERE jobid = ($1);",
+                    WHERE jobid = $1::uuid;",
       .param_count = 2,
     },
     { 
@@ -184,45 +184,47 @@ int store_commr_into_database(receivers_message *rcvm)
 int store_comms_into_database(char *blkptr) 
 {
     int resultFormat = 0;
-    char data1[11];
-    char data2[11];
-    char data3[11];
+    char ipaddress[11];
+    char fd[11];
+    char status[11];
+    char uuid[37];
+
     PGresult* res = NULL;
     
-    if(*(int *)blkptr == 3){
+    if(*(unsigned char *)blkptr == 3){
         
         connection_status *cncsts = (connection_status *)blkptr;
-        sprintf(data1, "%d", cncsts->ipaddress);        
-        sprintf(data2, "%d", cncsts->fd);
+        sprintf(ipaddress, "%d", cncsts->ipaddress);        
+        sprintf(fd, "%d", cncsts->fd);
 
         if (cncsts->fd >= 0) {
-            sprintf(data3, "%d", 2);
+            sprintf(status, "%d", 2);
         }
 
-        const char *param_values[] = {data1, data2, data3};
-        const int paramLengths[] = {strlen(data1), strlen(data2), strlen(data3)};
+        const char *param_values[] = {ipaddress, fd, status};
+        const int paramLengths[] = {sizeof(ipaddress), sizeof(fd), sizeof(status)};
         const int paramFormats[] = {0, 0, 0};
         
         res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
   
     }
-    
-    else if(*(int *)blkptr == 4) {
+    else if(*(unsigned char *)blkptr == 4) {
         
         message_status *msgsts = (message_status *)blkptr;
         
-        strncpy(data1, msgsts->uuid, strlen(msgsts->uuid));
-        sprintf(data2, "%d", msgsts->status);
+        sprintf(status, "%hhu", msgsts->status);
+        strncpy(uuid, msgsts->uuid, sizeof(msgsts->uuid));
+        
 
-        const char *param_values[] = {data1, data2};
-        const int paramLengths[] = {strlen(data1), strlen(data2)};
+        const char *param_values[] = {uuid, status};
+        const int paramLengths[] = {sizeof(uuid), sizeof(status)};
         const int paramFormats[] = {0, 0};
         res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, param_values, paramLengths, paramFormats, resultFormat);
     
     }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert failed: %s\n", PQerrorMessage(connection));
+        printf("Insert of communication failed: %s\n", PQerrorMessage(connection));
         return -1;
     }
 

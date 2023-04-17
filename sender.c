@@ -158,7 +158,7 @@ int run_sender()
 
         
         if (get_message_from_processor(data) != -1) {
-            if (*(int *)data == 1) {
+            if (*(unsigned char *)data == 1) {
                 
                 opncn = (open_connection *)data;
                 memset(&cncsts, 0, sizeof(connection_status));
@@ -169,7 +169,7 @@ int run_sender()
                 send_message_to_processor(3, (void *)&cncsts);
 
             }
-            else if(*(int *)data == 2) {
+            else if(*(unsigned char *)data == 2) {
 
                 clscn = (close_connection *)data;
                 close(clscn->fd);
@@ -182,7 +182,12 @@ int run_sender()
             memset(&msgsts, 0, sizeof(message_status));
             
             msgsts.type = 4;
-            msgsts.status = send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0);
+            if (send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0) > 0) {
+                msgsts.status = 1;
+            }
+            else{
+                msgsts.status = 0;
+            }
             strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
 
             send_message_to_processor(4, (void *)&msgsts);
