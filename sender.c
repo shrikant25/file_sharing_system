@@ -74,16 +74,19 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
 }
 
 
-int get_message_from_processor(char * blkptr) 
+int get_message_from_processor(char *data) 
 {
     int subblock_position = -1;
-    
+    char *blkptr;
+
     sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 1, 1);
     
     if (subblock_position >= 0) {
 
         blkptr = dblks.comms_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+        memset(data, 0, CPARTITION_SIZE);
+        memcpy(data, blkptr, CPARTITION_SIZE);
         toggle_bit(subblock_position, dblks.comms_block, 1);
 
     }
@@ -92,9 +95,10 @@ int get_message_from_processor(char * blkptr)
 }
 
 
-int get_data_from_processor(char *blkptr)
+int get_data_from_processor(send_message *sndmsg)
 {
     int subblock_position = -1;
+    char *blkptr;
     
     sem_wait(smlks.sem_lock_datas);         
     subblock_position = get_subblock(dblks.datas_block, 1, 3);
@@ -102,6 +106,7 @@ int get_data_from_processor(char *blkptr)
     if (subblock_position >= 0) {
 
         blkptr = dblks.datas_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+        memcpy(sndmsg, blkptr, sizeof(send_message));
         toggle_bit(subblock_position, dblks.datas_block, 3);
     
     }
@@ -142,51 +147,45 @@ int send_message_to_processor(int type, void *msg)
 
 int run_sender() 
 {
-    char *blkptr;
-    open_connection opncn; 
-    close_connection clscn;
-    connection_status cncsts;
+    char data[CPARTITION_SIZE];
+    open_connection *opncn; 
+    close_connection *clscn;
     message_status msgsts;
-    send_message *sndmsg;
-
+    send_message sndmsg;
+    connection_status cncsts;
+   
     while (sender_status) {
 
-        memset(blkptr, 0, CPARTITION_SIZE);
         
-        if (get_message_from_processor(blkptr) != -1) {
-            if (*(int *)blkptr == 1) {
-
-                memset(&opncn, 0, sizeof(open_connection));
-                memcpy(&opncn, blkptr, sizeof(open_connection));
-
+        if (get_message_from_processor(data) != -1) {
+            if (*(int *)data == 1) {
+                
+                opncn = (open_connection *)data;
                 memset(&cncsts, 0, sizeof(connection_status));
                 cncsts.type = 3;
-                cncsts.fd = create_connection(opncn.port, opncn.ipaddress);
-                cncsts.ipaddress = opncn.ipaddress;
+                cncsts.fd = create_connection(opncn->port, opncn->ipaddress);
+                cncsts.ipaddress = opncn->ipaddress;
                 
                 send_message_to_processor(3, (void *)&cncsts);
 
             }
-            else if(*(int *)blkptr == 2) {
+            else if(*(int *)data == 2) {
 
-                memset(&clscn, 0, sizeof(close_connection));
-                memcpy(&clscn, blkptr, sizeof(close_connection));
-                close(clscn.fd);
+                clscn = (close_connection *)data;
+                close(clscn->fd);
             }
         }
 
-        memset(blkptr, 0, sizeof(DPARTITION_SIZE));
         
-        if (get_data_from_processor(blkptr)!= -1) {
+        if (get_data_from_processor(&sndmsg)!= -1) {
 
-            sndmsg = (send_message *)blkptr;
             memset(&msgsts, 0, sizeof(message_status));
             
             msgsts.type = 4;
-            msgsts.status = send(sndmsg->fd, sndmsg->data, strlen(sndmsg->data), 0);
-            strncpy(msgsts.uuid, sndmsg->uuid, strlen(sndmsg->uuid));
+            msgsts.status = send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0);
+            strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
 
-            send_message_to_processor(4, (void *)&sndmsg);
+            send_message_to_processor(4, (void *)&msgsts);
         }
     }
 }
