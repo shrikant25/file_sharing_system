@@ -74,7 +74,7 @@ int connect_to_database()
 {   
     connection = PQconnectdb("user = shrikant dbname = shrikant");
     if (PQstatus(connection) == CONNECTION_BAD) {
-        fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
     }
 
     return 0;
@@ -90,7 +90,7 @@ int prepare_statements()
         PGresult* res = PQprepare(connection, dbs[i].statement_name, 
                                     dbs[i].statement, dbs[i].param_count, NULL);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
             return -1;
         }
 
@@ -105,13 +105,16 @@ int retrive_data_from_database(char *blkptr)
 {
     int row_count;
     int status = -1;
+    char error[100];
     PGresult *res = NULL;
     send_message *sndmsg = (send_message *)blkptr;
 
     res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        syslog(LOG_NOTICE,"retriving failed: %s", PQerrorMessage(connection));
+        memset(error, 0, sizeof(error));
+        sprintf(error, "%s %s", "failed to retrive data from db", PQerrorMessage(connection));
+        store_log(error);
     }    
     else {
 
@@ -131,7 +134,9 @@ int retrive_data_from_database(char *blkptr)
             res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
                                     param_values, paramLengths, paramFormats, resultFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                syslog(LOG_NOTICE,"updating failed: %s", PQerrorMessage(connection));
+                memset(error, 0, sizeof(error));
+                sprintf(error, "%s %s", "failed update job status", PQerrorMessage(connection));
+                store_log(error);
                 status  = -1;
             }
             else{
@@ -152,6 +157,7 @@ int store_comms_into_database(char *blkptr)
     char fd[11];
     char status[11];
     char uuid[37];
+    char error[100];
 
     PGresult* res = NULL;
     
@@ -188,7 +194,9 @@ int store_comms_into_database(char *blkptr)
     }
 
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("Insert of communication failed: %s\n", PQerrorMessage(connection));
+        memset(error, 0, sizeof(error));
+        sprintf(error, "%s %s", "failed to insert senders comms", PQerrorMessage(connection));
+        store_log(error);
         return -1;
     }
 
@@ -202,12 +210,15 @@ int retrive_comms_from_database(char *blkptr)
 {
     PGresult *res = NULL;
     int status = -1;
+    char error[100];
     int type;
 
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        syslog(LOG_NOTICE,"retriving failed: %s\n", PQerrorMessage(connection));
+        memset(error, 0, sizeof(error));
+        sprintf(error, "%s %s", "retriving comms for sender failed", PQerrorMessage(connection));
+        store_log(error);
         return status;
     }    
 
@@ -331,27 +342,33 @@ int run_process()
 int main(void) 
 {
     int status = 0;
+    if (connect_to_database() == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
 
-    dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
-
-    if (!( dblks.datas_block && dblks.comms_block)) {
-        syslog(LOG_NOTICE,"failed to get shared memory");
-        return -1; 
-    }
-
-    status = sem_unlink(SEM_LOCK_DATAS);
-    status = sem_unlink(SEM_LOCK_COMMS);
     
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
-        status = -1;
-
-    connect_to_database();
-    prepare_statements();   
+    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
+        store_log("failed to initialize locks");
+        return -1;
+    }
+        
     
+    dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
+    dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
+
+    if (!( dblks.datas_block && dblks.comms_block)) {
+        store_log("failed to get shared memory");
+        return -1; 
+    }
+
+    if (sem_unlink(SEM_LOCK_DATAS) == -1 || sem_unlink(SEM_LOCK_COMMS) == -1) {
+        store_log("unlinking failed");
+        return -1; 
+    }
+    
+
     unset_all_bits(dblks.comms_block, 2);
     unset_all_bits(dblks.comms_block, 3);
     unset_all_bits(dblks.datas_block, 1);
