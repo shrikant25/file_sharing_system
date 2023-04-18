@@ -108,7 +108,7 @@ int retrive_data_from_database(char *blkptr)
     PGresult *res = NULL;
     send_message *sndmsg = (send_message *)blkptr;
 
-    res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, 
+    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, 
                                     NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         syslog(LOG_NOTICE,"retriving failed: %s", PQerrorMessage(connection));
@@ -128,7 +128,7 @@ int retrive_data_from_database(char *blkptr)
             const int paramFormats[] = {0};
             int resultFormat = 0;
             
-            res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, 
+            res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
                                     param_values, paramLengths, paramFormats, resultFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 syslog(LOG_NOTICE,"updating failed: %s", PQerrorMessage(connection));
@@ -169,7 +169,7 @@ int store_comms_into_database(char *blkptr)
         const int paramLengths[] = {sizeof(ipaddress), sizeof(fd), sizeof(status)};
         const int paramFormats[] = {0, 0, 0};
         
-        res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, paramLengths, paramFormats, resultFormat);
+        res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
   
     }
     else if(*(unsigned char *)blkptr == 4) {
@@ -183,7 +183,7 @@ int store_comms_into_database(char *blkptr)
         const char *param_values[] = {uuid, status};
         const int paramLengths[] = {sizeof(uuid), sizeof(status)};
         const int paramFormats[] = {0, 0};
-        res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, param_values, paramLengths, paramFormats, resultFormat);
+        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
     
     }
 
@@ -204,7 +204,7 @@ int retrive_comms_from_database(char *blkptr)
     int status = -1;
     int type;
 
-    res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, NULL, NULL, NULL, 0);
+    res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         syslog(LOG_NOTICE,"retriving failed: %s\n", PQerrorMessage(connection));
@@ -251,7 +251,7 @@ void store_log(char *logtext)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "ps_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, "ps_storelog", 5, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
