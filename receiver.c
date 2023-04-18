@@ -20,7 +20,7 @@
 server_info s_info;
 datablocks dblks;
 semlocks smlks;
-
+PGconn *connection;
 int receiver_status = 1;
 
 
@@ -144,7 +144,7 @@ void accept_connection()
             rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
             rcvm.status = 1;
             syslog(LOG_NOTICE, "connection accepted");
-            while (send_message_to_processor(&rcvm) == -1);
+            send_message_to_processor(&rcvm);
             memset(&rcvm, 0, sizeof(rcvm));
         }
     }
@@ -283,6 +283,52 @@ int send_message_to_processor(receivers_message *rcvm)
 }
 
 
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+    if (PQstatus(connection) == CONNECTION_BAD) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    PGresult* res = PQprepare(connection, "r_storelog", "INSERT INTO logs (log) VALUES ($1)", 1, NULL);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    PQclear(res);
+
+    return 0;
+}
+
+
+void store_log(char *logtext) {
+
+    PGresult *res = NULL;
+    char log[100];
+    strncpy(log, logtext, strlen(logtext));
+
+    const char *const param_values[] = {log};
+    const int paramLengths[] = {sizeof(log)};
+    const int paramFormats[] = {0};
+    int resultFormat = 0;
+    
+    res = PQexecPrepared(connection, "r_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
+    }
+
+    PQclear(res);
+}
+
+
 int main(void) 
 {   
     // get lock variable for lock on data sharing memory
@@ -336,7 +382,7 @@ int main(void)
     
     run_receiver(); // recieve connections, data and communicate with database
  
-    
+    PQfinish(connection);
     close(s_info.epoll_fd); // close epoll instance
     shutdown(s_info.servsoc_fd, 2); // close server socket
     sem_close(smlks.sem_lock_commr); // unlink lock used for communication

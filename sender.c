@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <syslog.h>
+#include <libpq-fe.h>
+#include <errno.h>
 #include "sender.h"
 #include "partition.h"
 #include "shared_memory.h"
@@ -17,9 +19,11 @@
 datablocks dblks;
 semlocks smlks;
 int sender_status = 1;
+PGconn *connection;
 
 int create_connection(unsigned short int port_number, unsigned int ip_address) 
 {    
+    char error[100];
     int network_socket; // to hold socket file descriptor
     int connection_status; // to show wether a connection was established or not
     struct sockaddr_in server_address; // create a address structure to store the address of remote connection
@@ -65,12 +69,8 @@ int create_connection(unsigned short int port_number, unsigned int ip_address)
     setsockopt(network_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
 
     connection_status = connect(network_socket, (struct sockaddr *)&server_address, sizeof(server_address));
-    if (connection_status == -1) {
-        return -1;
-    }
-
-    syslog(LOG_NOTICE,"Error connecting to server");
-    return connection_status;
+    return (connection_status == -1 ? connection_status : network_socket);
+      
 }
 
 
@@ -147,6 +147,9 @@ int send_message_to_processor(int type, void *msg)
 
 int run_sender() 
 {
+    int data_sent;
+    int total_data_sent;
+    char error[100];
     char data[CPARTITION_SIZE];
     open_connection *opncn; 
     close_connection *clscn;
@@ -180,39 +183,102 @@ int run_sender()
         if (get_data_from_processor(&sndmsg)!= -1) {
 
             memset(&msgsts, 0, sizeof(message_status));
+            data_sent = 0;
+            total_data_sent = 0;
             
-            msgsts.type = 4;
-            if (send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0) > 0) {
-                msgsts.status = 1;
-            }
-            else{
-                msgsts.status = 0;
-            }
-            strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
+            
+            do {
 
+                data_sent = send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0);
+                total_data_sent += data_sent;
+                
+            }while (total_data_sent < strlen(sndmsg.data) && data_sent != 0);
+            
+            msgsts.status = total_data_sent < strlen(sndmsg.data) ? 0 : 1;
+
+            msgsts.type = 4;
+            strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
             send_message_to_processor(4, (void *)&msgsts);
         }
     }
 }
 
 
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+    if (PQstatus(connection) == CONNECTION_BAD) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    PGresult* res = PQprepare(connection, "s_storelog", "INSERT INTO logs (log) VALUES ($1)", 1, NULL);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    PQclear(res);
+
+    return 0;
+}
+
+
+void store_log(char *logtext) {
+
+    PGresult *res = NULL;
+    char log[100];
+    strncpy(log, logtext, strlen(logtext));
+
+    const char *const param_values[] = {log};
+    const int paramLengths[] = {sizeof(log)};
+    const int paramFormats[] = {0};
+    int resultFormat = 0;
+    
+    res = PQexecPrepared(connection, "s_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
+    }
+
+    PQclear(res);
+}
+
+
 int main(void) 
 {
- 
+    if (connect_to_database() == -1) {
+        return -1;
+    }
+
+    if (prepare_statements() == -1) {
+        return -1;
+    }
+
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED)
+    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
+        store_log("not able to initialize locks");
         return -1;
+    }
  
     dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, PROJECT_ID_DATAS);
     dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, PROJECT_ID_COMMS);
 
-    if (!(dblks.datas_block && dblks.comms_block)) 
+    if (!(dblks.datas_block && dblks.comms_block)) { 
+        store_log("not able to attach shared memory");
         return -1; 
+    }
 
     run_sender();
-    
+
+    PQfinish(connection);  
     sem_close(smlks.sem_lock_datas);
     sem_close(smlks.sem_lock_comms);
     detach_memory_block(dblks.datas_block);
