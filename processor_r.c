@@ -140,7 +140,7 @@ int store_data_in_database(newmsg_data *nmsg)
                                     dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "%s %s", "data storing failed failed", PQerrorMessage(connection));
+        sprintf(error, "%s %s", "data storing failed", PQerrorMessage(connection));
         store_log(error);
         return -1;
     }
@@ -245,6 +245,7 @@ int communicate_with_receiver()
 
         blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
+        memset(&rcvm, 0, sizeof(rcvm));
         memcpy(&rcvm, blkptr, sizeof(rcvm));
         store_commr_into_database(&rcvm);
           
@@ -273,6 +274,9 @@ int main(void)
     if (connect_to_database() == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
 
+    sem_unlink(SEM_LOCK_DATAR);
+    sem_unlink(SEM_LOCK_COMMR);
+
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
     if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) {
@@ -287,11 +291,6 @@ int main(void)
         return -1; 
     }
 
-    if (sem_unlink(SEM_LOCK_DATAR) == -1 || sem_unlink(SEM_LOCK_COMMR) == -1) {
-        store_log("unlinking failed");
-        return -1; 
-    }
-    
     unset_all_bits(dblks.commr_block, 2);
     unset_all_bits(dblks.commr_block, 3);
     unset_all_bits(dblks.datar_block, 1);

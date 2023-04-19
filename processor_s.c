@@ -344,8 +344,10 @@ int main(void)
     int status = 0;
     if (connect_to_database() == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
-
-    
+ 
+    sem_unlink(SEM_LOCK_DATAS);
+    sem_unlink(SEM_LOCK_COMMS);
+     
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
 
@@ -363,12 +365,7 @@ int main(void)
         return -1; 
     }
 
-    if (sem_unlink(SEM_LOCK_DATAS) == -1 || sem_unlink(SEM_LOCK_COMMS) == -1) {
-        store_log("unlinking failed");
-        return -1; 
-    }
-    
-
+   
     unset_all_bits(dblks.comms_block, 2);
     unset_all_bits(dblks.comms_block, 3);
     unset_all_bits(dblks.datas_block, 1);

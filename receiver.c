@@ -22,48 +22,58 @@ datablocks dblks;
 semlocks smlks;
 PGconn *connection;
 int receiver_status = 1;
+char error[100];
 
 
-void make_nonblocking(int active_fd) 
+int make_nonblocking(int active_fd) 
 {
     // get current flags for file descriptor
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
-        perror("failed to get file descriptor flags");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "failed to get current flags %s, fd %d", strerror(errno), active_fd);
+        store_log(error);
+        return -1;
     }
 
     // set the non blocking flag
     if( fcntl(active_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("failed to set file descriptor flags");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "failed to set non blocking %s, fd %d", strerror(errno), active_fd);
+        store_log(error);
+        return -1;
     }
+    return 0;
 }
 
 
-void create_socket() 
+int create_socket() 
 {
     int optval;
     struct sockaddr_in servaddr;
     
     s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0); // create socket for servet
     if (s_info.servsoc_fd == -1) {
-        syslog(LOG_NOTICE, "creating socket failed");
-        return;
+        store_log("creating socket failed");
+        return -1;
     }
 
     // if incase the process dies, then after restart if the socket is already in use
     // then bind to that socket
     optval = 1;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        syslog(LOG_NOTICE, "setting socket as resuable failed");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "setting socket option reuseaddr failed %s, s_info.servsoc_fd : %d, optval : %d", strerror(errno), s_info.servsoc_fd, optval);
+        store_log(error);
+        return -1;
     }
 
     optval = 128 *1024;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
-        syslog(LOG_NOTICE, "setting size of receiving buffer failed");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d", strerror(errno), s_info.servsoc_fd, optval);
+        store_log(error);
+        return -1;
     }
 
 
@@ -74,13 +84,17 @@ void create_socket()
 
     // bind address to socketfd
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
-        perror("bind error");
-        exit(1);
+        memset(error, 0, sizeof(error));
+        sprintf(error, "binding address to socketfd failed %s, s_info.servsoc_fd : %d, servaddr : %d", strerror(errno), s_info.servsoc_fd, servaddr.sin_addr);
+        store_log(error);
+        return -1;
     }
+
+    return 0;
 }
 
 
-void add_to_list(int active_fd) 
+int add_to_list(int active_fd) 
 {
     struct epoll_event event;
  
@@ -90,13 +104,17 @@ void add_to_list(int active_fd)
  
     // try to add epoll variable to epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_ADD, active_fd, &event) == -1) {
-        perror("error adding");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "adding to epoll list failed %s, epollfd : %d, fd to be added : %d", strerror(errno), s_info.epoll_fd, active_fd);
+        store_log(error);
+        return -1;
     }
+
+    return 0;
 }
 
 
-void remove_from_list(int active_fd) 
+int remove_from_list(int active_fd) 
 {
     struct epoll_event event;
 
@@ -106,13 +124,16 @@ void remove_from_list(int active_fd)
     
     // try to delete the file descriptor from epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_DEL, active_fd, &event) == -1) {
-        perror("error removing");
-        return;
+        memset(error, 0, sizeof(error));
+        sprintf(error, "removing from epoll list failed %s, epollfd : %d, fd to be removed : %d", strerror(errno), s_info.epoll_fd, active_fd);
+        store_log(error);
+        return -1;
     }
+    return 0;
 }
 
 
-void accept_connection() 
+int accept_connection() 
 {   
     int client_fd = -1;
     struct sockaddr_in client_addr;
@@ -127,27 +148,32 @@ void accept_connection()
         
         if (client_fd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) { // no connections are present
-                syslog(LOG_NOTICE, "connection not present %d", client_fd);
-                return;
+                return 0;
             }
             else {
-                syslog(LOG_NOTICE, "error accepting connection %d", client_fd);; // some other error occured
-                return;
+                memset(error, 0, sizeof(error));
+                sprintf(error, "error accepting connection %s, servsocfd : %d", strerror(errno), s_info.servsoc_fd);
+                store_log(error);
+                return -1;
             }
         }
         else{
+            if (make_nonblocking(client_fd) == -1) return -1;
+            if (add_to_list(client_fd) == -1) {
+                close(client_fd);
+                return -1;
+            } 
             
-            make_nonblocking(client_fd);
-            add_to_list(client_fd);
-            
+            memset(&rcvm, 0, sizeof(rcvm));
             rcvm.fd = client_fd;
             rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
             rcvm.status = 1;
-            syslog(LOG_NOTICE, "connection accepted");
+            
             send_message_to_processor(&rcvm);
-            memset(&rcvm, 0, sizeof(rcvm));
         }
     }
+
+    return 0;
 }
 
 
@@ -165,7 +191,9 @@ int run_receiver()
       //  read_message_from_processor(data); // todo
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
-            syslog(LOG_NOTICE, "epoll wait failed");
+            memset(error, 0, sizeof(error));
+            sprintf(error, "epoll wait failed %s, epollfd : %d", strerror(errno), s_info.epoll_fd);
+            store_log(error);
             return -1;
         }
 
@@ -174,15 +202,16 @@ int run_receiver()
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
                 
-                syslog(LOG_NOTICE, "removig from epoll list %d", events[i].data.fd);
-                remove_from_list(events[i].data.fd);
+                close(events[i].data.fd);
+                if (remove_from_list(events[i].data.fd) == -1)
+                    return -1;
                 
+                memset(&rcvm, 0, sizeof(rcvm));
                 rcvm.fd = events[i].data.fd;
                 rcvm.ipaddr = 0;
                 rcvm.status = 2;
 
-                while (send_message_to_processor(&rcvm) == -1);
-                memset(&rcvm, 0, sizeof(rcvm));
+                send_message_to_processor(&rcvm);
                 continue;
             
             }
@@ -207,6 +236,7 @@ int run_receiver()
         }
 
     }
+    return 0;
 }
  
     
@@ -219,7 +249,7 @@ int send_to_processor(newmsg_data *nmsg)
     subblock_position = get_subblock(dblks.datar_block, 0, 3);
 
     if (subblock_position >= 0) {
-        syslog(LOG_NOTICE, "got subblock %d", subblock_position);
+        
         blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
@@ -273,7 +303,7 @@ int send_message_to_processor(receivers_message *rcvm)
         blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         
         memset(blkptr, 0, CPARTITION_SIZE);
-        memcpy(blkptr, rcvm, sizeof(rcvm));
+        memcpy(blkptr, rcvm, sizeof(receivers_message));
 
         toggle_bit(subblock_position, dblks.commr_block, 2);
     }
@@ -331,14 +361,19 @@ void store_log(char *logtext) {
 
 int main(void) 
 {   
+
+    int status = 0;
+    if (connect_to_database() == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
+
     // get lock variable for lock on data sharing memory
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
 
     // get lock variable for lock on message sharing memory
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){
-        syslog(LOG_NOTICE, "failed to get variabale");
+    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){ 
+        store_log("failed to initialize locks");
         return -1;
     }
     
@@ -353,36 +388,35 @@ int main(void)
     dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
 
     if (!(dblks.datar_block && dblks.commr_block)) {
-        syslog(LOG_NOTICE, "failed to get shared memory");
+        store_log("failed to get/attach shared memory");
         return -1;
     }
-    
     
     
     s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
     s_info.port = 7000; // server port
  
-    create_socket(); // create socket
-    make_nonblocking(s_info.servsoc_fd); // make the server socket file descriptor as non blocking
+    if (create_socket() == -1) { return -1; } // create socket
+    if (make_nonblocking(s_info.servsoc_fd) == -1) { return -1; } // make the server socket file descriptor as non blocking
  
     // somaxconn is defined in socket.h
     if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
-        syslog(LOG_NOTICE, "failed to listen on port %d", s_info.servsoc_fd);
+        store_log("failed to listen on port");
         return -1;
     }
  
     
     s_info.epoll_fd = epoll_create1(0); // create epoll instance
     if (s_info.epoll_fd == -2) {
-        syslog(LOG_NOTICE, "failed to create epoll instance");
+        store_log("failed to create epoll instance");
         return -1;
     }
-    add_to_list(s_info.servsoc_fd); // add socket file descriptor to epoll list
-    
+
+    if( add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
     
     run_receiver(); // recieve connections, data and communicate with database
  
-    PQfinish(connection);
+    PQfinish(connection); // close connection to db
     close(s_info.epoll_fd); // close epoll instance
     shutdown(s_info.servsoc_fd, 2); // close server socket
     sem_close(smlks.sem_lock_commr); // unlink lock used for communication
