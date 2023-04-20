@@ -7,23 +7,21 @@
 #include "shared_memory.h"
 #include <errno.h>
 
+
+int get_key(char *filename, int project_id) 
+{
+    return ftok(filename, project_id);
+}
+
 int get_shared_block(char *filename, int size, unsigned char project_id) 
 {
-    key_t key;
-
-    key = ftok(filename, project_id);
-    if (key == -1){
-        return -1;
-    }
+    key_t key = get_key(filename, project_id);
+    if (key == -1) { return -1; }
 
     size_t page_size = sysconf(_SC_PAGESIZE);
     size_t rounded_size = ((size + page_size - 1) / page_size) * page_size;
 
-    int id = shmget(key, rounded_size, 0600 | IPC_CREAT);
-    if(id == -1)
-        fprintf(stderr, "errno %d\n", errno);
-
-    return id;
+    return shmget(key, rounded_size, 0600 | IPC_CREAT);
 }
 
 

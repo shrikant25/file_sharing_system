@@ -30,6 +30,8 @@ typedef struct datablocks {
 typedef struct semlocks {
     sem_t *sem_lock_datar;
     sem_t *sem_lock_commr;
+    sem_t *sem_lock_sigdr;
+    sem_t *sem_lock_sigmr;
 }semlocks;
 
 #endif // PROCESSOR_H 

@@ -183,6 +183,7 @@ int run_receiver()
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     int bytes_read = 0;
+    int total_bytes_read = 0;
     newmsg_data nmsg;
     receivers_message rcvm;
 
@@ -223,14 +224,29 @@ int run_receiver()
                 memset(&nmsg, 0, MESSAGE_SIZE);
                 nmsg.data1 = events[i].data.fd;
                 bytes_read = 0;
+                total_bytes_read = 0;
 
-                while (bytes_read < MESSAGE_SIZE) {
+                while (total_bytes_read < MESSAGE_SIZE) {
                     
-                    bytes_read += read(nmsg.data1, nmsg.data+bytes_read, MESSAGE_SIZE);
-                
+                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE);
+                    
+                    if (bytes_read == 0) {
+                        memset(&rcvm, 0, sizeof(rcvm));
+                        rcvm.fd = events[i].data.fd;
+                        rcvm.ipaddr = 0;
+                        rcvm.status = 2;
+                        send_message_to_processor(&rcvm);     
+                        break;
+                    }
+
+                    total_bytes_read += bytes_read;
+                    
                 }
 
-                send_to_processor(&nmsg);
+                if (total_bytes_read == MESSAGE_SIZE) {
+                    send_to_processor(&nmsg);
+                }
+
             }
             
         }
@@ -257,9 +273,14 @@ int send_to_processor(newmsg_data *nmsg)
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 3);
+    } 
+    else {
+        store_log("failed to get empty block");
     }
 
     sem_post(smlks.sem_lock_datar);
+    sem_post(smlks.sem_lock_sigr);
+
     return subblock_position;
 }
 
@@ -307,8 +328,12 @@ int send_message_to_processor(receivers_message *rcvm)
 
         toggle_bit(subblock_position, dblks.commr_block, 2);
     }
+    else {
+        store_log("failed to get empty block");
+    }
     
     sem_post(smlks.sem_lock_commr);
+    sem_post(smlks.sem_lock_sigr);
     return subblock_position;
 }
 
@@ -372,12 +397,15 @@ int main(void)
     // get lock variable for lock on message sharing memory
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){ 
+    // get lock variable for signaling
+    smlks.sem_lock_sigr = sem_open(SEM_LOCK_SIG_R, O_CREAT, 0777, 0);
+
+    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){ 
         store_log("failed to initialize locks");
         return -1;
     }
     
-    
+
     // filename and projectid are present in shared_memory.h
     // block sizes are present in partition.h
 
@@ -412,7 +440,7 @@ int main(void)
         return -1;
     }
 
-    if( add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
+    if (add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
     
     run_receiver(); // recieve connections, data and communicate with database
  

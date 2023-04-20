@@ -3,11 +3,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
+#include <errno.h>
 #include <libpq-fe.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <semaphore.h>
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_r.h"
@@ -261,9 +264,29 @@ int communicate_with_receiver()
 
 int run_process() 
 {
+    struct timespec ts;
+    ts.tv_sec = 1;
+    ts.tv_nsec = 0;
+
     while (process_status) {
         communicate_with_receiver();
         get_data_from_receiver();
+        if (sem_timedwait(smlks.sem_lock_sigdr, &ts) == -1 && strerror(errno) == ETIMEDOUT) {
+            // check for noti from psql
+        }
+        else{
+            // call function to read messages
+            //
+        }
+        /*
+            
+            if signal from data base read messae from database
+            
+        
+        */
+       /*
+            if signal from receivers read from reciever and store in database
+       */
     }  
 }
 
@@ -279,10 +302,25 @@ int main(void)
 
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
+    smlks.sem_lock_sigdr = sme_open(SEM_LOCK_SIG_D, O_CREAT, 0777, 1);
+    
+    
     if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) {
         store_log("failed to intialize locks");
         status = -1;
     }
+
+    /*
+    
+    sid.sem_sig_id = semget(get_key(SEM_ID_SIG_R, PROJECT_ID_SIG_R), 1, 0666);
+    if (sem_id < 0) {
+        store_log("failed create to semaphore for signaling");
+        return -1;
+    }
+    
+    */
+
+
 
     dblks.datar_block = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAR);
     dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMR);
