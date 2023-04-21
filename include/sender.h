@@ -20,6 +20,18 @@ typedef struct semlocks {
     sem_t *sem_lock_comms; 
 }semlocks;
 
+typedef struct db_statements {
+    char statement_name[20];
+    char *statement;
+    int param_count;
+}db_statements;
 
+db_statements dbs[statement_count] = {
+    { 
+      .statement_name = "s_storelog",  
+      .statement = "INSERT INTO logs (log) VALUES ($1)",
+      .param_count = 1
+    }
+};
 
 #endif // SENDER_H

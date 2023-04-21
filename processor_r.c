@@ -1,82 +1,27 @@
+
+#include <semaphore.h>
+#include <signal.h>
 #include <syslog.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <time.h>
 #include <errno.h>
 #include <libpq-fe.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/shm.h>
-#include <semaphore.h>
+#include "connect_and_prepare.h"
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_r.h"
 
 int process_status = 1;
-
+PGconn *connection;
 datablocks dblks;
 semlocks smlks;
-PGconn *connection;
-
-#define statement_count 3
-
-db_statements dbs[statement_count] = {
-    { 
-      .statement_name = "r_insert_data",  
-      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, \
-                    jsource, jobid, jparent_jobid, jdestination, \
-                    jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(), \
-                    (select jobid from job_scheduler where jparent_jobid = jobid), 0, 0);",
-      .param_count = 2,
-    },
-    { 
-      .statement_name = "r_insert_conns", 
-      .statement = "INSERT INTO receiving_conns (rfd, ripaddr, rcstatus) \
-                    VALUES ($1, $2, $3) ON CONFLICT (rfd) DO UPDATE SET rcstatus = ($3);",
-      .param_count = 3,
-    },
-    {
-      .statement_name = "pr_storelogs", 
-      .statement = "INSERT INTO logs (log) VALUES ($1);",
-      .param_count = 1,
-    }
-};
-
-
-int connect_to_database() 
-{   
-    connection = PQconnectdb("user = shrikant dbname = shrikant");
-    if (PQstatus(connection) == CONNECTION_BAD) {
-        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }
-
-    return 0;
-}
-
-
-int prepare_statements() 
-{    
-    int i;
-
-    for(i = 0; i<statement_count; i++){
-
-        PGresult* res = PQprepare(connection, dbs[i].statement_name, 
-                                    dbs[i].statement, dbs[i].param_count, NULL);
-        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
-            return -1;
-        }
-
-        PQclear(res);
-    }
-
-    return 0;
-}
-
 
 int retrive_commr_from_database(char *data) 
 {
@@ -192,7 +137,7 @@ int get_data_from_receiver()
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    newmsg_data rcond;
+    newmsg_data nmsg;
 
     sem_wait(smlks.sem_lock_datar);         
     subblock_position = get_subblock(dblks.datar_block, 1, 3);
@@ -201,10 +146,10 @@ int get_data_from_receiver()
 
         blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
-        memset(&rcond, 0, sizeof(rcond));
-        memcpy(&rcond, blkptr, sizeof(rcond));
+        memset(&nmsg, 0, sizeof(nmsg));
+        memcpy(&nmsg, blkptr, sizeof(nmsg));
 
-        store_data_in_database(&rcond);
+        store_data_in_database(&nmsg);
 
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 3);
@@ -212,11 +157,39 @@ int get_data_from_receiver()
     }
 
     sem_post(smlks.sem_lock_datar);
+    return subblock_position;
 }
 
 
-int communicate_with_receiver() 
-{
+int get_message_from_receiver() {
+    
+    int subblock_position = -1;
+    char *blkptr = NULL;
+    receivers_message rcvm;
+
+    sem_wait(smlks.sem_lock_commr);         
+    subblock_position = get_subblock(dblks.commr_block, 1, 2);
+    
+    if (subblock_position >= 0) {
+
+        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
+        
+        memset(&rcvm, 0, sizeof(rcvm));
+        memcpy(&rcvm, blkptr, sizeof(rcvm));
+        store_commr_into_database(&rcvm);
+          
+        blkptr = NULL;
+        toggle_bit(subblock_position, dblks.commr_block, 2);
+    
+    }
+
+    sem_post(smlks.sem_lock_commr);
+    return subblock_position;
+}
+
+
+int send_message_to_receiver() {
+    
     int subblock_position = -1;
     char *blkptr = NULL;
     char data[CPARTITION_SIZE];
@@ -239,54 +212,22 @@ int communicate_with_receiver()
         }
         blkptr = NULL;
     }
-
- 
-    subblock_position = -1;
-    subblock_position = get_subblock(dblks.commr_block, 1, 2);
     
-    if (subblock_position >= 0) {
-
-        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        
-        memset(&rcvm, 0, sizeof(rcvm));
-        memcpy(&rcvm, blkptr, sizeof(rcvm));
-        store_commr_into_database(&rcvm);
-          
-        blkptr = NULL;
-        toggle_bit(subblock_position, dblks.commr_block, 2);
-    
-    }
-
-    sem_post(smlks.sem_lock_commr);   
+    sem_post(smlks.sem_lock_commr);    
+    return subblock_position;
 }
-
 
 
 int run_process() 
 {
-    struct timespec ts;
-    ts.tv_sec = 1;
-    ts.tv_nsec = 0;
+    int status = 0;
 
     while (process_status) {
-        communicate_with_receiver();
-        get_data_from_receiver();
-        if (sem_timedwait(smlks.sem_lock_sigdr, &ts) == -1 && strerror(errno) == ETIMEDOUT) {
-            // check for noti from psql
-        }
-        else{
-            // call function to read messages
-            //
-        }
-        /*
+
+        sem_wait(smlks.sem_lock_sigr); 
+            get_message_from_receiver();
+            get_data_from_receiver();           
             
-            if signal from data base read messae from database
-            
-        
-        */
-       /*
-            if signal from receivers read from reciever and store in database
-       */
     }  
 }
 
@@ -294,33 +235,20 @@ int run_process()
 int main(void) 
 {
     int status = 0;
-    if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
+    if (connect_to_database(connection) == -1) { return -1; }
+    if (prepare_statements(connection, statement_count, dbs) == -1) { return -1; }   
 
     sem_unlink(SEM_LOCK_DATAR);
     sem_unlink(SEM_LOCK_COMMR);
 
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
-    smlks.sem_lock_sigdr = sme_open(SEM_LOCK_SIG_D, O_CREAT, 0777, 1);
+    smlks.sem_lock_sigr = sem_open(SEM_LOCK_SIG_R, O_CREAT, 0777, 0);
     
-    
-    if (smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) {
+    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) {
         store_log("failed to intialize locks");
         status = -1;
     }
-
-    /*
-    
-    sid.sem_sig_id = semget(get_key(SEM_ID_SIG_R, PROJECT_ID_SIG_R), 1, 0666);
-    if (sem_id < 0) {
-        store_log("failed create to semaphore for signaling");
-        return -1;
-    }
-    
-    */
-
-
 
     dblks.datar_block = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAR);
     dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMR);

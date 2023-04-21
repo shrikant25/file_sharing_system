@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <connect_and_prepare.h>
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_s.h"
@@ -18,87 +19,6 @@ datablocks dblks;
 semlocks smlks;
 
 PGconn *connection;
-
-#define statement_count 6
-
-db_statements dbs[statement_count] = {
-    { 
-      .statement_name = "s_get_data", 
-      .statement = "SELECT sc.sfd, js.jobid, js.jobdata\
-                    FROM job_scheduler js, sending_conns sc \
-                    WHERE js.jstate = 'S-3' \
-                    AND sc.sipaddr::text = js.jdestination \
-                    AND sc.scstatus = 2 \
-                    ORDER BY jpriority DESC LIMIT 1;",
-      .param_count = 0,
-    },
-    { 
-      .statement_name = "s_update_conns", 
-      .statement = "UPDATE sending_conns SET scstatus = ($3), sfd = ($2)  WHERE sipaddr = ($1);",
-      .param_count = 3,
-    },
-    { 
-      .statement_name = "s_update_job_status2", 
-      .statement = "UPDATE job_scheduler \
-                    SET jstate = (\
-                        SELECT\
-                            CASE\
-                                WHEN ($2) > 0 THEN 'C'\
-                                ELSE 'D'\
-                            END\
-                        )\
-                    WHERE jobid = $1::uuid;",
-      .param_count = 2,
-    },
-    { 
-      .statement_name = "s_get_comms", 
-      .statement = "WITH sdata AS(SELECT scommid FROM senders_comms WHERE mtype IN(1, 2) LIMIT 1) \
-                    DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata1, mdata2;",
-      .param_count = 0,
-    },
-    {
-      .statement_name = "s_update_job_status1", 
-      .statement = "UPDATE job_scheduler SET jstate = jstate || 'W' WHERE jobid = $1::uuid;",
-      .param_count = 1, 
-    },
-    {
-      .statement_name = "ps_storelogs", 
-      .statement = "INSERT INTO logs (log) VALUES ($1);",
-      .param_count = 1,
-    }
-
-};
-
-
-int connect_to_database() 
-{   
-    connection = PQconnectdb("user = shrikant dbname = shrikant");
-    if (PQstatus(connection) == CONNECTION_BAD) {
-        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
-    }
-
-    return 0;
-}
-
-
-int prepare_statements() 
-{    
-    int i;
-
-    for(i = 0; i<statement_count; i++){
-
-        PGresult* res = PQprepare(connection, dbs[i].statement_name, 
-                                    dbs[i].statement, dbs[i].param_count, NULL);
-        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
-            return -1;
-        }
-
-        PQclear(res);
-    }
-
-    return 0;
-}
 
 
 int retrive_data_from_database(char *blkptr) 
@@ -343,7 +263,7 @@ int main(void)
 {
     int status = 0;
     if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
+    if (prepare_statements(statement_count) == -1) { return -1; }   
  
     sem_unlink(SEM_LOCK_DATAS);
     sem_unlink(SEM_LOCK_COMMS);

@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <netinet/in.h>
+#include "connect_and_prepare.h"
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
 #include "receiver.h"
@@ -23,7 +24,6 @@ semlocks smlks;
 PGconn *connection;
 int receiver_status = 1;
 char error[100];
-
 
 int make_nonblocking(int active_fd) 
 {
@@ -273,14 +273,13 @@ int send_to_processor(newmsg_data *nmsg)
         
         blkptr = NULL;
         toggle_bit(subblock_position, dblks.datar_block, 3);
+        sem_post(smlks.sem_lock_sigr);
     } 
     else {
         store_log("failed to get empty block");
     }
 
     sem_post(smlks.sem_lock_datar);
-    sem_post(smlks.sem_lock_sigr);
-
     return subblock_position;
 }
 
@@ -327,40 +326,14 @@ int send_message_to_processor(receivers_message *rcvm)
         memcpy(blkptr, rcvm, sizeof(receivers_message));
 
         toggle_bit(subblock_position, dblks.commr_block, 2);
+        sem_post(smlks.sem_lock_sigr);
     }
     else {
         store_log("failed to get empty block");
     }
     
     sem_post(smlks.sem_lock_commr);
-    sem_post(smlks.sem_lock_sigr);
     return subblock_position;
-}
-
-
-int connect_to_database() 
-{   
-    connection = PQconnectdb("user = shrikant dbname = shrikant");
-    if (PQstatus(connection) == CONNECTION_BAD) {
-        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }
-
-    return 0;
-}
-
-
-int prepare_statements() 
-{    
-    PGresult* res = PQprepare(connection, "r_storelog", "INSERT INTO logs (log) VALUES ($1)", 1, NULL);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }
-
-    PQclear(res);
-
-    return 0;
 }
 
 
@@ -388,8 +361,8 @@ int main(void)
 {   
 
     int status = 0;
-    if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
+    if (connect_to_database(connection) == -1) { return -1; }
+    if (prepare_statements(connection, statement_count, dbs) == -1) { return -1; }   
 
     // get lock variable for lock on data sharing memory
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
@@ -400,7 +373,7 @@ int main(void)
     // get lock variable for signaling
     smlks.sem_lock_sigr = sem_open(SEM_LOCK_SIG_R, O_CREAT, 0777, 0);
 
-    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED){ 
+    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) { 
         store_log("failed to initialize locks");
         return -1;
     }

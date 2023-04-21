@@ -2,6 +2,7 @@
 #define RECEIVER_H
 #include <semaphore.h>
 #include "partition.h"
+#include "connect_and_prepare.h"
 
 typedef struct datablocks {     
     char *datar_block;
@@ -12,8 +13,7 @@ typedef struct datablocks {
 typedef struct semlocks {
     sem_t *sem_lock_datar;
     sem_t *sem_lock_commr; 
-    sem_t *sem_lock_sigdr;
-    sem_t *sem_lock_sigmr;
+    sem_t *sem_lock_sigr;
 }semlocks;
 
 typedef struct server_info{
@@ -22,6 +22,17 @@ typedef struct server_info{
     unsigned int servsoc_fd;
     unsigned int epoll_fd;
 }server_info;
+
+
+#define statement_count 1
+
+db_statements dbs[statement_count] = {
+    { 
+      .statement_name = "rr_storelog",  
+      .statement = "INSERT INTO logs (log) VALUES ($1)",
+      .param_count = 1
+    }
+};
 
 int connect_to_database();
 int prepare_statements();

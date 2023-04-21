@@ -204,32 +204,6 @@ int run_sender()
 }
 
 
-int connect_to_database() 
-{   
-    connection = PQconnectdb("user = shrikant dbname = shrikant");
-    if (PQstatus(connection) == CONNECTION_BAD) {
-        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }
-
-    return 0;
-}
-
-
-int prepare_statements() 
-{    
-    PGresult* res = PQprepare(connection, "s_storelog", "INSERT INTO logs (log) VALUES ($1)", 1, NULL);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
-        return -1;
-    }
-
-    PQclear(res);
-
-    return 0;
-}
-
-
 void store_log(char *logtext) {
 
     PGresult *res = NULL;
