@@ -251,6 +251,14 @@ int run_process()
    
     while (process_status) {
 
+        /*
+            sem_wait(semval);
+            read_data_from_database();
+            send_msg_to_sender();
+            read_msg_from_database();
+            send_msg_to_sender();
+                
+        1*/
         communicate_with_sender();
         give_data_to_sender();
     

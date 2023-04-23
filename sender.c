@@ -137,7 +137,7 @@ int send_message_to_processor(int type, void *msg)
             memcpy(blkptr, (message_status *)msg, sizeof(message_status));
         }
         toggle_bit(subblock_position, dblks.comms_block, 2);
-    
+        // sem_post(Semval);
     }
 
     sem_post(smlks.sem_lock_comms);

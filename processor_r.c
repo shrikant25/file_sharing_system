@@ -186,7 +186,7 @@ int get_message_from_receiver() {
     return subblock_position;
 }
 
-
+/*
 int send_message_to_receiver() {
     
     int subblock_position = -1;
@@ -215,7 +215,7 @@ int send_message_to_receiver() {
     sem_post(smlks.sem_lock_commr);    
     return subblock_position;
 }
-
+*/
 
 int run_process() 
 {
@@ -227,9 +227,9 @@ int run_process()
         sem_wait(smlks.sem_lock_sigr); 
         get_message_from_receiver();
         get_data_from_receiver();           
-        if (retrive_commr_from_database(data) != -1) {
+  /*      if (retrive_commr_from_database(data) != -1) {
             send_message_to_receiver(data);
-        }    
+        }*/    
     }  
 }
 
@@ -265,6 +265,7 @@ int prepare_statements()
     
     return status;
 }
+
 
 int main(void) 
 {
