@@ -3,7 +3,6 @@
 
 #include <semaphore.h>
 #include "partition.h"
-#include "connect_and_prepare.h"
 
 void store_log(char *);
 int run_process();
@@ -26,6 +25,14 @@ typedef struct semlocks {
     sem_t *sem_lock_sigr;
 }semlocks;
 
+typedef struct db_statements {
+    char statement_name[20];
+    char *statement;
+    int param_count;
+}db_statements;
+
+int connect_to_database();
+int prepare_statements();
 
 #define statement_count 3
 

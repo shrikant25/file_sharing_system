@@ -8,7 +8,7 @@ typedef struct db_statements {
     int param_count;
 }db_statements;
 
-int connect_to_database(PGconn *);
-int prepare_statements(PGconn *c, int, db_statements *);
+int connect_to_database();
+int prepare_statements();
 
 #endif // _C_N_P

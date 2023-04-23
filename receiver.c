@@ -10,13 +10,14 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <netinet/in.h>
-#include "connect_and_prepare.h"
+#include <syslog.h>
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
+#include "connect_and_prepare.h"
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
-#include <syslog.h>
+
 
 server_info s_info;
 datablocks dblks;
@@ -235,6 +236,9 @@ int run_receiver()
                         rcvm.fd = events[i].data.fd;
                         rcvm.ipaddr = 0;
                         rcvm.status = 2;
+                        close(events[i].data.fd);
+                        if (remove_from_list(events[i].data.fd) == -1)
+                            return -1;
                         send_message_to_processor(&rcvm);     
                         break;
                     }

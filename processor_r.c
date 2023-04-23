@@ -1,4 +1,3 @@
-
 #include <semaphore.h>
 #include <signal.h>
 #include <syslog.h>
@@ -13,12 +12,12 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/shm.h>
-#include "connect_and_prepare.h"
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_r.h"
 
 int process_status = 1;
+
 PGconn *connection;
 datablocks dblks;
 semlocks smlks;
@@ -221,22 +220,59 @@ int send_message_to_receiver() {
 int run_process() 
 {
     int status = 0;
+    char data[CPARTITION_SIZE];
 
     while (process_status) {
 
         sem_wait(smlks.sem_lock_sigr); 
-            get_message_from_receiver();
-            get_data_from_receiver();           
-            
+        get_message_from_receiver();
+        get_data_from_receiver();           
+        if (retrive_commr_from_database(data) != -1) {
+            send_message_to_receiver(data);
+        }    
     }  
 }
 
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+
+    if (PQstatus(connection) != CONNECTION_OK) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    int i, status = 0;
+
+    for (i = 0; i<statement_count; i++){
+
+        PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            status = -1;
+            PQclear(res);
+            break;
+        }
+
+        PQclear(res);
+    }
+    
+    return status;
+}
 
 int main(void) 
 {
     int status = 0;
-    if (connect_to_database(connection) == -1) { return -1; }
-    if (prepare_statements(connection, statement_count, dbs) == -1) { return -1; }   
+
+    if (connect_to_database() == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
+    
 
     sem_unlink(SEM_LOCK_DATAR);
     sem_unlink(SEM_LOCK_COMMR);
