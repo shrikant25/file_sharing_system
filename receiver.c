@@ -13,7 +13,6 @@
 #include <syslog.h>
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
-#include "connect_and_prepare.h"
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
@@ -232,13 +231,16 @@ int run_receiver()
                     bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE);
                     
                     if (bytes_read == 0) {
+                       
                         memset(&rcvm, 0, sizeof(rcvm));
                         rcvm.fd = events[i].data.fd;
                         rcvm.ipaddr = 0;
                         rcvm.status = 2;
-                        close(events[i].data.fd);
+                       
                         if (remove_from_list(events[i].data.fd) == -1)
                             return -1;
+                        close(events[i].data.fd);
+
                         send_message_to_processor(&rcvm);     
                         break;
                     }
@@ -361,12 +363,46 @@ void store_log(char *logtext) {
 }
 
 
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+
+    if (PQstatus(connection) != CONNECTION_OK) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    int i, status = 0;
+
+    for (i = 0; i<statement_count; i++){
+
+        PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            status = -1;
+            PQclear(res);
+            break;
+        }
+
+        PQclear(res);
+    }
+    
+    return status;
+}
+
+
 int main(void) 
 {   
 
     int status = 0;
-    if (connect_to_database(connection) == -1) { return -1; }
-    if (prepare_statements(connection, statement_count, dbs) == -1) { return -1; }   
+    if (connect_to_database() == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
 
     // get lock variable for lock on data sharing memory
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);

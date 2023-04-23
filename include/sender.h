@@ -26,6 +26,15 @@ typedef struct db_statements {
     int param_count;
 }db_statements;
 
+typedef struct db_statements {
+    char statement_name[20];
+    char *statement;
+    int param_count;
+}db_statements;
+
+int connect_to_database();
+int prepare_statements();
+
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "s_storelog",  

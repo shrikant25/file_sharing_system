@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
-#include <connect_and_prepare.h>
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_s.h"
@@ -256,6 +255,39 @@ int run_process()
         give_data_to_sender();
     
     }  
+}
+
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+
+    if (PQstatus(connection) != CONNECTION_OK) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    int i, status = 0;
+
+    for (i = 0; i<statement_count; i++){
+
+        PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            status = -1;
+            PQclear(res);
+            break;
+        }
+
+        PQclear(res);
+    }
+    
+    return status;
 }
 
 

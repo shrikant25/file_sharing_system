@@ -96,3 +96,9 @@ WHERE jobdata = '__ROOT__';
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
+
+CREATE TRIGGER msg_for_receiver
+AFTER INSERT on receiving_comms
+FOR EACH ROW
+WHEN (NEW.type = 3)
+EXECUTE PROCEDURE pg_notify('receivers_channel', 'get_data');

@@ -224,6 +224,39 @@ void store_log(char *logtext) {
 }
 
 
+int connect_to_database() 
+{   
+    connection = PQconnectdb("user = shrikant dbname = shrikant");
+
+    if (PQstatus(connection) != CONNECTION_OK) {
+        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int prepare_statements() 
+{    
+    int i, status = 0;
+
+    for (i = 0; i<statement_count; i++){
+
+        PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            status = -1;
+            PQclear(res);
+            break;
+        }
+
+        PQclear(res);
+    }
+    
+    return status;
+}
+
 int main(void) 
 {
     if (connect_to_database() == -1) {
