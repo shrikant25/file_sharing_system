@@ -11,6 +11,9 @@ processor_r_files := processor_r.c shared_memory.c partition.c
 processor_s_target = processor_s
 processor_s_files := processor_s.c shared_memory.c partition.c 
 
+sender_notif_target = sender_notif
+sender_notif_files := sender_notif.c 
+
 sender_target = sender
 sender_files := sender.c shared_memory.c partition.c 
 
@@ -22,6 +25,7 @@ processor_r: $(processor_r_files)
 
 processor_s: $(processor_s_files)
 		$(CC) $(processor_s_files) -o $(processor_s_target) $(CFLAGS) 
+		$(CC) $(sender_notif_files) -o $(sender_notif_target) $(CFLAGS)
 
 sender: $(sender_files)
 		$(CC) $(sender_files) -o $(sender_target) $(CFLAGS)

@@ -21,7 +21,7 @@ void store_log(char *logtext)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "store_log", 5, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, "store_log", 1, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
@@ -43,7 +43,7 @@ int main(void) {
         return -1;
     }
 
-    res = PQprepare(connection, "store_logs", "INSERT INTO LOGS (log) VALUES ($1)", 1, NULL);
+    res = PQprepare(connection, "store_log", "INSERT INTO LOGS (log) VALUES ($1)", 1, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
         PQclear(res);
@@ -52,7 +52,7 @@ int main(void) {
     }
     PQclear(res);
 
-    res = PQexec(connection, "LISTEN mychannel");
+    res = PQexec(connection, "LISTEN senders_channel");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "LISTEN command failed: %s", PQerrorMessage(connection));
@@ -62,7 +62,7 @@ int main(void) {
         return -1;
     }
     PQclear(res);
-
+    
     if ((sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 0)) == SEM_FAILED) {
         memset(error, 0, sizeof(error));
         sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
@@ -70,6 +70,7 @@ int main(void) {
         return -1;
     }
 
+    store_log("listening");
     while (1) {
 
         if (PQconsumeInput(connection) == 0) {
