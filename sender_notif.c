@@ -77,10 +77,11 @@ int main(void) {
             sprintf(error, "Failed to consume input: %s", PQerrorMessage(connection));
             store_log(error);
         }
-
-        while ((notify = PQnotifies(connection)) != NULL) {
-            sem_post(sigps);
-            PQfreemem(notify);
+        else{
+            while ((notify = PQnotifies(connection)) != NULL) {
+                sem_post(sigps);
+                PQfreemem(notify);
+            }
         }
     
     }
