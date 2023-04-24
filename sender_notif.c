@@ -14,6 +14,7 @@ void store_log(char *logtext)
 
     PGresult *res = NULL;
     char log[100];
+    memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
     const char *const param_values[] = {log};
@@ -43,7 +44,7 @@ int main(void) {
         return -1;
     }
 
-    res = PQprepare(connection, "store_log", "INSERT INTO LOGS (log) VALUES ($1)", 1, NULL);
+    res = PQprepare(connection, "store_log", "INSERT INTO logs (log) VALUES ($1);", 1, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
         PQclear(res);
@@ -70,7 +71,6 @@ int main(void) {
         return -1;
     }
 
-    store_log("listening");
     while (1) {
 
         if (PQconsumeInput(connection) == 0) {
