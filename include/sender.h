@@ -18,13 +18,9 @@ typedef struct datablocks {
 typedef struct semlocks {
     sem_t *sem_lock_datas;
     sem_t *sem_lock_comms; 
+    sem_t *sem_lock_sigs;
+    sem_t *sem_lock_sigps;
 }semlocks;
-
-typedef struct db_statements {
-    char statement_name[20];
-    char *statement;
-    int param_count;
-}db_statements;
 
 typedef struct db_statements {
     char statement_name[20];
@@ -34,6 +30,8 @@ typedef struct db_statements {
 
 int connect_to_database();
 int prepare_statements();
+
+#define statement_count 1
 
 db_statements dbs[statement_count] = {
     { 

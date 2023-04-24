@@ -137,7 +137,7 @@ int send_message_to_processor(int type, void *msg)
             memcpy(blkptr, (message_status *)msg, sizeof(message_status));
         }
         toggle_bit(subblock_position, dblks.comms_block, 2);
-        // sem_post(Semval);
+        sem_post(smlks.sem_lock_sigps);
     }
 
     sem_post(smlks.sem_lock_comms);
@@ -159,7 +159,7 @@ int run_sender()
    
     while (sender_status) {
 
-        
+        sem_wait(smlks.sem_lock_sigs);
         if (get_message_from_processor(data) != -1) {
             if (*(unsigned char *)data == 1) {
                 
@@ -257,6 +257,7 @@ int prepare_statements()
     return status;
 }
 
+
 int main(void) 
 {
     if (connect_to_database() == -1) {
@@ -269,8 +270,10 @@ int main(void)
 
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
+    smlks.sem_lock_sigs = sem_open(SEM_LOCK_SIG_S, O_CREAT, 0777, 1);
+    smlks.sem_lock_sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 1);
 
-    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
+    if (smlks.sem_lock_sigs == SEM_FAILED || smlks.sem_lock_sigps == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
         store_log("not able to initialize locks");
         return -1;
     }
@@ -286,8 +289,12 @@ int main(void)
     run_sender();
 
     PQfinish(connection);  
+
     sem_close(smlks.sem_lock_datas);
     sem_close(smlks.sem_lock_comms);
+    sem_close(smlks.sem_lock_sigs);
+    sem_close(smlks.sem_lock_sigps);
+    
     detach_memory_block(dblks.datas_block);
     detach_memory_block(dblks.comms_block);
     

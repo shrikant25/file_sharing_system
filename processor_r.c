@@ -277,6 +277,7 @@ int main(void)
 
     sem_unlink(SEM_LOCK_DATAR);
     sem_unlink(SEM_LOCK_COMMR);
+    sem_unklink(SEM_LOCK_SIG_S);
 
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
@@ -304,6 +305,7 @@ int main(void)
 
     sem_close(smlks.sem_lock_datar);
     sem_close(smlks.sem_lock_commr);
+    sem_close(smlks.sem_lock_sigr);
     
     detach_memory_block(dblks.datar_block);
     detach_memory_block(dblks.commr_block);

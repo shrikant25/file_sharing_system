@@ -204,15 +204,16 @@ int give_data_to_sender()
         
         if (retrive_data_from_database(blkptr) != -1) { 
             toggle_bit(subblock_position, dblks.datas_block, 3);
+            sem_post(smlks.sem_lock_sigs);
         }
-        blkptr = NULL;
+    
     }
 
     sem_post(smlks.sem_lock_datas);
 }
 
 
-int communicate_with_sender() 
+int send_msg_to_sender() 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -226,12 +227,21 @@ int communicate_with_sender()
         
         if (retrive_comms_from_database(blkptr) != -1){
             toggle_bit(subblock_position, dblks.comms_block, 1);
+            sem_post(smlks.sem_lock_sigs);
         }
-
-        blkptr = NULL;
     }
-    
-    subblock_position = -1;
+    sem_post(smlks.sem_lock_comms);
+
+}
+
+
+int read_msg_from_sender() 
+{
+
+    int subblock_position = -1;
+    char *blkptr = NULL;
+
+    sem_wait(smlks.sem_lock_comms);         
     subblock_position = get_subblock(dblks.comms_block, 1, 2);
     
     if (subblock_position >= 0) {
@@ -241,7 +251,6 @@ int communicate_with_sender()
         toggle_bit(subblock_position, dblks.comms_block, 2);
     
     }
-
     sem_post(smlks.sem_lock_comms);   
 }
 
@@ -251,19 +260,14 @@ int run_process()
    
     while (process_status) {
 
-        /*
-            sem_wait(semval);
-            read_data_from_database();
-            send_msg_to_sender();
-            read_msg_from_database();
-            send_msg_to_sender();
-                
-        1*/
-        communicate_with_sender();
+        sem_wait(smlks.sem_lock_sigps);
         give_data_to_sender();
-    
+        send_msg_to_sender();
+        read_msg_from_sender();
+        
     }  
 }
+
 
 int connect_to_database() 
 {   
@@ -303,20 +307,23 @@ int main(void)
 {
     int status = 0;
     if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements(statement_count) == -1) { return -1; }   
+    if (prepare_statements() == -1) { return -1; }   
  
     sem_unlink(SEM_LOCK_DATAS);
     sem_unlink(SEM_LOCK_COMMS);
-     
+    sem_unlink(SEM_LOCK_SIG_S); 
+    sem_unlink(SEM_LOCK_SIG_PS);
+
     smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
     smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
+    smlks.sem_lock_sigs = sem_open(SEM_LOCK_SIG_S, O_CREAT, 0777, 0);
+    smlks.sem_lock_sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 0);
 
-    if (smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
+    if (smlks.sem_lock_sigps == SEM_FAILED || smlks.sem_lock_sigs == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
         store_log("failed to initialize locks");
         return -1;
     }
         
-    
     dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
     dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
 
@@ -325,7 +332,6 @@ int main(void)
         return -1; 
     }
 
-   
     unset_all_bits(dblks.comms_block, 2);
     unset_all_bits(dblks.comms_block, 3);
     unset_all_bits(dblks.datas_block, 1);
@@ -335,6 +341,8 @@ int main(void)
 
     sem_close(smlks.sem_lock_datas);
     sem_close(smlks.sem_lock_comms);
+    sem_close(smlks.sem_lock_sigs);
+    sem_close(smlks.sem_lock_sigps);
 
     detach_memory_block(dblks.datas_block);
     detach_memory_block(dblks.comms_block);

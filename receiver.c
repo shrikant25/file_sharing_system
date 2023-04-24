@@ -458,10 +458,14 @@ int main(void)
     run_receiver(); // recieve connections, data and communicate with database
  
     PQfinish(connection); // close connection to db
+   
     close(s_info.epoll_fd); // close epoll instance
     shutdown(s_info.servsoc_fd, 2); // close server socket
+   
     sem_close(smlks.sem_lock_commr); // unlink lock used for communication
     sem_close(smlks.sem_lock_datar); // unlink lock used for data sharing
+    sem_close(smlks.sem_lock_sigr);
+
     detach_memory_block(dblks.datar_block); // detach memory used for data sharing
     detach_memory_block(dblks.commr_block); // detach memory used for communication
     

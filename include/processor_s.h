@@ -23,6 +23,8 @@ typedef struct datablocks {
 typedef struct semlocks {
     sem_t *sem_lock_datas;
     sem_t *sem_lock_comms; 
+    sem_t *sem_lock_sigs;
+    sem_t *sem_lock_sigps;
 }semlocks;
 
 typedef struct db_statements {
@@ -33,7 +35,7 @@ typedef struct db_statements {
 
 
 
-int statement_count = 6;
+#define statement_count 6
 
 db_statements dbs[statement_count] = {
     { 
