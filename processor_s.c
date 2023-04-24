@@ -306,13 +306,18 @@ int prepare_statements()
 
 int main(void) 
 {
-    pid_t pid = fork();
+    int pid = fork();
     if (pid < 0) {
         syslog(LOG_NOTICE, "failed to fork %s", strerror(errno));
         return -1;
     }
     else if(pid == 0) {
-        if (execv("./sender_notif", (char *const *)"sender_notif") == -1) {
+
+        const char *path = "/home/shrikant/Desktop/prj/sender_notif";
+        char *params[] = {"sender_notif"};
+        int result;
+        result = execv(path, params);
+        if (result == -1) {
             syslog(LOG_NOTICE, "failed execv sender_notif  %s", strerror(errno));
         }
         exit(0);
