@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <libpq-fe.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
@@ -305,50 +306,64 @@ int prepare_statements()
 
 int main(void) 
 {
-    int status = 0;
-    if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
- 
-    sem_unlink(SEM_LOCK_DATAS);
-    sem_unlink(SEM_LOCK_COMMS);
-    sem_unlink(SEM_LOCK_SIG_S); 
-    sem_unlink(SEM_LOCK_SIG_PS);
-
-    smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
-    smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
-    smlks.sem_lock_sigs = sem_open(SEM_LOCK_SIG_S, O_CREAT, 0777, 0);
-    smlks.sem_lock_sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 0);
-
-    if (smlks.sem_lock_sigps == SEM_FAILED || smlks.sem_lock_sigs == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
-        store_log("failed to initialize locks");
+    pid_t pid = fork();
+    if (pid < 0) {
+        syslog(LOG_NOTICE, "failed to fork %s", strerror(errno));
         return -1;
     }
-        
-    dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
-    dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
-
-    if (!( dblks.datas_block && dblks.comms_block)) {
-        store_log("failed to get shared memory");
-        return -1; 
+    else if(pid == 0) {
+        if (execv("./sender_notif", (char *const *)"sender_notif") == -1) {
+            syslog(LOG_NOTICE, "failed execv sender_notif  %s", strerror(errno));
+        }
+        exit(0);
     }
+    else {
 
-    unset_all_bits(dblks.comms_block, 2);
-    unset_all_bits(dblks.comms_block, 3);
-    unset_all_bits(dblks.datas_block, 1);
+        int status = 0;
+        if (connect_to_database() == -1) { return -1; }
+        if (prepare_statements() == -1) { return -1; }   
     
-    run_process(); 
-    PQfinish(connection);  
+        sem_unlink(SEM_LOCK_DATAS);
+        sem_unlink(SEM_LOCK_COMMS);
+        sem_unlink(SEM_LOCK_SIG_S); 
+        sem_unlink(SEM_LOCK_SIG_PS);
 
-    sem_close(smlks.sem_lock_datas);
-    sem_close(smlks.sem_lock_comms);
-    sem_close(smlks.sem_lock_sigs);
-    sem_close(smlks.sem_lock_sigps);
+        smlks.sem_lock_datas = sem_open(SEM_LOCK_DATAS, O_CREAT, 0777, 1);
+        smlks.sem_lock_comms = sem_open(SEM_LOCK_COMMS, O_CREAT, 0777, 1);
+        smlks.sem_lock_sigs = sem_open(SEM_LOCK_SIG_S, O_CREAT, 0777, 0);
+        smlks.sem_lock_sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 0);
 
-    detach_memory_block(dblks.datas_block);
-    detach_memory_block(dblks.comms_block);
+        if (smlks.sem_lock_sigps == SEM_FAILED || smlks.sem_lock_sigs == SEM_FAILED || smlks.sem_lock_datas == SEM_FAILED || smlks.sem_lock_comms == SEM_FAILED) {
+            store_log("failed to initialize locks");
+            return -1;
+        }
+            
+        dblks.datas_block = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAS);
+        dblks.comms_block = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMS);
 
-    destroy_memory_block(dblks.datas_block, PROJECT_ID_DATAS);
-    destroy_memory_block(dblks.comms_block, PROJECT_ID_COMMS);
+        if (!( dblks.datas_block && dblks.comms_block)) {
+            store_log("failed to get shared memory");
+            return -1; 
+        }
 
-    return 0;
+        unset_all_bits(dblks.comms_block, 2);
+        unset_all_bits(dblks.comms_block, 3);
+        unset_all_bits(dblks.datas_block, 1);
+        
+        run_process(); 
+        PQfinish(connection);  
+
+        sem_close(smlks.sem_lock_datas);
+        sem_close(smlks.sem_lock_comms);
+        sem_close(smlks.sem_lock_sigs);
+        sem_close(smlks.sem_lock_sigps);
+
+        detach_memory_block(dblks.datas_block);
+        detach_memory_block(dblks.comms_block);
+
+        destroy_memory_block(dblks.datas_block, PROJECT_ID_DATAS);
+        destroy_memory_block(dblks.comms_block, PROJECT_ID_COMMS);
+
+        return 0;
+    }
 }   
