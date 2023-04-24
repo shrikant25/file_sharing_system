@@ -14,9 +14,6 @@
 #define PROJECT_ID_COMMR 12
 #define PROJECT_ID_DATAS 13
 #define PROJECT_ID_COMMS 14
-#define PROJECT_ID_SIG_R 15
-#define PROJECT_ID_SIG_S 16
-#define PROJECT_ID_SIG_PS 17
  
 #define FILENAME_R "processor_r"
 #define FILENAME_S "processor_s"

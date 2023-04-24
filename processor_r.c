@@ -274,10 +274,9 @@ int main(void)
     if (connect_to_database() == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
     
-
     sem_unlink(SEM_LOCK_DATAR);
     sem_unlink(SEM_LOCK_COMMR);
-    sem_unklink(SEM_LOCK_SIG_S);
+    sem_unlink(SEM_LOCK_SIG_S);
 
     smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
     smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
