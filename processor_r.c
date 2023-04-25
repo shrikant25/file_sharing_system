@@ -16,11 +16,12 @@
 #include "partition.h"
 #include "processor_r.h"
 
-int process_status = 1;
-
 PGconn *connection;
-datablocks dblks;
-semlocks smlks;
+semlocks sem_lock_datar;
+semlocks sem_lock_commr;
+semlocks sem_lock_sigr;
+datablocks datar_block;
+datablocks commr_block;
 
 int retrive_commr_from_database(char *data) 
 {
@@ -138,12 +139,12 @@ int get_data_from_receiver()
     char *blkptr = NULL;
     newmsg_data nmsg;
 
-    sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block, 1, 3);
+    sem_wait(sem_lock_datar.var);         
+    subblock_position = get_subblock(datar_block.var, 1, 3);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+        blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(&nmsg, 0, sizeof(nmsg));
         memcpy(&nmsg, blkptr, sizeof(nmsg));
@@ -151,11 +152,11 @@ int get_data_from_receiver()
         store_data_in_database(&nmsg);
 
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 3);
+        toggle_bit(subblock_position, datar_block.var, 3);
     
     }
 
-    sem_post(smlks.sem_lock_datar);
+    sem_post(sem_lock_datar.var);
     return subblock_position;
 }
 
@@ -166,23 +167,23 @@ int get_message_from_receiver() {
     char *blkptr = NULL;
     receivers_message rcvm;
 
-    sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.commr_block, 1, 2);
+    sem_wait(sem_lock_commr.var);         
+    subblock_position = get_subblock(commr_block.var, 1, 2);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
+        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         
         memset(&rcvm, 0, sizeof(rcvm));
         memcpy(&rcvm, blkptr, sizeof(rcvm));
         store_commr_into_database(&rcvm);
           
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.commr_block, 2);
+        toggle_bit(subblock_position, commr_block.var, 2);
     
     }
 
-    sem_post(smlks.sem_lock_commr);
+    sem_post(sem_lock_commr.var);
     return subblock_position;
 }
 
@@ -194,25 +195,25 @@ int send_message_to_receiver() {
     char data[CPARTITION_SIZE];
     receivers_message rcvm;
 
-    sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.commr_block, 0, 1);
+    sem_wait(sem_lock_commr.var);         
+    subblock_position = get_subblock(commr_block.var, 0, 1);
     
     if(subblock_position >= 0) {
 
-        blkptr = dblks.commr_block  + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+        blkptr = commr_block.var  + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         
         memset(data, 0, CPARTITION_SIZE);
         if (retrive_commr_from_database(data) != -1) {
 
             memcpy(blkptr, data, CPARTITION_SIZE);
             memset(data, 0, CPARTITION_SIZE);  
-            toggle_bit(subblock_position, dblks.commr_block, 1);
+            toggle_bit(subblock_position, commr_block.var, 1);
 
         }
         blkptr = NULL;
     }
     
-    sem_post(smlks.sem_lock_commr);    
+    sem_post(sem_lock_commr.var);    
     return subblock_position;
 }
 */
@@ -222,9 +223,9 @@ int run_process()
     int status = 0;
     char data[CPARTITION_SIZE];
 
-    while (process_status) {
+    while (1) {
 
-        sem_wait(smlks.sem_lock_sigr); 
+        sem_wait(sem_lock_sigr.var); 
         get_message_from_receiver();
         get_data_from_receiver();           
   /*      if (retrive_commr_from_database(data) != -1) {
@@ -269,48 +270,78 @@ int prepare_statements()
 
 int main(void) 
 {
-    int status = 0;
+    int status = -1;
+    int conffd = -1;
+    int temp_int;
+    char temp_char[20];
+    char buf[500];
 
     if (connect_to_database() == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
     
-    sem_unlink(SEM_LOCK_DATAR);
-    sem_unlink(SEM_LOCK_COMMR);
-    sem_unlink(SEM_LOCK_SIG_S);
+    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
+        store_log("failed to open configuration file");
+        return -1;
+    }
 
-    smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
-    smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
-    smlks.sem_lock_sigr = sem_open(SEM_LOCK_SIG_R, O_CREAT, 0777, 0);
+    if (read(conffd, buf, sizeof(buf)) > 0) {
+       
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\n\
+                    SEM_LOCK_SIG_R=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\n\
+                    PROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d",\
+                    sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char,\
+                    datar_block.key, commr_block.key, temp_int, temp_int);
+    }
+    else {
+        store_log("failed to read configuration file");
+        return -1;
+    }
     
-    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) {
+    //destroy unnecessary data;
+    memset(buf, 0, sizeof(buf));
+    memset(temp_char, 0, sizeof(temp_char));
+    temp_int = -1;
+
+    close(conffd);
+
+
+    sem_unlink(sem_lock_datar.key);
+    sem_unlink(sem_lock_commr.key);
+    sem_unlink(sem_lock_sigr.key);
+
+    sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);
+    sem_lock_commr.var = sem_open(sem_lock_commr.key, O_CREAT, 0777, 1);
+    sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
+    
+    if (sem_lock_sigr.var == SEM_FAILED || sem_lock_datar.var == SEM_FAILED || sem_lock_commr.var == SEM_FAILED) {
         store_log("failed to intialize locks");
         status = -1;
     }
 
-    dblks.datar_block = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, (unsigned char)PROJECT_ID_DATAR);
-    dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, (unsigned char)PROJECT_ID_COMMR);
-    if (!(dblks.datar_block && dblks.commr_block)) {
+    datar_block.var = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, datar_block.key);
+    commr_block.var = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, commr_block.key);
+    if (!(datar_block.var && commr_block.var)) {
         store_log("failed to get shared memory");
         return -1; 
     }
 
-    unset_all_bits(dblks.commr_block, 2);
-    unset_all_bits(dblks.commr_block, 3);
-    unset_all_bits(dblks.datar_block, 1);
+    unset_all_bits(commr_block.var, 2);
+    unset_all_bits(commr_block.var, 3);
+    unset_all_bits(datar_block.var, 1);
     
     run_process(); 
     
     PQfinish(connection);    
 
-    sem_close(smlks.sem_lock_datar);
-    sem_close(smlks.sem_lock_commr);
-    sem_close(smlks.sem_lock_sigr);
+    sem_close(sem_lock_datar.var);
+    sem_close(sem_lock_commr.var);
+    sem_close(sem_lock_sigr.var);
     
-    detach_memory_block(dblks.datar_block);
-    detach_memory_block(dblks.commr_block);
+    detach_memory_block(datar_block.var);
+    detach_memory_block(commr_block.var);
     
-    destroy_memory_block(dblks.datar_block, PROJECT_ID_DATAR);
-    destroy_memory_block(dblks.commr_block, PROJECT_ID_COMMR);
+    destroy_memory_block(datar_block.var, datar_block.key);
+    destroy_memory_block(commr_block.var, commr_block.key);
     
     return 0;
 }   
