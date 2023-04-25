@@ -1,5 +1,9 @@
 
-DROP TABLE logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
+DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
+DROP FUNCTION IF EXISTS send_noti(), create_message();
+DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
+DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
+UNLISTEN send_noti;
 
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -48,9 +52,9 @@ CREATE TABLE sysinfo (system_name CHAR(10),
                       CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
                       CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
                         REFERENCES  systems(system_name) 
+
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
-
 
 CREATE OR REPLACE FUNCTION create_message(
     message_type text,
@@ -97,8 +101,26 @@ ALTER TABLE job_scheduler
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
 
-CREATE TRIGGER msg_for_receiver
-AFTER INSERT on receiving_comms
-FOR EACH ROW
-WHEN (NEW.type = 3)
-EXECUTE PROCEDURE pg_notify('receivers_channel', 'get_data');
+CREATE OR REPLACE FUNCTION send_noti()
+RETURNS TRIGGER AS 
+$$
+BEGIN
+    PERFORM pg_notify('senders_channel', 'get_data');
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE TRIGGER msg_for_sender1
+AFTER UPDATE ON job_scheduler
+FOR EACH ROW 
+WHEN (NEW.jstate = 'S-3')
+EXECUTE FUNCTION send_noti();
+
+
+CREATE TRIGGER msg_for_sender2
+AFTER INSERT on senders_comms
+FOR EACH ROW 
+WHEN (NEW.mtype = 1)
+EXECUTE FUNCTION send_noti();
