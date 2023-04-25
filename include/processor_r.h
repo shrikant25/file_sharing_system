@@ -1,7 +1,6 @@
 #ifndef PROCESSOR_R_H
 #define PROCESSOR_R_H
 
-#include <semaphore.h>
 #include "partition.h"
 
 void store_log(char *);
@@ -12,18 +11,6 @@ int store_commr_into_database(receivers_message *);
 int get_data_from_receiver();
 int send_message_to_receiver();
 int get_message_from_receiver();
-
-
-typedef struct datablocks {
-    char *datar_block;
-    char *commr_block;
-}datablocks;
-
-typedef struct semlocks {
-    sem_t *sem_lock_datar;
-    sem_t *sem_lock_commr;
-    sem_t *sem_lock_sigr;
-}semlocks;
 
 typedef struct db_statements {
     char statement_name[20];

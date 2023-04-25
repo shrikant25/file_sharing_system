@@ -18,12 +18,15 @@
 #include "partition.h"
 
 
-server_info s_info;
-datablocks dblks;
-semlocks smlks;
-PGconn *connection;
-int receiver_status = 1;
 char error[100];
+server_info s_info;
+PGconn *connection;
+semlocks sem_lock_datar;
+semlocks sem_lock_commr;
+semlocks sem_lock_sigr;
+datablocks datar_block;
+datablocks commr_block;
+
 
 int make_nonblocking(int active_fd) 
 {
@@ -187,7 +190,7 @@ int run_receiver()
     newmsg_data nmsg;
     receivers_message rcvm;
 
-    while (receiver_status) {
+    while (1) {
         
       //  read_message_from_processor(data); // todo
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
@@ -267,25 +270,25 @@ int send_to_processor(newmsg_data *nmsg)
     int subblock_position = -1;
     char *blkptr = NULL;
     
-    sem_wait(smlks.sem_lock_datar);         
-    subblock_position = get_subblock(dblks.datar_block, 0, 3);
+    sem_wait(sem_lock_datar.var);         
+    subblock_position = get_subblock(datar_block.var, 0, 3);
 
     if (subblock_position >= 0) {
         
-        blkptr = dblks.datar_block + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+        blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         
         memset(blkptr, 0, DPARTITION_SIZE);
         memcpy(blkptr, nmsg, sizeof(newmsg_data));
         
         blkptr = NULL;
-        toggle_bit(subblock_position, dblks.datar_block, 3);
-        sem_post(smlks.sem_lock_sigr);
+        toggle_bit(subblock_position, datar_block.var, 3);
+        sem_post(sem_lock_sigr.var);
     } 
     else {
         store_log("failed to get empty block");
     }
 
-    sem_post(smlks.sem_lock_datar);
+    sem_post(sem_lock_datar.var);
     return subblock_position;
 }
 
@@ -295,22 +298,22 @@ int read_message_from_processor(char *data)
     int subblock_position = -1;
     char *blkptr = NULL;
     
-    sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock2(dblks.commr_block, 1, 1);
+    sem_wait(sem_lock_commr.var);         
+    subblock_position = get_subblock2(commr_block.var, 1, 1);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(data, 0, CPARTITION_SIZE);
         
         memcpy(data, blkptr, CPARTITION_SIZE);
         memset(blkptr, 0, CPARTITION_SIZE);
         
         blkptr = NULL; 
-        toggle_bit(subblock_position, dblks.commr_block, 1);
+        toggle_bit(subblock_position, commr_block.var, 1);
     }
     
-    sem_post(smlks.sem_lock_commr);
+    sem_post(sem_lock_commr.var);
     return subblock_position;
 }
 */
@@ -321,24 +324,24 @@ int send_message_to_processor(receivers_message *rcvm)
     char *blkptr = NULL;
     char msg_type;
     
-    sem_wait(smlks.sem_lock_commr);         
-    subblock_position = get_subblock(dblks.commr_block, 0, 2);
+    sem_wait(sem_lock_commr.var);         
+    subblock_position = get_subblock(commr_block.var, 0, 2);
     
     if (subblock_position >= 0) {
 
-        blkptr = dblks.commr_block + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         
         memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, rcvm, sizeof(receivers_message));
 
-        toggle_bit(subblock_position, dblks.commr_block, 2);
-        sem_post(smlks.sem_lock_sigr);
+        toggle_bit(subblock_position, commr_block.var, 2);
+        sem_post(sem_lock_sigr.var);
     }
     else {
         store_log("failed to get empty block");
     }
     
-    sem_post(smlks.sem_lock_commr);
+    sem_post(sem_lock_commr.var);
     return subblock_position;
 }
 
@@ -399,40 +402,65 @@ int prepare_statements()
 
 int main(void) 
 {   
+    int status = -1;
+    int conffd = -1;
+    int temp_int;
+    char temp_char[20];
+    char buf[500];
 
-    int status = 0;
     if (connect_to_database() == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
+    
+    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
+        store_log("failed to open configuration file");
+        return -1;
+    }
+
+    if (read(conffd, buf, sizeof(buf)) > 0) {
+       
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\n\
+                    SEM_LOCK_SIG_R=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\n\
+                    PROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d",\
+                    sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char,\
+                    datar_block.key, commr_block.key, temp_int, temp_int);
+    }
+    else {
+        store_log("failed to read configuration file");
+        return -1;
+    }
+    
+    //destroy unnecessary data;
+    memset(buf, 0, sizeof(buf));
+    memset(temp_char, 0, sizeof(temp_char));
+    temp_int = -1;
+
+    close(conffd);
+
 
     // get lock variable for lock on data sharing memory
-    smlks.sem_lock_datar = sem_open(SEM_LOCK_DATAR, O_CREAT, 0777, 1);
+    sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);
 
     // get lock variable for lock on message sharing memory
-    smlks.sem_lock_commr = sem_open(SEM_LOCK_COMMR, O_CREAT, 0777, 1);
-
-    // get lock variable for signaling
-    smlks.sem_lock_sigr = sem_open(SEM_LOCK_SIG_R, O_CREAT, 0777, 0);
-
-    if (smlks.sem_lock_sigr == SEM_FAILED || smlks.sem_lock_datar == SEM_FAILED || smlks.sem_lock_commr == SEM_FAILED) { 
-        store_log("failed to initialize locks");
-        return -1;
-    }
+    sem_lock_commr.var = sem_open(sem_lock_commr.key, O_CREAT, 0777, 1);
     
-
-    // filename and projectid are present in shared_memory.h
-    // block sizes are present in partition.h
+    // get lock variable for signaling
+    sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
+    
+    if (sem_lock_sigr.var == SEM_FAILED || sem_lock_datar.var == SEM_FAILED || sem_lock_commr.var == SEM_FAILED) {
+        store_log("failed to intialize locks");
+        status = -1;
+    }
 
     // attach memroy block for data sharing
-    dblks.datar_block = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, PROJECT_ID_DATAR);
+    datar_block.var = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, datar_block.key);
     
     // attach memroy block for message sharing
-    dblks.commr_block = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, PROJECT_ID_COMMR);
-
-    if (!(dblks.datar_block && dblks.commr_block)) {
-        store_log("failed to get/attach shared memory");
-        return -1;
-    }
+    commr_block.var = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, commr_block.key);
     
+    if (!(datar_block.var && commr_block.var)) {
+        store_log("failed to get shared memory");
+        return -1; 
+    }    
     
     s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
     s_info.port = 7000; // server port
@@ -462,12 +490,12 @@ int main(void)
     close(s_info.epoll_fd); // close epoll instance
     shutdown(s_info.servsoc_fd, 2); // close server socket
    
-    sem_close(smlks.sem_lock_commr); // unlink lock used for communication
-    sem_close(smlks.sem_lock_datar); // unlink lock used for data sharing
-    sem_close(smlks.sem_lock_sigr);
+    sem_close(sem_lock_commr.var); // unlink lock used for communication
+    sem_close(sem_lock_datar.var); // unlink lock used for data sharing
+    sem_close(sem_lock_sigr.var);
 
-    detach_memory_block(dblks.datar_block); // detach memory used for data sharing
-    detach_memory_block(dblks.commr_block); // detach memory used for communication
+    detach_memory_block(datar_block.var); // detach memory used for data sharing
+    detach_memory_block(commr_block.var); // detach memory used for communication
     
     return 0;
 }

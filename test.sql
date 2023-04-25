@@ -120,7 +120,7 @@ EXECUTE FUNCTION send_noti();
 
 
 CREATE TRIGGER msg_for_sender2
-AFTER UPDATE on senders_comms
+AFTER INSERT on senders_comms
 FOR EACH ROW 
 WHEN (NEW.mtype = 1)
 EXECUTE FUNCTION send_noti();

@@ -1,19 +1,7 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
-#include <semaphore.h>
+
 #include "partition.h"
-
-typedef struct datablocks {     
-    char *datar_block;
-    char *commr_block;
-}datablocks;
-
-
-typedef struct semlocks {
-    sem_t *sem_lock_datar;
-    sem_t *sem_lock_commr; 
-    sem_t *sem_lock_sigr;
-}semlocks;
 
 typedef struct server_info{
     unsigned short int port;

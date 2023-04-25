@@ -1,7 +1,6 @@
 #ifndef PROCESSOR_S_H
 #define PROCESSOR_S_H
 
-#include <semaphore.h>
 #include "partition.h"
 
 int run_process();
@@ -14,25 +13,11 @@ int retrive_data_from_database(char *);
 int prepare_statements();
 int connect_to_database();
 
-
-typedef struct datablocks {
-    char *datas_block;
-    char *comms_block;
-}datablocks;
-
-typedef struct semlocks {
-    sem_t *sem_lock_datas;
-    sem_t *sem_lock_comms; 
-    sem_t *sem_lock_sigs;
-    sem_t *sem_lock_sigps;
-}semlocks;
-
 typedef struct db_statements {
     char statement_name[20];
     char *statement;
     int param_count;
 }db_statements;
-
 
 
 #define statement_count 6

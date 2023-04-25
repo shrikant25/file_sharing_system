@@ -1,4 +1,5 @@
-#include <stdio.h>
+#include <stdio.h> 
+#include <unistd.h>
 #include <semaphore.h>
 #include <string.h>
 #include <syslog.h>
@@ -8,10 +9,11 @@
 #include "shared_memory.h"
 
 PGconn *connection;
+semlocks sem_lock_sigps;
+char error[100];
 
 void store_log(char *logtext) 
 {
-
     PGresult *res = NULL;
     char log[100];
     memset(log, 0, sizeof(log));
@@ -30,13 +32,50 @@ void store_log(char *logtext)
     PQclear(res);
 }
 
+int init_semaphore() {
+    
+    int conffd = -1;
+    int temp_int;
+    char temp_char[20];
+    char buf[500];
+
+    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
+        store_log("failed to open configuration file");
+        return -1;
+    }
+
+    if (read(conffd, buf, sizeof(buf)) > 0) {
+    
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\n\
+                    SEM_LOCK_SIG_R=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\n",\
+                    temp_char, temp_char, temp_char, temp_char, temp_char, temp_char, sem_lock_sigps.key);
+    }
+    else {
+        store_log("failed to read configuration file");
+        return -1;
+    }
+    
+    //destroy unnecessary data;
+    memset(buf, 0, sizeof(buf));
+    memset(temp_char, 0, sizeof(temp_char));
+    temp_int = -1;
+    
+    if ((sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
+        memset(error, 0, sizeof(error));
+        sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
+        store_log(error);
+        return -1;
+    }
+    return 0;
+}
+
+
+
 
 int main(void) {
 
     PGresult *res;
     PGnotify *notify;
-    sem_t *sigps;
-    char error[100];
 
     connection = PQconnectdb("user = shrikant dbname = shrikant ");
     if (PQstatus(connection) != CONNECTION_OK) {
@@ -63,13 +102,8 @@ int main(void) {
         return -1;
     }
     PQclear(res);
-    
-    if ((sigps = sem_open(SEM_LOCK_SIG_PS, O_CREAT, 0777, 0)) == SEM_FAILED) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
-        store_log(error);
-        return -1;
-    }
+
+    if(init_semaphore() == -1) {return -1;}
 
     while (1) {
 
@@ -80,14 +114,14 @@ int main(void) {
         }
         else{
             while ((notify = PQnotifies(connection)) != NULL) {
-                sem_post(sigps);
+                sem_post(sem_lock_sigps.var);
                 PQfreemem(notify);
             }
         }
     
     }
     
-    sem_close(sigps);
+    sem_close(sem_lock_sigps.var);
     PQfinish(connection);
 
     return 0;
