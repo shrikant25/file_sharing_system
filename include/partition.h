@@ -44,7 +44,7 @@ typedef struct close_connection {
 typedef struct connection_status {
     unsigned char type;
     unsigned int fd;
-    unsigned int ipaddress; // identity can be ipaddress or fd, depends where the message is being used
+    unsigned int ipaddress; 
 }connection_status;
 
 typedef struct send_message {

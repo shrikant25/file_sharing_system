@@ -105,6 +105,7 @@ CREATE OR REPLACE FUNCTION send_noti()
 RETURNS TRIGGER AS 
 $$
 BEGIN
+    RAISE NOTICE, "hola";
     PERFORM pg_notify('senders_channel', 'get_data');
     RETURN NEW;
 END;

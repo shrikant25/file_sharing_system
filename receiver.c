@@ -418,11 +418,7 @@ int main(void)
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\n\
-                    SEM_LOCK_SIG_R=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\n\
-                    PROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d",\
-                    sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char,\
-                    datar_block.key, commr_block.key, temp_int, temp_int);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d",sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char, &datar_block.key, &commr_block.key, &temp_int, &temp_int);
     }
     else {
         store_log("failed to read configuration file");

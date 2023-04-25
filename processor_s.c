@@ -263,10 +263,9 @@ int run_process()
     while (1) {
 
         sem_wait(sem_lock_sigps.var);
-        give_data_to_sender();
         send_msg_to_sender();
         read_msg_from_sender();
-        
+        give_data_to_sender();
     }  
 }
 
@@ -307,99 +306,77 @@ int prepare_statements()
 
 int main(void) 
 {
-    int pid = fork();
-    if (pid < 0) {
-        syslog(LOG_NOTICE, "failed to fork %s", strerror(errno));
+    int status = -1;
+    int conffd = -1;
+    int temp_int;
+    char temp_char[20];
+    char buf[500];
+
+    if (connect_to_database() == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
+    
+    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
+        store_log("failed to open configuration file");
         return -1;
     }
-    else if(pid == 0) {
 
-        const char *path = "/home/shrikant/Desktop/prj/sender_notif";
-        char *params[] = {"sender_notif"};
-        int result;
-        result = execv(path, params);
-        if (result == -1) {
-            syslog(LOG_NOTICE, "failed execv sender_notif  %s", strerror(errno));
-        }
-        exit(0);
+    if (read(conffd, buf, sizeof(buf)) > 0) {
+    
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d", temp_char, temp_char, temp_char, sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &temp_int, &temp_int, &datas_block.key, &comms_block.key);
     }
     else {
-
-        int status = -1;
-        int conffd = -1;
-        int temp_int;
-        char temp_char[20];
-        char buf[500];
-
-        if (connect_to_database() == -1) { return -1; }
-        if (prepare_statements() == -1) { return -1; }   
-        
-        if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
-            store_log("failed to open configuration file");
-            return -1;
-        }
-
-        if (read(conffd, buf, sizeof(buf)) > 0) {
-        
-            sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\n\
-                        SEM_LOCK_SIG_R=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\n\
-                        PROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d",\
-                        temp_char, temp_char, temp_char, sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key,\
-                        temp_int, temp_int, datas_block.key, comms_block.key);
-        }
-        else {
-            store_log("failed to read configuration file");
-            return -1;
-        }
-        
-        //destroy unnecessary data;
-        memset(buf, 0, sizeof(buf));
-        memset(temp_char, 0, sizeof(temp_char));
-        temp_int = -1;
-
-        close(conffd);
-
-        sem_unlink(sem_lock_datas.key);
-        sem_unlink(sem_lock_comms.key);
-        sem_unlink(sem_lock_sigs.key); 
-        sem_unlink(sem_lock_sigps.key);
-
-        sem_lock_datas.var = sem_open(sem_lock_datas.key, O_CREAT, 0777, 1);
-        sem_lock_comms.var = sem_open(sem_lock_comms.key, O_CREAT, 0777, 1);
-        sem_lock_sigs.var = sem_open(sem_lock_sigs.key, O_CREAT, 0777, 0);
-        sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0);
-
-        if (sem_lock_sigps.var == SEM_FAILED || sem_lock_sigs.var == SEM_FAILED || sem_lock_datas.var == SEM_FAILED || sem_lock_comms.var == SEM_FAILED) {
-            store_log("failed to initialize locks");
-            return -1;
-        }
-            
-        datas_block.var = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)datas_block.key);
-        comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)datas_block.key);
-
-        if (!( datas_block.var && comms_block.var)) {
-            store_log("failed to get shared memory");
-            return -1; 
-        }
-
-        unset_all_bits(comms_block.var, 2);
-        unset_all_bits(comms_block.var, 3);
-        unset_all_bits(datas_block.var, 1);
-        
-        run_process(); 
-        PQfinish(connection);  
-
-        sem_close(sem_lock_datas.var);
-        sem_close(sem_lock_comms.var);
-        sem_close(sem_lock_sigs.var);
-        sem_close(sem_lock_sigps.var);
-
-        detach_memory_block(datas_block.var);
-        detach_memory_block(comms_block.var);
-
-        destroy_memory_block(datas_block.var, datas_block.key);
-        destroy_memory_block(comms_block.var, comms_block.key);
-
-        return 0;
+        store_log("failed to read configuration file");
+        return -1;
     }
+    
+    //destroy unnecessary data;
+    memset(buf, 0, sizeof(buf));
+    memset(temp_char, 0, sizeof(temp_char));
+    temp_int = -1;
+
+    close(conffd);
+
+    sem_unlink(sem_lock_datas.key);
+    sem_unlink(sem_lock_comms.key);
+    sem_unlink(sem_lock_sigs.key); 
+    sem_unlink(sem_lock_sigps.key);
+
+    sem_lock_datas.var = sem_open(sem_lock_datas.key, O_CREAT, 0777, 1);
+    sem_lock_comms.var = sem_open(sem_lock_comms.key, O_CREAT, 0777, 1);
+    sem_lock_sigs.var = sem_open(sem_lock_sigs.key, O_CREAT, 0777, 0);
+    sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0);
+
+    if (sem_lock_sigps.var == SEM_FAILED || sem_lock_sigs.var == SEM_FAILED || sem_lock_datas.var == SEM_FAILED || sem_lock_comms.var == SEM_FAILED) {
+        store_log("failed to initialize locks");
+        return -1;
+    }
+        
+    datas_block.var = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)datas_block.key);
+    comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)comms_block.key);
+
+    if (!( datas_block.var && comms_block.var)) {
+        store_log("failed to get shared memory");
+        return -1; 
+    }
+
+    unset_all_bits(comms_block.var, 2);
+    unset_all_bits(comms_block.var, 3);
+    unset_all_bits(datas_block.var, 1);
+    
+    run_process(); 
+    PQfinish(connection);  
+
+    sem_close(sem_lock_datas.var);
+    sem_close(sem_lock_comms.var);
+    sem_close(sem_lock_sigs.var);
+    sem_close(sem_lock_sigps.var);
+
+    detach_memory_block(datas_block.var);
+    detach_memory_block(comms_block.var);
+
+    destroy_memory_block(datas_block.var, datas_block.key);
+    destroy_memory_block(comms_block.var, comms_block.key);
+
+    return 0;
+
 }   
