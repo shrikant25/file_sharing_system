@@ -1,20 +1,19 @@
 #ifndef SHARED_MEMORY_H
 #define SHARED_MEMORY_H
 
+#include <semaphore.h>
 
-#define SEM_LOCK_DATAR "sem_lock_datar"
-#define SEM_LOCK_COMMR "sem_lock_commr"
-#define SEM_LOCK_DATAS "sem_lock_datas"
-#define SEM_LOCK_COMMS "sem_lock_comms"
-#define SEM_LOCK_SIG_R "sem_lock_sigr"
-#define SEM_LOCK_SIG_S "sem_lock_sigs"
-#define SEM_LOCK_SIG_PS "sem_lock_sigps"
+typedef struct datablocks {
+    unsigned int key;
+    char *var;
+}datablocks;
 
-#define PROJECT_ID_DATAR 11
-#define PROJECT_ID_COMMR 12
-#define PROJECT_ID_DATAS 13
-#define PROJECT_ID_COMMS 14
- 
+
+typedef struct semlocks {
+  char key[20];
+  sem_t *var;
+}semlocks;
+
 #define FILENAME_R "processor_r"
 #define FILENAME_S "processor_s"
 
