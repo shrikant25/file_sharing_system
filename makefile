@@ -20,6 +20,9 @@ sender_files := sender.c shared_memory.c partition.c
 receiver_target = receiver
 receiver_files := receiver.c shared_memory.c partition.c 
 
+launcher_target = launcher
+launcher_files := launcher.c
+
 processor_r: $(processor_r_files)
 		$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)
 
@@ -32,3 +35,11 @@ sender: $(sender_files)
 
 receiver: $(receiver_files)
 		$(CC) $(receiver_files) -o $(receiver_target) $(CFLAGS)
+
+launcher:
+	$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)
+	$(CC) $(processor_s_files) -o $(processor_s_target) $(CFLAGS) 
+	$(CC) $(sender_notif_files) -o $(sender_notif_target) $(CFLAGS)
+	$(CC) $(sender_files) -o $(sender_target) $(CFLAGS)
+	$(CC) $(receiver_files) -o $(receiver_target) $(CFLAGS)
+	$(CC) $(launcher_files) -o $(launcher_target) $(CFLAGS)

@@ -305,11 +305,6 @@ int main(void)
 
     close(conffd);
 
-
-    sem_unlink(sem_lock_datar.key);
-    sem_unlink(sem_lock_commr.key);
-    sem_unlink(sem_lock_sigr.key);
-
     sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);
     sem_lock_commr.var = sem_open(sem_lock_commr.key, O_CREAT, 0777, 1);
     sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
