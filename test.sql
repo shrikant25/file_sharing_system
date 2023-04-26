@@ -105,7 +105,6 @@ CREATE OR REPLACE FUNCTION send_noti()
 RETURNS TRIGGER AS 
 $$
 BEGIN
-    RAISE NOTICE, "hola";
     PERFORM pg_notify('senders_channel', 'get_data');
     RETURN NEW;
 END;
@@ -196,11 +195,45 @@ SET jstate = (
 
 -- replace the system name with its ip address 
 
+
+-- UPDATE job_scheduler
+-- SET jdestination = (SELECT ipaddress::text 
+--                     FROM sysinfo sy 
+--                     JOIN (
+--                         SELECT system_name, MAX(system_capacity) AS max_capacity 
+--                         FROM sysinfo 
+--                         GROUP BY system_name
+--                     ) sy2 ON sy.system_name = sy2.system_name AND sy.system_capacity = sy2.max_capacity
+--                     WHERE sy.system_name = job_scheduler.jdestination
+--                     LIMIT 1)  
+--                     WHERE jstate IN ('S-3', 'S-2');
+
+
+-- UPDATE job_scheduler
+-- SET jdestination = (SELECT ipaddress::text 
+--                     FROM (
+--                         SELECT ipaddress, system_capacity 
+--                         FROM sysinfo 
+--                         WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
+--                         ORDER BY system_capacity ASC
+--                     ) ip 
+--                     GROUP BY system_capacity, ipaddress 
+--                     ORDER BY system_capacity DESC 
+--                     LIMIT 1)  
+--                     WHERE jstate IN ('S-3', 'S-2');
+
+
+
+
+
+
+
+
 UPDATE job_scheduler 
 SET jdestination = (
-    SELECT
+        SELECT
         CASE
-            WHEN LENGTH(jobdata) > MAX(system_capacity)
+            WHEN LENGTH(jobdata) > MAX(system_capacity) AND system_name = jdestination
             THEN (
                 SELECT ipaddress::text 
                 FROM sysinfo sy 
@@ -212,21 +245,17 @@ SET jdestination = (
                 WHERE sy.system_name = job_scheduler.jdestination
                 LIMIT 1
             )
-            ELSE (
+            WHEN  LENGTH(jobdata) <= MAX(system_capacity)  AND system_name = jdestination
+            THEN(
                 SELECT ipaddress::text 
-                FROM (
-                    SELECT ipaddress, system_capacity 
-                    FROM sysinfo 
-                    WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
-                    ORDER BY system_capacity ASC
-                ) ip 
-                GROUP BY system_capacity, ipaddress 
-                ORDER BY system_capacity DESC 
-                LIMIT 1
+                FROM sysinfo 
+                WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
+                ORDER BY system_capacity ASC LIMIT 1
             )
+            ELSE job_scheduler.jdestination
         END
-    FROM sysinfo 
-    WHERE sysinfo.system_name = job_scheduler.jdestination
+        FROM sysinfo
+        GROUP BY system_name
 ) 
 WHERE jstate IN ('S-3', 'S-2');
 
