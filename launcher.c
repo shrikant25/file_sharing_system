@@ -12,35 +12,41 @@
 struct launch_processes
 {
     const char *path;
-    char *args[1];
+    char *args[3];
 };
 
-struct launch_processes lps[TOTAL_PROCESSES] = {
-    {
-        .path = "./processor_r",
-        .args = {"processor_r"},
-    },
-    {
-        .path = "./receiver",
-        .args = {"processor_r"},
-    },
-    {
-        .path = "./processor_s",
-        .args = {"processor_s"},
-    },
-    {
-        .path = "./sender",
-        .args = {"sender"},
-    },
-    {
-        .path = "./sender_notif",
-        .args = {"sender_notif"},
-    },
-};
+int main(int argc, char *argv[]) {
+	
+    if (argc !=2) {
+        syslog(LOG_NOTICE, "invalid arguments");
+        return -1;
+    }
+    
+    struct launch_processes lps[TOTAL_PROCESSES];
+    lps[0].path = "./processor_r";
+    lps[0].args[0] = "processor_r";
+    lps[0].args[1] = argv[1];
+    lps[0].args[2] = NULL;
 
+    lps[1].path = "./processor_s";
+    lps[1].args[0] = "processor_s";
+    lps[1].args[1] = argv[1];
+    lps[1].args[2] = NULL;
 
+    lps[2].path = "./receiver";
+    lps[2].args[0] = "receiver";
+    lps[2].args[1] = argv[1];
+    lps[2].args[2] = NULL;
 
-int main(void) {
+    lps[3].path = "./sender";
+    lps[3].args[0] = "sender";
+    lps[3].args[1] = argv[1];
+    lps[3].args[2] = NULL;
+
+    lps[4].path = "./sender_notif";
+    lps[4].args[0] = "sender_notif";
+    lps[4].args[1] = argv[1];
+    lps[4].args[2] = NULL;
 
     pid_t pid = -1;
     int i = 0;
@@ -52,8 +58,9 @@ int main(void) {
             syslog(LOG_NOTICE, "failed to fork %s", strerror(errno));
         }
         else if (pid == 0){
+
             if ((execv(lps[i].path, lps[i].args)) == -1) {
-                syslog(LOG_NOTICE, "failed execv %s with errro  %s", lps[i].args[0], strerror(errno));
+                syslog(LOG_NOTICE, "failed execv %s with error  %s", lps[i].args[0], strerror(errno));
             }
             exit(0);
         }

@@ -234,9 +234,9 @@ int run_process()
     }  
 }
 
-int connect_to_database() 
+int connect_to_database(char *conninfo) 
 {   
-    connection = PQconnectdb("user = shrikant dbname = shrikant");
+    connection = PQconnectdb(conninfo);
 
     if (PQstatus(connection) != CONNECTION_OK) {
         syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
@@ -268,19 +268,22 @@ int prepare_statements()
 }
 
 
-int main(void) 
+int main(int argc, char *argv[]) 
 {
     int status = -1;
     int conffd = -1;
     int temp_int;
     char temp_char[20];
     char buf[500];
+    char conninfo[50];
 
-    if (connect_to_database() == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
-    
-    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
-        store_log("failed to open configuration file");
+    if (argc != 2) {
+        syslog(LOG_NOTICE,"invalid arguments");
+        return -1;
+    }
+   
+    if ((conffd = open(argv[1], O_RDONLY)) == -1) {
+        syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
@@ -291,10 +294,10 @@ int main(void)
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char, &datar_block.key, &commr_block.key, &temp_int, &temp_int);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nCONNINFO=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, temp_char, temp_char, temp_char, temp_char, &datar_block.key, &commr_block.key, &temp_int, &temp_int, conninfo);
     }
     else {
-        store_log("failed to read configuration file");
+        syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
     
@@ -305,6 +308,9 @@ int main(void)
 
     close(conffd);
 
+    if (connect_to_database(conninfo) == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }   
+    
     sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);
     sem_lock_commr.var = sem_open(sem_lock_commr.key, O_CREAT, 0777, 1);
     sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);

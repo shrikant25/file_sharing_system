@@ -32,24 +32,27 @@ void store_log(char *logtext)
     PQclear(res);
 }
 
-int init_semaphore() {
+int init(char *confg_filename) {
     
     int conffd = -1;
     int temp_int;
     char temp_char[20];
     char buf[500];
+    char conninfo[30];
+    PGresult *res = NULL;
 
-    if ((conffd = open("./keys.conf", O_RDONLY)) == -1) {
-        store_log("failed to open configuration file");
+    if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
+        syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
-    
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s", temp_char, temp_char, temp_char, temp_char, temp_char, temp_char, sem_lock_sigps.key);
+        
+        sscanf(buf,"SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nCONNINFO=%s", temp_char, temp_char, temp_char, temp_char, temp_char, temp_char, sem_lock_sigps.key, &temp_int, &temp_int, &temp_int, &temp_int, conninfo);
+
     }
     else {
-        store_log("failed to read configuration file");
+        syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
     
@@ -57,25 +60,8 @@ int init_semaphore() {
     memset(buf, 0, sizeof(buf));
     memset(temp_char, 0, sizeof(temp_char));
     temp_int = -1;
-    
-    if ((sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
-        store_log(error);
-        return -1;
-    }
-    return 0;
-}
 
-
-
-
-int main(void) {
-
-    PGresult *res;
-    PGnotify *notify;
-
-    connection = PQconnectdb("user = shrikant dbname = shrikant ");
+    connection = PQconnectdb(conninfo);
     if (PQstatus(connection) != CONNECTION_OK) {
         syslog(LOG_NOTICE, "failed to create connection to database %s", PQerrorMessage(connection));
         return -1;
@@ -90,6 +76,7 @@ int main(void) {
     }
     PQclear(res);
 
+
     res = PQexec(connection, "LISTEN senders_channel");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
@@ -100,8 +87,28 @@ int main(void) {
         return -1;
     }
     PQclear(res);
+    
+    if ((sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
+        memset(error, 0, sizeof(error));
+        sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
+        store_log(error);
+        return -1;
+    }
+    return 0;
+}
 
-    if(init_semaphore() == -1) {return -1;}
+
+int main(int argc, char *argv[]) {
+
+    PGresult *res;
+    PGnotify *notify;
+
+    if (argc != 2) {
+        syslog(LOG_NOTICE, "invlaid arguments");
+    }
+
+
+    if(init(argv[1]) == -1) {return -1;}
 
     while (1) {
 
