@@ -17,37 +17,44 @@ struct launch_processes
 
 int main(int argc, char *argv[]) {
 	
-    if (argc !=2) {
+    if (argc !=4) {
         syslog(LOG_NOTICE, "invalid arguments");
         return -1;
     }
     
-    struct launch_processes lps[TOTAL_PROCESSES];
-    lps[0].path = "./processor_r";
-    lps[0].args[0] = "processor_r";
-    lps[0].args[1] = argv[1];
-    lps[0].args[2] = NULL;
-
-    lps[1].path = "./processor_s";
-    lps[1].args[0] = "processor_s";
-    lps[1].args[1] = argv[1];
-    lps[1].args[2] = NULL;
-
-    lps[2].path = "./receiver";
-    lps[2].args[0] = "receiver";
-    lps[2].args[1] = argv[1];
-    lps[2].args[2] = NULL;
-
-    lps[3].path = "./sender";
-    lps[3].args[0] = "sender";
-    lps[3].args[1] = argv[1];
-    lps[3].args[2] = NULL;
-
-    lps[4].path = "./sender_notif";
-    lps[4].args[0] = "sender_notif";
-    lps[4].args[1] = argv[1];
-    lps[4].args[2] = NULL;
-
+    struct launch_processes lps[TOTAL_PROCESSES] = {
+        {
+            .path = "./processor_r",
+            .args[0] = "processor_r",
+            .args[1] = argv[1],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./processor_s",
+            .args[0] = "processor_s",
+            .args[1] = argv[2],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./receiver",
+            .args[0] = "receiver",
+            .args[1] = argv[1],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./sender",
+            .args[0] = "sender",
+            .args[1] = argv[2],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./sender_notif",
+            .args[0] = "sender_notif",
+            .args[1] = argv[3],
+            .args[2] = NULL,
+        }
+    };
+    
     pid_t pid = -1;
     int i = 0;
 

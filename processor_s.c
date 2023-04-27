@@ -308,10 +308,8 @@ int main(int argc, char *argv[])
 {
     int status = -1;
     int conffd = -1;
-    int temp_int;
-    char temp_char[20];
     char buf[500];
-    char conninfo[30];
+    char conninfo[50];
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -325,7 +323,7 @@ int main(int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
     
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nSEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nCONNINFO=%s", temp_char, temp_char, temp_char, sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &temp_int, &temp_int, &datas_block.key, &comms_block.key, conninfo);
+        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nCONNINFO=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, conninfo);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -334,8 +332,6 @@ int main(int argc, char *argv[])
     
     //destroy unnecessary data;
     memset(buf, 0, sizeof(buf));
-    memset(temp_char, 0, sizeof(temp_char));
-    temp_int = -1;
 
     close(conffd);
 
