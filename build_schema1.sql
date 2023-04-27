@@ -3,7 +3,7 @@ DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysi
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
-UNLISTEN send_noti;
+UNLISTEN channel_sig;
 
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -105,7 +105,7 @@ CREATE OR REPLACE FUNCTION send_noti()
 RETURNS TRIGGER AS 
 $$
 BEGIN
-    PERFORM pg_notify('senders_channel', 'get_data');
+    PERFORM pg_notify('channel_sig', 'get_data');
     RETURN NEW;
 END;
 $$

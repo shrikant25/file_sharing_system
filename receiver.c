@@ -402,25 +402,27 @@ int prepare_statements()
 
 int main(int argc, char *argv[]) 
 {
+
     int status = -1;
     int conffd = -1;
     char buf[500];
-    char conninfo[50];
+    char db_conn_command[100];
+    char username[30];
+    char dbname[30];
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
         return -1;
     }
-    
+   
     if ((conffd = open(argv[1], O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
-    
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nCONNINFO=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, conninfo);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -432,9 +434,10 @@ int main(int argc, char *argv[])
 
     close(conffd);
 
-    if (connect_to_database(conninfo) == -1) { return -1; }
-    if (prepare_statements() == -1) { return -1; }   
-    
+    sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
+
+    if (connect_to_database(db_conn_command) == -1) { return -1; }
+    if (prepare_statements() == -1) { return -1; }     
     
     // get lock variable for lock on data sharing memory
     sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);

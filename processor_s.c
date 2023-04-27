@@ -309,7 +309,9 @@ int main(int argc, char *argv[])
     int status = -1;
     int conffd = -1;
     char buf[500];
-    char conninfo[50];
+    char db_conn_command[100];
+    char username[30];
+    char dbname[30];
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -323,19 +325,21 @@ int main(int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
     
-        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nCONNINFO=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, conninfo);
+        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
     
+    
     //destroy unnecessary data;
     memset(buf, 0, sizeof(buf));
 
     close(conffd);
 
-    if (connect_to_database(conninfo) == -1) { return -1; }
+    sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
+    if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
     
     sem_lock_datas.var = sem_open(sem_lock_datas.key, O_CREAT, 0777, 1);

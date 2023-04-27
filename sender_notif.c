@@ -36,27 +36,32 @@ int init(char *confg_filename) {
     
     int conffd = -1;
     char buf[500];
-    char conninfo[50];
-    PGresult *res = NULL;
-    char *noti_channel[20]; 
+    char username[30];
+    char dbname[30];
+    char noti_channel[30];
+    char noti_command[100];
+    char db_conn_commnand[100];
 
+    PGresult *res = NULL;
     if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
-        sscanf(buf,"SEM_LOCK_SIG_PS=%s\nCONNINFO=%s\nNOTI_CHANNEL", sem_lock_sigps.key, conninfo, noti_channel);
+        sscanf(buf,"SEM_LOCK_SIG_PS=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sigps.key, username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
-    
     //destroy unnecessary data;
     memset(buf, 0, sizeof(buf));
 
-    connection = PQconnectdb(conninfo);
+    sprintf(noti_command, "LISTEN %s", noti_channel);
+    sprintf(db_conn_commnand, "user=%s dbname=%s", username, dbname);
+
+    connection = PQconnectdb(db_conn_commnand);
     if (PQstatus(connection) != CONNECTION_OK) {
         syslog(LOG_NOTICE, "failed to create connection to database %s", PQerrorMessage(connection));
         return -1;
@@ -72,7 +77,7 @@ int init(char *confg_filename) {
     PQclear(res);
 
 
-    res = PQexec(connection, (const char *)noti_channel);
+    res = PQexec(connection, noti_command);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "LISTEN command failed: %s", PQerrorMessage(connection));
@@ -101,7 +106,6 @@ int main(int argc, char *argv[]) {
     if (argc != 2) {
         syslog(LOG_NOTICE, "invlaid arguments");
     }
-
 
     if(init(argv[1]) == -1) {return -1;}
 

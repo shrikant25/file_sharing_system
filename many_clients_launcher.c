@@ -42,5 +42,5 @@ int main(int argc, char *argv[])
     }
     
     printf("parent dead");
-    exit(0);
+    return 0;
 }
