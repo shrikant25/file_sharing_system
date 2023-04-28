@@ -3,7 +3,7 @@ DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysi
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
-UNLISTEN noti_1sys;
+UNLISTEN noti_2sys;
 
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -71,6 +71,7 @@ DECLARE
     fixed_source text;
     fixed_destination text;
     fixed_priority text;
+    msg bytea;
     lenmsg int;
     dummy text;
 BEGIN
@@ -83,7 +84,7 @@ BEGIN
                 fixed_source::bytea || fixed_destination::bytea || 
                 fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget;
     
-    lenmsg := length(hnmessage)+32;
+  lenmsg := length(hnmessage)+32;
 
     if lenmsg<(128 *1024) then
         dummy := ' ';
@@ -95,12 +96,11 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-
 INSERT INTO job_scheduler
     (jobdata, jstate, jtype, jsource, 
         jobid, jparent_jobid, jdestination, jpriority) 
-VALUES('__ROOT__', 'N-0', '0', '   M3', 
-    GEN_RANDOM_UUID(), NULL, '   M3', 0);
+VALUES('__ROOT__', 'N-0', '0', '   M2', 
+    GEN_RANDOM_UUID(), NULL, '   M2', 0);
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -114,7 +114,7 @@ CREATE OR REPLACE FUNCTION send_noti()
 RETURNS TRIGGER AS 
 $$
 BEGIN
-    PERFORM pg_notify('noit_1sys', 'get_data');
+    PERFORM pg_notify('noti_2sys', 'get_data');
     RETURN NEW;
 END;
 $$

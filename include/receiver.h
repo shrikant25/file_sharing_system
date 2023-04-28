@@ -8,7 +8,7 @@ typedef struct server_info{
     unsigned int maxevents;
     unsigned int servsoc_fd;
     unsigned int epoll_fd;
-    char ipaddress[30];
+    int ipaddress;
 }server_info;
 
 typedef struct db_statements {

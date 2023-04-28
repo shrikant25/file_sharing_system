@@ -228,10 +228,18 @@ int run_receiver()
                 nmsg.data1 = events[i].data.fd;
                 bytes_read = 0;
                 total_bytes_read = 0;
+                
+                memset(error, 0, sizeof(error));
+                sprintf(error, "done");
+                store_log(error);
 
                 while (total_bytes_read < MESSAGE_SIZE) {
                     
                     bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE);
+                    
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "bytes read %d", bytes_read);
+                    store_log(error);
                     
                     if (bytes_read == 0) {
                        
@@ -423,7 +431,7 @@ int main(int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, s_info.ipaddress);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, &s_info.ipaddress);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");

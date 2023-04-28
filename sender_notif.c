@@ -48,6 +48,7 @@ int init(char *confg_filename) {
         return -1;
     }
 
+    memset(noti_channel, 0 , sizeof(noti_channel));
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf,"SEM_LOCK_SIG_PS=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sigps.key, username, dbname, noti_channel);
     }
