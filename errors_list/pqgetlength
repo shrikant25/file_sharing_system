@@ -1,7 +1,0 @@
-Returns the actual length of a field value in bytes. Row and column numbers start at 0.
-
-int PQgetlength(const PGresult *res,
-                int row_number,
-                int column_number);
-This is the actual data length for the particular data value, that is, the size of the object pointed to by PQgetvalue. For text data format this is the same as strlen(). For binary format this is essential information. Note that one should not rely on PQfsize to obtain the actual data length.
-

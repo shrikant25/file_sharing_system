@@ -1,2 +1,0 @@
-RETURN VALUE
-       On success, the generated key_t value is returned.  On failure -1 is returned, with errno indicating the error as for the stat(2) system call.

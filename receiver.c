@@ -83,7 +83,7 @@ int create_socket()
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // set family
     servaddr.sin_port = htons(s_info.port); // set port
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set ip
+    servaddr.sin_addr.s_addr = htonl(s_info.ipaddress); // set ip
 
     // bind address to socketfd
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
@@ -405,6 +405,7 @@ int main(int argc, char *argv[])
 
     int status = -1;
     int conffd = -1;
+    int port = -1;
     char buf[500];
     char db_conn_command[100];
     char username[30];
@@ -422,7 +423,7 @@ int main(int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, s_info.ipaddress);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -465,7 +466,6 @@ int main(int argc, char *argv[])
     }    
     
     s_info.maxevents = 1000; // maxevent that will taken from kernel to process buffer
-    s_info.port = 7000; // server port
  
     if (create_socket() == -1) { return -1; } // create socket
     if (make_nonblocking(s_info.servsoc_fd) == -1) { return -1; } // make the server socket file descriptor as non blocking

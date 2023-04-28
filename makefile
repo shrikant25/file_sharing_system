@@ -43,3 +43,6 @@ launcher:
 	$(CC) $(sender_files) -o $(sender_target) $(CFLAGS)
 	$(CC) $(receiver_files) -o $(receiver_target) $(CFLAGS)
 	$(CC) $(launcher_files) -o $(launcher_target) $(CFLAGS)
+
+clean:
+	rm processor_r processor_s receiver sender sender_notif launcher

@@ -1,4 +1,0 @@
-Frees the storage associated with a PGresult. Every command result should be freed via PQclear when it is no longer needed.
-
-void PQclear(PGresult *res);
-You can keep a PGresult object around for as long as you need it; it does not go away when you issue a new command, nor even if you close the connection. To get rid of it, you must call PQclear. Failure to do this will result in memory leaks in your application.
