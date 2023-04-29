@@ -5,11 +5,9 @@
 
 void store_log(char *);
 int run_process();
-int retrive_commr_from_database(char *);
 int store_data_in_database(newmsg_data *);
 int store_commr_into_database(receivers_message *);
 int get_data_from_receiver();
-int send_message_to_receiver();
 int get_message_from_receiver();
 
 typedef struct db_statements {

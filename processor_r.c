@@ -23,31 +23,6 @@ semlocks sem_lock_sigr;
 datablocks datar_block;
 datablocks commr_block;
 
-int retrive_commr_from_database(char *data) 
-{
-    // int row_count = 0;
-    // PGresult *res = NULL;
-    // error[100];
-    // res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, NULL, NULL, NULL, 0);
-
-    // if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-    //     memset(error, 0, sizeof(error));
-    //        sprintf(error, "%s %s", "data storing failed failed", PQerrorMessage(connection));
-    //        store_log(error);
-    //        return -1;
-    // }    
-
-    // row_count = PQntuples(res);
-    // if (row_count > 0) {
-    //     memcpy(data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-    //     PQclear(res);
-    //     return 0;
-    // }
-
-    // PQclear(res);
-    return -1;
-}
-
 
 void store_log(char *logtext) {
 
@@ -168,7 +143,7 @@ int get_message_from_receiver() {
     receivers_message rcvm;
 
     sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 1, 2);
+    subblock_position = get_subblock(commr_block.var, 1, 3);
     
     if (subblock_position >= 0) {
 
@@ -179,7 +154,7 @@ int get_message_from_receiver() {
         store_commr_into_database(&rcvm);
           
         blkptr = NULL;
-        toggle_bit(subblock_position, commr_block.var, 2);
+        toggle_bit(subblock_position, commr_block.var, 3);
     
     }
 
@@ -201,6 +176,7 @@ int run_process()
   
     }  
 }
+
 
 int connect_to_database(char *conninfo) 
 {   

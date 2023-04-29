@@ -38,7 +38,6 @@ int add_to_list(int);
 int create_socket();
 int make_nonblocking(int);
 int send_to_processor(newmsg_data *);
-int read_message_from_processor(char *);
 int send_message_to_processor(receivers_message *);
 
 

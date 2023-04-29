@@ -170,7 +170,7 @@ int accept_connection()
             memset(&rcvm, 0, sizeof(rcvm));
             rcvm.fd = client_fd;
             rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
-            rcvm.status = 1;
+            rcvm.status = 2;
             
             send_message_to_processor(&rcvm);
         }
@@ -213,7 +213,7 @@ int run_receiver()
                 memset(&rcvm, 0, sizeof(rcvm));
                 rcvm.fd = events[i].data.fd;
                 rcvm.ipaddr = 0;
-                rcvm.status = 2;
+                rcvm.status = 1;
 
                 send_message_to_processor(&rcvm);
                 continue;
@@ -222,37 +222,33 @@ int run_receiver()
             else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) 
                 accept_connection();
             
-            else if (events[i].events & EPOLLIN){
+            else if (events[i].events & EPOLLIN) {
 
                 memset(&nmsg, 0, MESSAGE_SIZE);
                 nmsg.data1 = events[i].data.fd;
                 bytes_read = 0;
                 total_bytes_read = 0;
                 
-                memset(error, 0, sizeof(error));
-                sprintf(error, "done");
-                store_log(error);
-
+                
                 while (total_bytes_read < MESSAGE_SIZE) {
                     
                     bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE);
-                    
-                    memset(error, 0, sizeof(error));
-                    sprintf(error, "bytes read %d", bytes_read);
-                    store_log(error);
                     
                     if (bytes_read == 0) {
                        
                         memset(&rcvm, 0, sizeof(rcvm));
                         rcvm.fd = events[i].data.fd;
                         rcvm.ipaddr = 0;
-                        rcvm.status = 2;
+                        rcvm.status = 1;
                        
                         if (remove_from_list(events[i].data.fd) == -1)
                             return -1;
                         close(events[i].data.fd);
 
                         send_message_to_processor(&rcvm);     
+                        break;
+                    }
+                    else if (bytes_read == -1) {
                         break;
                     }
 
@@ -263,7 +259,11 @@ int run_receiver()
                 if (total_bytes_read == MESSAGE_SIZE) {
                     send_to_processor(&nmsg);
                 }
-
+               
+                memset(error, 0, sizeof(error));
+                sprintf(error, "total bytes read  %d", total_bytes_read);
+                store_log(error);
+               
             }
             
         }
@@ -308,7 +308,7 @@ int send_message_to_processor(receivers_message *rcvm)
     char msg_type;
     
     sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 0, 2);
+    subblock_position = get_subblock(commr_block.var, 0, 3);
     
     if (subblock_position >= 0) {
 
@@ -317,7 +317,7 @@ int send_message_to_processor(receivers_message *rcvm)
         memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, rcvm, sizeof(receivers_message));
 
-        toggle_bit(subblock_position, commr_block.var, 2);
+        toggle_bit(subblock_position, commr_block.var, 3);
         sem_post(sem_lock_sigr.var);
     }
     else {
