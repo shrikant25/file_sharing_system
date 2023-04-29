@@ -300,31 +300,6 @@ int send_to_processor(newmsg_data *nmsg)
     return subblock_position;
 }
 
-/*
-int read_message_from_processor(char *data)
-{
-    int subblock_position = -1;
-    char *blkptr = NULL;
-    
-    sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock2(commr_block.var, 1, 1);
-    
-    if (subblock_position >= 0) {
-
-        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
-        memset(data, 0, CPARTITION_SIZE);
-        
-        memcpy(data, blkptr, CPARTITION_SIZE);
-        memset(blkptr, 0, CPARTITION_SIZE);
-        
-        blkptr = NULL; 
-        toggle_bit(subblock_position, commr_block.var, 1);
-    }
-    
-    sem_post(sem_lock_commr.var);
-    return subblock_position;
-}
-*/
 
 int send_message_to_processor(receivers_message *rcvm)
 {
