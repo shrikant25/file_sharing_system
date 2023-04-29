@@ -79,7 +79,7 @@ int store_data_in_database(newmsg_data *nmsg)
     sprintf(fd, "%d", nmsg->data1);
 
     const int paramLengths[] = {sizeof(nmsg->data1), sizeof(nmsg->data)};
-    const int paramFormats[] = {0, 1};
+    const int paramFormats[] = {0, 0};
     int resultFormat = 0;
 
     const char *const param_values[] = {fd, nmsg->data};
@@ -187,36 +187,6 @@ int get_message_from_receiver() {
     return subblock_position;
 }
 
-/*
-int send_message_to_receiver() {
-    
-    int subblock_position = -1;
-    char *blkptr = NULL;
-    char data[CPARTITION_SIZE];
-    receivers_message rcvm;
-
-    sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 0, 1);
-    
-    if(subblock_position >= 0) {
-
-        blkptr = commr_block.var  + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
-        
-        memset(data, 0, CPARTITION_SIZE);
-        if (retrive_commr_from_database(data) != -1) {
-
-            memcpy(blkptr, data, CPARTITION_SIZE);
-            memset(data, 0, CPARTITION_SIZE);  
-            toggle_bit(subblock_position, commr_block.var, 1);
-
-        }
-        blkptr = NULL;
-    }
-    
-    sem_post(sem_lock_commr.var);    
-    return subblock_position;
-}
-*/
 
 int run_process() 
 {
@@ -228,9 +198,7 @@ int run_process()
         sem_wait(sem_lock_sigr.var); 
         get_message_from_receiver();
         get_data_from_receiver();           
-  /*      if (retrive_commr_from_database(data) != -1) {
-            send_message_to_receiver(data);
-        }*/    
+  
     }  
 }
 

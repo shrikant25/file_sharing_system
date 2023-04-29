@@ -335,12 +335,12 @@ void store_log(char *logtext) {
     char log[100];
     strncpy(log, logtext, strlen(logtext));
 
-    const char *const param_values[] = {log};
+    const char *const param_values[dbs[0].param_count] = {log};
     const int paramLengths[] = {sizeof(log)};
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "r_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
@@ -388,7 +388,6 @@ int main(int argc, char *argv[])
 
     int status = -1;
     int conffd = -1;
-    int port = -1;
     char buf[500];
     char db_conn_command[100];
     char username[30];
@@ -406,7 +405,7 @@ int main(int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, &s_info.ipaddress);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%lu", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, &s_info.ipaddress);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");

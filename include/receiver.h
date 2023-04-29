@@ -8,7 +8,7 @@ typedef struct server_info{
     unsigned int maxevents;
     unsigned int servsoc_fd;
     unsigned int epoll_fd;
-    unsigned int ipaddress;
+    unsigned long ipaddress;
 }server_info;
 
 typedef struct db_statements {
@@ -23,7 +23,7 @@ typedef struct db_statements {
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "r_storelog",  
-      .statement = "INSERT INTO logs (log) VALUES ($1)",
+      .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1
     }
 };
