@@ -34,7 +34,7 @@ int make_nonblocking(int active_fd)
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "failed to get current flags %s, fd %d", strerror(errno), active_fd);
+        sprintf(error, "failed to get current flags %s, fd %d .", strerror(errno), active_fd);
         store_log(error);
         return -1;
     }
@@ -42,7 +42,7 @@ int make_nonblocking(int active_fd)
     // set the non blocking flag
     if( fcntl(active_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "failed to set non blocking %s, fd %d", strerror(errno), active_fd);
+        sprintf(error, "failed to set non blocking %s, fd %d .", strerror(errno), active_fd);
         store_log(error);
         return -1;
     }
@@ -66,7 +66,7 @@ int create_socket()
     optval = 1;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "setting socket option reuseaddr failed %s, s_info.servsoc_fd : %d, optval : %d", strerror(errno), s_info.servsoc_fd, optval);
+        sprintf(error, "setting socket option reuseaddr failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
         store_log(error);
         return -1;
     }
@@ -74,7 +74,7 @@ int create_socket()
     optval = 128 *1024;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d", strerror(errno), s_info.servsoc_fd, optval);
+        sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
         store_log(error);
         return -1;
     }
@@ -88,7 +88,7 @@ int create_socket()
     // bind address to socketfd
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "binding address to socketfd failed %s, s_info.servsoc_fd : %d, servaddr : %d", strerror(errno), s_info.servsoc_fd, servaddr.sin_addr);
+        sprintf(error, "binding address to socketfd failed %s, s_info.servsoc_fd : %d, servaddr : %d .", strerror(errno), s_info.servsoc_fd, servaddr.sin_addr);
         store_log(error);
         return -1;
     }
@@ -108,7 +108,7 @@ int add_to_list(int active_fd)
     // try to add epoll variable to epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_ADD, active_fd, &event) == -1) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "adding to epoll list failed %s, epollfd : %d, fd to be added : %d", strerror(errno), s_info.epoll_fd, active_fd);
+        sprintf(error, "adding to epoll list failed %s, epollfd : %d, fd to be added : %d .", strerror(errno), s_info.epoll_fd, active_fd);
         store_log(error);
         return -1;
     }
@@ -128,7 +128,7 @@ int remove_from_list(int active_fd)
     // try to delete the file descriptor from epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_DEL, active_fd, &event) == -1) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "removing from epoll list failed %s, epollfd : %d, fd to be removed : %d", strerror(errno), s_info.epoll_fd, active_fd);
+        sprintf(error, "removing from epoll list failed %s, epollfd : %d, fd to be removed : %d .", strerror(errno), s_info.epoll_fd, active_fd);
         store_log(error);
         return -1;
     }
@@ -155,7 +155,7 @@ int accept_connection()
             }
             else {
                 memset(error, 0, sizeof(error));
-                sprintf(error, "error accepting connection %s, servsocfd : %d", strerror(errno), s_info.servsoc_fd);
+                sprintf(error, "error accepting connection %s, servsocfd : %d .", strerror(errno), s_info.servsoc_fd);
                 store_log(error);
                 return -1;
             }
@@ -192,11 +192,10 @@ int run_receiver()
 
     while (1) {
         
-      //  read_message_from_processor(data); // todo
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
         if (act_events_cnt == -1) {
             memset(error, 0, sizeof(error));
-            sprintf(error, "epoll wait failed %s, epollfd : %d", strerror(errno), s_info.epoll_fd);
+            sprintf(error, "epoll wait failed %s, epollfd : %d .", strerror(errno), s_info.epoll_fd);
             store_log(error);
             return -1;
         }
@@ -206,10 +205,10 @@ int run_receiver()
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
                 
-                close(events[i].data.fd);
                 if (remove_from_list(events[i].data.fd) == -1)
                     return -1;
-                
+                close(events[i].data.fd);
+
                 memset(&rcvm, 0, sizeof(rcvm));
                 rcvm.fd = events[i].data.fd;
                 rcvm.ipaddr = 0;
@@ -261,7 +260,7 @@ int run_receiver()
                 }
                
                 memset(error, 0, sizeof(error));
-                sprintf(error, "total bytes read  %d", total_bytes_read);
+                sprintf(error, "total bytes read  %d bytes", total_bytes_read);
                 store_log(error);
                
             }
@@ -335,7 +334,7 @@ void store_log(char *logtext) {
     char log[100];
     strncpy(log, logtext, strlen(logtext));
 
-    const char *const param_values[dbs[0].param_count] = {log};
+    const char *const param_values[] = {log};
     const int paramLengths[] = {sizeof(log)};
     const int paramFormats[] = {0};
     int resultFormat = 0;
