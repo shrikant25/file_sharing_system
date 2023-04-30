@@ -71,15 +71,6 @@ int create_socket()
         return -1;
     }
 
-    optval = 128 *1024;
-    if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
-        store_log(error);
-        return -1;
-    }
-
-
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // set family
     servaddr.sin_port = htons(s_info.port); // set port
@@ -160,7 +151,16 @@ int accept_connection()
                 return -1;
             }
         }
-        else{
+        else {
+            // get this data from database and store for buffer size
+            optval = 128 *1024;
+            if (setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
+                memset(error, 0, sizeof(error));
+                sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
+                store_log(error);
+                return -1;
+            }
+
             if (make_nonblocking(client_fd) == -1) return -1;
             if (add_to_list(client_fd) == -1) {
                 close(client_fd);
@@ -218,50 +218,56 @@ int run_receiver()
                 continue;
             
             }
-            else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) 
+            else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) {
                 accept_connection();
+            }
             
             else if (events[i].events & EPOLLIN) {
+                
+                // use get sokcopt to get socket buffer size, assign it to message_size
 
                 memset(&nmsg, 0, MESSAGE_SIZE);
                 nmsg.data1 = events[i].data.fd;
                 bytes_read = 0;
                 total_bytes_read = 0;
                 
-                
-                while (total_bytes_read < MESSAGE_SIZE) {
-                    
-                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE);
-                    
-                    if (bytes_read == 0) {
-                       
+                while (1) {
+
+                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE - total_bytes_read);
+                    if (bytes_read == -1) {
+                        
                         memset(&rcvm, 0, sizeof(rcvm));
                         rcvm.fd = events[i].data.fd;
                         rcvm.ipaddr = 0;
                         rcvm.status = 1;
-                       
+                        
                         if (remove_from_list(events[i].data.fd) == -1)
                             return -1;
                         close(events[i].data.fd);
 
                         send_message_to_processor(&rcvm);     
-                        break;
+                        break;    
                     }
-                    else if (bytes_read == -1) {
-                        break;
-                    }
+                    else {
+                        
+                        if (bytes_read = 0 && strerror(errno) == (EAGAIN || EWOULDBLOCK)) {
+                            break;
+                        } 
 
-                    total_bytes_read += bytes_read;
+                        total_bytes_read += bytes_read;
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "total bytes read  %d bytes", total_bytes_read);
+                        store_log(error);
                     
-                }
+                        if (total_bytes_read == MESSAGE_SIZE) {
+                            send_to_processor(&nmsg);
+                            total_bytes_read = 0;
+                            memset(&nmsg, 0, MESSAGE_SIZE);
+                            nmsg.data1 = events[i].data.fd;
+                        }
 
-                if (total_bytes_read == MESSAGE_SIZE) {
-                    send_to_processor(&nmsg);
+                    }
                 }
-               
-                memset(error, 0, sizeof(error));
-                sprintf(error, "total bytes read  %d bytes", total_bytes_read);
-                store_log(error);
                
             }
             
