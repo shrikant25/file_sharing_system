@@ -191,12 +191,15 @@ int run_sender()
             
             do {
 
-                data_sent = send(sndmsg.fd, sndmsg.data, strlen(sndmsg.data), 0);
+                data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, sizeof(sndmsg.data), 0);
                 total_data_sent += data_sent;
                 
-            }while (total_data_sent < strlen(sndmsg.data) && data_sent != 0);
+            }while (total_data_sent < sizeof(sndmsg.data) && data_sent != 0);
             
             msgsts.status = total_data_sent < strlen(sndmsg.data) ? 0 : 1;
+            memset(error, 0, sizeof(error));
+            sprintf(error, "total bytes sent %s\n", total_data_sent);
+            store_log(error);
 
             msgsts.type = 4;
             strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
@@ -210,6 +213,7 @@ void store_log(char *logtext) {
 
     PGresult *res = NULL;
     char log[100];
+    memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
     const char *const param_values[] = {log};

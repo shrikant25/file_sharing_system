@@ -177,6 +177,7 @@ void store_log(char *logtext)
 
     PGresult *res = NULL;
     char log[100];
+    memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
     const char *const param_values[] = {log};

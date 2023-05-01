@@ -8,6 +8,7 @@ int get_message_from_processor(char *);
 int get_data_from_processor(send_message *);
 int send_message_to_processor(int, void *); 
 int run_sender(); 
+void store_log(char *);
 
 typedef struct db_statements {
     char statement_name[20];

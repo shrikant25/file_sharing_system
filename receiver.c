@@ -130,6 +130,7 @@ int remove_from_list(int active_fd)
 int accept_connection() 
 {   
     int client_fd = -1;
+    int optval;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len;
     receivers_message rcvm;
@@ -153,13 +154,13 @@ int accept_connection()
         }
         else {
             // get this data from database and store for buffer size
-            optval = 128 *1024;
-            if (setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
-                store_log(error);
-                return -1;
-            }
+            // optval = 128 *1024;
+            // if (setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
+            //     memset(error, 0, sizeof(error));
+            //     sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
+            //     store_log(error);
+            //     return -1;
+            // }
 
             if (make_nonblocking(client_fd) == -1) return -1;
             if (add_to_list(client_fd) == -1) {
@@ -233,33 +234,26 @@ int run_receiver()
                 
                 while (1) {
 
-                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE - total_bytes_read);
+                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
                     if (bytes_read == -1) {
-                        
-                        memset(&rcvm, 0, sizeof(rcvm));
-                        rcvm.fd = events[i].data.fd;
-                        rcvm.ipaddr = 0;
-                        rcvm.status = 1;
-                        
-                        if (remove_from_list(events[i].data.fd) == -1)
-                            return -1;
-                        close(events[i].data.fd);
-
-                        send_message_to_processor(&rcvm);     
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "read failed %s", strerror(errno));
+                        store_log(error);
                         break;    
                     }
                     else {
                         
-                        if (bytes_read = 0 && strerror(errno) == (EAGAIN || EWOULDBLOCK)) {
+                        if (bytes_read == 0 && errno == EAGAIN) {
                             break;
                         } 
 
                         total_bytes_read += bytes_read;
                         memset(error, 0, sizeof(error));
-                        sprintf(error, "total bytes read  %d bytes", total_bytes_read);
+                        sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
                         store_log(error);
                     
-                        if (total_bytes_read == MESSAGE_SIZE) {
+                        if (total_bytes_read >= MESSAGE_SIZE) {
+                            store_log("treu");
                             send_to_processor(&nmsg);
                             total_bytes_read = 0;
                             memset(&nmsg, 0, MESSAGE_SIZE);
@@ -283,6 +277,7 @@ int send_to_processor(newmsg_data *nmsg)
     int subblock_position = -1;
     char *blkptr = NULL;
     
+    store_log("waiting for lock");
     sem_wait(sem_lock_datar.var);         
     subblock_position = get_subblock(datar_block.var, 0, 3);
 
@@ -338,6 +333,7 @@ void store_log(char *logtext) {
 
     PGresult *res = NULL;
     char log[100];
+    memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
     const char *const param_values[] = {log};

@@ -87,8 +87,8 @@ BEGIN
   lenmsg := length(hnmessage)+32;
 
     if lenmsg<(128 *1024) then
-        dummy := ' ';
-        hnmessage := (hnmessage || (lpad(dummy, ((128*1024)-lenmsg), ' '))::bytea);
+        dummy := '0';
+        hnmessage := (hnmessage || (lpad(dummy, ((128*1024)-lenmsg), '0'))::bytea);
     end if;
     
     return md5(hnmessage)::bytea || hnmessage;
