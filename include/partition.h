@@ -39,6 +39,7 @@ typedef struct open_connection {
 typedef struct close_connection {
     unsigned char type;
     unsigned int fd;
+    unsigned int ipaddress;
 }close_connection;
 
 typedef struct connection_status {

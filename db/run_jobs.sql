@@ -391,7 +391,7 @@ WHERE sc.scstatus = 1;
 -- but none of the job in scheduler have destination same as the ip that belong to those fd
 -- and create a message to close them
 INSERT INTO senders_comms (mdata1, mdata2, mtype)
-SELECT sc.sfd, 0, 2
+SELECT sc.sfd, sc.sipaddr, 2
 FROM sending_conns sc
 LEFT JOIN job_scheduler js 
 ON sc.sipaddr::text = js.jdestination 

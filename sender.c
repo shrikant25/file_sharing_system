@@ -178,6 +178,11 @@ int run_sender()
 
                 clscn = (close_connection *)data;
                 close(clscn->fd);
+                cncsts.type = 3;
+                cncsts.fd = -1;
+                cncsts.ipaddress = clscn->ipaddress;
+
+                send_message_to_processor(3, (void *)&cncsts);
             }
         }
 
