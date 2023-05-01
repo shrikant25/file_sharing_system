@@ -305,12 +305,12 @@ WITH cte_jobdata AS (
         encode(substr(js.jobdata, 74, 5), 'escape') as jsource,
         jpriority,
         seqnum, 
-        substring(jobdata, (seqnum * (system_capacity-114) +1)::int, (system_capacity-114)) AS subdata
+        substring(jobdata, (seqnum * (system_capacity-168) +1)::int, (system_capacity-168)) AS subdata
     
     FROM job_scheduler js
     JOIN sysinfo si
     ON encode(substr(js.jobdata, 79, 5), 'escape') = si.system_name
-    CROSS JOIN generate_series(0, ceil(length(js.jobdata)::decimal/ (si.system_capacity -114))-1) AS seqnum
+    CROSS JOIN generate_series(0, ceil(length(js.jobdata)::decimal/ (si.system_capacity -168))-1) AS seqnum
     WHERE js.jstate = 'S-2' and si.ipaddress::text = js.jdestination
 ), 
 cte_msg AS (
@@ -341,7 +341,7 @@ WITH cte_msginfo as(
         create_message(
                 '3'::text,
                 jobid::text::bytea || lpad(length(jobdata)::text, 10, ' ')::bytea || 
-                    lpad((ceil(length(jobdata)::decimal/ (system_capacity -114)))::text, 10, ' ')::bytea,
+                    lpad((ceil(length(jobdata)::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
                 btrim(encode(substr(job_scheduler.jobdata, 74, 5), 'escape'), ' '), 
                 btrim(jdestination, ' '),
                 jpriority::text
@@ -384,3 +384,17 @@ FROM sysinfo si
 JOIN sending_conns sc 
 ON si.ipaddress = sc.sipaddr
 WHERE sc.scstatus = 1;
+
+
+
+-- take all fd which belong to an open connection,
+-- but none of the job in scheduler have destination same as the ip that belong to those fd
+-- and create a message to close them
+INSERT INTO senders_comms (mdata1, mdata2, mtype)
+SELECT sc.sfd, 0, 2
+FROM sending_conns sc
+LEFT JOIN job_scheduler js 
+ON sc.sipaddr::text = js.jdestination 
+AND js.jstate != 'C'
+WHERE js.jdestination IS NULL
+AND sc.scstatus = 2;
