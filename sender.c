@@ -191,14 +191,14 @@ int run_sender()
             
             do {
 
-                data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, sizeof(sndmsg.data), 0);
+                data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, MESSAGE_SIZE, 0);
                 total_data_sent += data_sent;
-                
-            }while (total_data_sent < sizeof(sndmsg.data) && data_sent != 0);
+
+            } while (total_data_sent < MESSAGE_SIZE && data_sent != 0);
             
-            msgsts.status = total_data_sent < strlen(sndmsg.data) ? 0 : 1;
+            msgsts.status = total_data_sent < MESSAGE_SIZE ? 0 : 1;
             memset(error, 0, sizeof(error));
-            sprintf(error, "total bytes sent %s\n", total_data_sent);
+            sprintf(error, "total bytes sent %d\n", total_data_sent);
             store_log(error);
 
             msgsts.type = 4;

@@ -235,17 +235,13 @@ int run_receiver()
                 while (1) {
 
                     bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
-                    if (bytes_read == -1) {
+                    if (bytes_read <= 0) {
                         memset(error, 0, sizeof(error));
                         sprintf(error, "read failed %s", strerror(errno));
                         store_log(error);
                         break;    
                     }
                     else {
-                        
-                        if (bytes_read == 0 && errno == EAGAIN) {
-                            break;
-                        } 
 
                         total_bytes_read += bytes_read;
                         memset(error, 0, sizeof(error));
