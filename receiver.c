@@ -237,7 +237,7 @@ int run_receiver()
                     bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
                     if (bytes_read <= 0) {
                         memset(error, 0, sizeof(error));
-                        sprintf(error, "read failed %s", strerror(errno));
+                        sprintf(error, "read failed %s %d", strerror(errno), bytes_read);
                         store_log(error);
                         break;    
                     }
