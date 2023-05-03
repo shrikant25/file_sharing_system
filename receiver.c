@@ -325,7 +325,8 @@ int send_message_to_processor(receivers_message *rcvm)
 }
 
 
-void store_log(char *logtext) {
+void store_log(char *logtext) 
+{
 
     PGresult *res = NULL;
     char log[100];
@@ -408,9 +409,6 @@ int main(int argc, char *argv[])
         syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
-    
-    //destroy unnecessary data;
-    memset(buf, 0, sizeof(buf));
 
     close(conffd);
 

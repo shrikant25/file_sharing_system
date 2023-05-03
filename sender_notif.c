@@ -32,7 +32,8 @@ void store_log(char *logtext)
     PQclear(res);
 }
 
-int init(char *confg_filename) {
+int init(char *confg_filename) 
+{
     
     int conffd = -1;
     char buf[500];
@@ -56,8 +57,6 @@ int init(char *confg_filename) {
         syslog(LOG_NOTICE, "failed to read configuration file");
         return -1;
     }
-    //destroy unnecessary data;
-    memset(buf, 0, sizeof(buf));
 
     sprintf(noti_command, "LISTEN %s", noti_channel);
     sprintf(db_conn_commnand, "user=%s dbname=%s", username, dbname);
@@ -99,7 +98,8 @@ int init(char *confg_filename) {
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
 
     PGresult *res;
     PGnotify *notify;

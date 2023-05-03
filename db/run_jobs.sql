@@ -255,39 +255,54 @@ SET jstate = (
 
 -- replace the system name with its ip address 
 
-UPDATE job_scheduler 
+UPDATE job_scheduler
 SET jdestination = (
-    SELECT
-        CASE
-            WHEN LENGTH(jobdata) > MAX(system_capacity)
-            THEN (
-                SELECT ipaddress::text 
-                FROM sysinfo sy 
-                JOIN (
-                    SELECT system_name, MAX(system_capacity) AS max_capacity 
-                    FROM sysinfo 
-                    GROUP BY system_name
-                ) sy2 ON sy.system_name = sy2.system_name AND sy.system_capacity = sy2.max_capacity
-                WHERE sy.system_name = job_scheduler.jdestination
-                LIMIT 1
-            )
-            ELSE (
-                SELECT ipaddress::text 
-                FROM (
-                    SELECT ipaddress, system_capacity 
-                    FROM sysinfo 
-                    WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
-                    ORDER BY system_capacity ASC
-                ) ip 
-                GROUP BY system_capacity, ipaddress 
-                ORDER BY system_capacity DESC 
-                LIMIT 1
-            )
-        END
-    FROM sysinfo 
-    WHERE sysinfo.system_name = job_scheduler.jdestination
-) 
-WHERE jstate IN ('S-3', 'S-2');
+        SELECT ipaddress::text 
+        FROM sysinfo sy
+        JOIN job_scheduler js
+        ON sy.system_name = js.jdestination
+        AND LENGTH(js.jobdata) >= system_capacity
+        ORDER BY system_capacity ASC
+        LIMIT 1
+    )
+WHERE jstate = 'S-3';
+
+
+
+
+-- UPDATE job_scheduler 
+-- SET jdestination = (
+--     SELECT
+--         CASE
+--             WHEN LENGTH(jobdata) > MAX(system_capacity)
+--             THEN (
+--                 SELECT ipaddress::text 
+--                 FROM sysinfo sy 
+--                 JOIN (
+--                     SELECT system_name, MAX(system_capacity) AS max_capacity 
+--                     FROM sysinfo 
+--                     GROUP BY system_name
+--                 ) sy2 ON sy.system_name = sy2.system_name AND sy.system_capacity = sy2.max_capacity
+--                 WHERE sy.system_name = job_scheduler.jdestination
+--                 LIMIT 1
+--             )
+--             ELSE (
+--                 SELECT ipaddress::text 
+--                 FROM (
+--                     SELECT ipaddress, system_capacity 
+--                     FROM sysinfo 
+--                     WHERE system_name = job_scheduler.jdestination AND LENGTH(jobdata) <= system_capacity 
+--                     ORDER BY system_capacity ASC
+--                 ) ip 
+--                 GROUP BY system_capacity, ipaddress 
+--                 ORDER BY system_capacity DESC 
+--                 LIMIT 1
+--             )
+--         END
+--     FROM sysinfo 
+--     WHERE sysinfo.system_name = job_scheduler.jdestination
+-- ) 
+-- WHERE jstate IN ('S-3', 'S-2');
 
 
 

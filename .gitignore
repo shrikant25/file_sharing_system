@@ -2,3 +2,9 @@
 launcher
 temp/
 test/
+receiver
+sender
+processor_r
+processor_s
+user_program
+sender_notif

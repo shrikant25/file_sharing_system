@@ -23,18 +23,8 @@ receiver_files := receiver.c shared_memory.c partition.c
 launcher_target = launcher
 launcher_files := launcher.c
 
-processor_r: $(processor_r_files)
-		$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)
-
-processor_s: $(processor_s_files)
-		$(CC) $(processor_s_files) -o $(processor_s_target) $(CFLAGS) 
-		$(CC) $(sender_notif_files) -o $(sender_notif_target) $(CFLAGS)
-
-sender: $(sender_files)
-		$(CC) $(sender_files) -o $(sender_target) $(CFLAGS)
-
-receiver: $(receiver_files)
-		$(CC) $(receiver_files) -o $(receiver_target) $(CFLAGS)
+user_program_target = user_program
+user_program_files := user_program.c
 
 launcher:
 	$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)
@@ -43,6 +33,7 @@ launcher:
 	$(CC) $(sender_files) -o $(sender_target) $(CFLAGS)
 	$(CC) $(receiver_files) -o $(receiver_target) $(CFLAGS)
 	$(CC) $(launcher_files) -o $(launcher_target) $(CFLAGS)
+	$(CC) $(user_program_files) -o $(user_program_target) $(CFLAGS)
 
 clean:
-	rm processor_r processor_s receiver sender sender_notif launcher
+	rm processor_r processor_s receiver sender sender_notif launcher user_program
