@@ -1,5 +1,5 @@
 
-DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
+DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns file_data;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -55,6 +55,12 @@ CREATE TABLE sysinfo (system_name CHAR(10),
 
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
+
+CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
+                        file_name TEXT NOT NULL, 
+                        file_size INTEGER NOT NULL, 
+                        file_data oid NOT NULL, 
+                        creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); 
 
 CREATE OR REPLACE FUNCTION create_message(
     message_type text,
