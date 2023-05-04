@@ -1,22 +1,84 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <syslog.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <libpq-fe.h>
 #include "user_program.h"
 
 PGconn *connection;
-char error[100];
 
-int connect_to_database(char *conninfo) 
+int import_file (char *file_path) 
+{
+    int fd = 0;
+    char file_name[pathsize];
+    size_t file_length = 0;
+    char file_length_param[20];
+ 
+    int pathlen = strlen(file_path);
+    int i = pathlen-1;
+    if (file_path[i] == '\n') {
+        file_path[i] = '\0';
+    }
+
+    memset(file_name, 0, sizeof(pathsize));
+    while (i > 0 && file_path[i--] != '/');
+    strncpy(file_name, file_path+i+2, pathlen-i-1);
+
+    if ((fd = open(file_path, O_RDONLY)) == -1) {
+        printf("failed to open file :%s, error : %s\n",file_path, strerror(errno));
+        return -1;
+    }
+
+    file_length = lseek(fd, 0, SEEK_END);
+    close(fd);
+
+    if (file_length <= 0) {
+        printf("invalid file length %d %s, error : %s\n", file_length, file_name, strerror(errno));
+        return -1;
+    }
+
+    sprintf(file_length_param, "%d", file_length);
+
+    PGresult *res = NULL;
+    const char *const param_values[] = {file_name, file_length_param, file_path};
+    const int paramLengths[] = {sizeof(file_name), sizeof(file_length_param), sizeof(file_path)};
+    const int paramFormats[] = {0, 0, 0};
+    int resultFormat = 0;
+    
+    res = PQexecPrepared(connection, dbs[0].statement_name ,dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("failed to store file %s, error : %s\n", file_name, PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+
+    PQclear(res);
+    return 0;
+
+}
+
+
+int export_file (char *path) 
+{
+    printf("not implemented\n");
+} 
+
+
+int send_file (char* path)
+{
+    printf("not implemented\n");
+}
+
+
+int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
 
     if (PQstatus(connection) != CONNECTION_OK) {
-        syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
+        printf("Connection to database failed: %s\n", PQerrorMessage(connection));
         return -1;
     }
 
@@ -24,7 +86,7 @@ int connect_to_database(char *conninfo)
 }
 
 
-int prepare_statements() 
+int prepare_statements () 
 {    
     int i, status = 0;
 
@@ -32,7 +94,7 @@ int prepare_statements()
 
         PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+            printf("Preparation of statement failed: %s\n", PQerrorMessage(connection));
             status = -1;
             PQclear(res);
             break;
@@ -45,29 +107,22 @@ int prepare_statements()
 }
 
 
-void store_log(char *logtext) 
+int get_input (char *buf, int bufsize) 
 {
+    printf("Enter absolute file path\n");
+    memset(buf, 0, bufsize);
 
-    PGresult *res = NULL;
-    char log[100];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, "u_storelog", 1, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
+    if (fgets(buf, bufsize, stdin) != NULL) {
+        return 0;
     }
 
-    PQclear(res);
+    printf("Invalid Input\n");
+    return -1;    
 }
 
 
-int main(int argc, char *argv[]) {
+int main (int argc, char *argv[]) 
+{
 
     char path[pathsize];    
     char confdata[confdatasize];
@@ -75,15 +130,15 @@ int main(int argc, char *argv[]) {
     char username[conn_param_size];
     char dbname[conn_param_size];
     int conffd = -1;
-    int choice1 = 0;
+    char choice1[3];
 
     if (argc != 2){
-        syslog(LOG_NOTICE, "invalid arguments");
+        printf("invalid arguments\n");
         return -1;
     }
 
     if((conffd = open(argv[1], O_RDONLY)) == -1) {
-        syslog(LOG_NOTICE, "failed to open config file");
+        printf("failed to open config file\n");
         return -1;
     }
 
@@ -92,7 +147,7 @@ int main(int argc, char *argv[]) {
         sscanf(confdata, "USERNAME=%s\nDBNAME=%s", username, dbname);
     }
     else {
-        syslog(LOG_NOTICE, "failed to read config file");
+        printf("failed to read config file");
         return -1;
     }
 
@@ -103,32 +158,41 @@ int main(int argc, char *argv[]) {
     if (connect_to_database(db_conn_command) == -1) { return -1;}
     if (prepare_statements() == -1) { return -1;}
 
-    do {
+    do {       
         printf("Enter 1 to import a file into database\n");
         printf("Enter 2 to send a file\n");
         printf("Enter 3 to export a file from database\n");
-        scanf("%d", &choice1);
-
-        memset(path, 0, pathsize);
-        printf("Enter file path\n");
+        printf("Enter 4 to close the program\n");
+        fflush(stdin);
+        memset(choice1, 0, sizeof(choice1));
+        fgets(choice1, sizeof(choice1), stdin);    
+    
+        switch (choice1[0]) {
+    
+            case '4':   PQfinish(connection);
+                        return 0;
+                        break;
+    
+            case '1':   if(get_input(path, pathsize) != -1) {
+                            import_file(path);
+                        }
+                        break;
         
-        if (fgets(path, pathsize, stdin)) {
+            case '2':   if(get_input(path, pathsize) != -1) {
+                            send_file(path);
+                        }   
+                        break;
             
-            switch (choice1) {
-                case 1: //import_file(path);
+            case '3':
+                        if(get_input(path, pathsize) != -1) {
+                            export_file(path);
+                        }
                         break;
-                case 2: //send_file(path);
+            
+            default:    printf("Invalid Input\n");        
                         break;
-                case 3: //export_file(path);
-                        break;
-                default: printf("Invalide choice\n");
-                        break;
-            };
-        }
-        else {     
-            printf("Invalid Input\n");
-        }
+        };
+
     } while(1);
 
-    return 0;
 }

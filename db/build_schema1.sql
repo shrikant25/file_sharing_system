@@ -52,9 +52,14 @@ CREATE TABLE sysinfo (system_name CHAR(10),
                       CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
                       CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
                         REFERENCES  systems(system_name) 
-
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
+
+CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
+                        file_name TEXT NOT NULL, 
+                        file_size BIGINT NOT NULL, 
+                        file_data oid NOT NULL, 
+                        creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
 CREATE OR REPLACE FUNCTION create_message(
     message_type text,

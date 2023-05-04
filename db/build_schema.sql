@@ -58,7 +58,7 @@ CREATE TABLE sysinfo (system_name CHAR(10),
 
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
                         file_name TEXT NOT NULL, 
-                        file_size INTEGER NOT NULL, 
+                        file_size BIGINT NOT NULL, 
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); 
 

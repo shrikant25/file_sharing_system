@@ -11,7 +11,7 @@ int get_data_from_receiver();
 int get_message_from_receiver();
 
 typedef struct db_statements {
-    char statement_name[20];
+    char *statement_name;
     char *statement;
     int param_count;
 }db_statements;
