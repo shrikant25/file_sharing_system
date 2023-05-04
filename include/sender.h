@@ -11,7 +11,7 @@ int run_sender();
 void store_log(char *);
 
 typedef struct db_statements {
-    char statement_name[20];
+    char statement_name;
     char *statement;
     int param_count;
 }db_statements;
