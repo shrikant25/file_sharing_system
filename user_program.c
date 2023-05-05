@@ -32,21 +32,6 @@ int import_file (char *file_path)
     const int paramFormats[] = {0, 0};
     int resultFormat = 0;
 
-    res = PQexecPrepared(connection, dbs[1].statement_name ,dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        printf("failed to get file info %s, error : %s\n", file_name, PQerrorMessage(connection));
-        PQclear(res);
-        return -1;
-    }
-
-    if (PQntuples(res) > 0) {
-        printf("file with same name already exists\n");
-        PQclear(res);
-        return -1;
-    }
-
-    PQclear(res);
-
     res = PQexecPrepared(connection, dbs[0].statement_name ,dbs[0].param_count, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("failed to store file %s, error : %s\n", file_name, PQerrorMessage(connection));
@@ -86,12 +71,6 @@ int send_file (char *file_name, char *destination)
     res = PQexecPrepared(connection, dbs[1].statement_name ,dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         printf("failed to get file info %s, error : %s\n", file_name, PQerrorMessage(connection));
-        PQclear(res);
-        return -1;
-    }
-
-    if (PQntuples(res) > 1) {
-        printf("multiple files with same name exists\n");
         PQclear(res);
         return -1;
     }

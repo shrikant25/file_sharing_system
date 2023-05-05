@@ -56,7 +56,7 @@ CREATE TABLE sysinfo (system_name CHAR(10),
                         ON UPDATE CASCADE);
 
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
-                        file_name TEXT NOT NULL, 
+                        file_name TEXT UNIQUE NOT NULL, 
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
 

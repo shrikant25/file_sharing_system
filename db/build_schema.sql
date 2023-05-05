@@ -51,12 +51,11 @@ CREATE TABLE sysinfo (system_name CHAR(10),
                       CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
                       CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
                         REFERENCES  systems(system_name) 
-
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
 
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
-                        file_name TEXT NOT NULL,  
+                        file_name TEXT UNIQUE NOT NULL,  
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); 
 
@@ -114,6 +113,7 @@ WHERE jobdata = '__ROOT__';
 ALTER TABLE job_scheduler 
 ALTER COLUMN jparent_jobid
 SET NOT NULL;
+
 
 CREATE OR REPLACE FUNCTION send_noti()
 RETURNS TRIGGER AS 
