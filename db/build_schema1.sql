@@ -47,7 +47,8 @@ CREATE TABLE systems(system_name CHAR(10) PRIMARY KEY);
 
 CREATE TABLE sysinfo (system_name CHAR(10),
                       ipaddress BIGINT UNIQUE,
-                      port INTEGER NOT NULL,
+                      dataport INTEGER,
+                      comssport INTEGER NOT NULL,
                       system_capacity INTEGER,
                       CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
                       CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)

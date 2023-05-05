@@ -236,13 +236,16 @@ SET jstate = 'N-4',
 jtype = encode(substr(jobdata, 69, 5), 'escape')
 WHERE jstate = 'N-3';
 
+insert into job_scheduler (jobid,  jobdata, jstate, jtype, jsource, jparent_jobid, jdestination, jpriority) 
+values (gen_random_uuid(), 'hola', 'N-1', 0, lpad('M2', 5, ' '), (select jobid from job_scheduler where jobid = jparent_jobid), lpad('m3', 5, ' '), 5);
 
--- INSERT into sysinfo_comms (sipaddr, port, capacity, type)
--- select si.ipaddress, si.comssport,  (select system_capacity SELFINO), 1
--- from sysinfo si, 
--- join job_scheduler js 
--- ON js.jdestination = sy.system_capacity
--- WHERE dataport = 0; 
+    INSERT into sysinfo_comms (sipaddr, port, capacity, sctype)
+    select si.ipaddress, si.comssport,  (select system_capacity from SELFINO), 1
+    from sysinfo si 
+    join job_scheduler js 
+    ON js.jdestination = si.system_name
+    WHERE dataport = 0 AND
+    js.jstate = 'S-1'; 
 
 -- jobs that have larger size then receivers capacity, update them to state S-2 
 -- or else update them to state S-3
