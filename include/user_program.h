@@ -31,8 +31,8 @@ db_statements dbs[statement_count] = {
                     jsource, jobid, jparent_jobid, jdestination, jpriority) \
                     VALUES($1, 'N-0', '0', \
                     (select jsource from job_scheduler where jparent_jobid = jobid), GEN_RANDOM_UUID(), \
-                    (select jobid from job_scheduler where jparent_jobid = jobid), lpad('$2, 5, ' '), 5);",
-      .param_count = 2;
+                    (select jobid from job_scheduler where jparent_jobid = jobid), lpad($2, 5, ' '), 5);",
+      .param_count = 2,
     },
 };
 

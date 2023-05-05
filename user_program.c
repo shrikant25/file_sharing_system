@@ -14,6 +14,7 @@ int import_file (char *file_path)
 {
     int fd = 0;
     char file_name[bufsize];
+    PGresult *res = NULL;
     
     int pathlen = strlen(file_path);
     int i = pathlen-1;
@@ -26,18 +27,34 @@ int import_file (char *file_path)
     memset(file_name, 0, sizeof(bufsize));
     strncpy(file_name, file_path+i+2, pathlen-i-1);
 
-    PGresult *res = NULL;
     const char *const param_values[] = {file_name, file_path};
-    const int paramLengths[] = {sizeof(file_name), sizeof(file_path)};
+    const int paramLengths[] = {sizeof(file_name), pathlen};
     const int paramFormats[] = {0, 0};
     int resultFormat = 0;
-    
+
+    res = PQexecPrepared(connection, dbs[1].statement_name ,dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("failed to get file info %s, error : %s\n", file_name, PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+
+    if (PQntuples(res) > 0) {
+        printf("file with same name already exists\n");
+        PQclear(res);
+        return -1;
+    }
+
+    PQclear(res);
+
     res = PQexecPrepared(connection, dbs[0].statement_name ,dbs[0].param_count, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         printf("failed to store file %s, error : %s\n", file_name, PQerrorMessage(connection));
         PQclear(res);
         return -1;
     }
+
+    printf("File %s succesfully stored in database\n", file_name);
 
     PQclear(res);
     return 0;
@@ -47,22 +64,54 @@ int import_file (char *file_path)
 int send_file (char *file_name, char *destination)
 {
     int fd = 0;
-    char file_name[bufsize];;
-
-
-
+    int len = 0;
     PGresult *res = NULL;
-    const char *const param_values[] = {file_name};
-    const int paramLengths[] = {sizeof(file_name), sizeof(file_length_param), sizeof(file_path)};
-    const int paramFormats[] = {0, 0, 0};
-    int resultFormat = 0;
+
+    len = strlen(file_name);
+    if (file_name[len-1] == '\n') {
+        file_name[len-1] = '\0';
+    }
+
+    len = strlen(destination);
+    if (destination[len-1] == '\n') {
+        destination[len-1] = '\0';
+    }
     
-    res = PQexecPrepared(connection, dbs[0].statement_name ,dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        printf("failed to store file %s, error : %s\n", file_name, PQerrorMessage(connection));
+    const char *const param_values[] = {file_name, destination};
+    const int paramLengths[] = {strlen(file_name), strlen(destination)};
+    const int paramFormats[] = {0, 0};
+    int resultFormat = 0;
+
+    // here param count is 1, so it is going to only use 1 parameter, rest will be ignored
+    res = PQexecPrepared(connection, dbs[1].statement_name ,dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("failed to get file info %s, error : %s\n", file_name, PQerrorMessage(connection));
         PQclear(res);
         return -1;
     }
+
+    if (PQntuples(res) > 1) {
+        printf("multiple files with same name exists\n");
+        PQclear(res);
+        return -1;
+    }
+
+    if (PQntuples(res) < 1) {
+        printf("file doesn't exists in database\n");
+        PQclear(res);
+        return -1;
+    }
+    
+    PQclear(res);
+
+    res = PQexecPrepared(connection, dbs[2].statement_name ,dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("failed to create job for file sending %s, error : %s\n", file_name, PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+
+    printf("Job succesfully created for %s\n", file_name);
 
     PQclear(res);
     return 0;
@@ -160,7 +209,7 @@ int main (int argc, char *argv[])
     if (prepare_statements() == -1) { return -1;}
 
     do {       
-        printf("Enter 1 to import a file into database\n");
+        printf("\nEnter 1 to import a file into database\n");
         printf("Enter 2 to send a file\n");
         printf("Enter 3 to export a file from database\n");
         printf("Enter 4 to close the program\n");
@@ -180,18 +229,19 @@ int main (int argc, char *argv[])
                         import_file(buf1);
                         break;
         
-            case '2':   if (get_input("Enter absolute file path\n", buf1, bufsize) != -1) {
+            case '2':   if (get_input("Enter file name\n", buf1, bufsize) == -1) {
                             break;
                         }   
-                        if (get_input("Enter destination\n", buf1, bufsize) == -1) {
+                        if (get_input("Enter destination\n", buf2   , bufsize) == -1) {
                             break;
                         }
                         send_file (buf1, buf2);
                         break;
             
-            case '3':   if (get_input("Enter absolute file path\n", buf1, bufsize) != -1) {
-                            export_file(buf1);
+            case '3':   if (get_input("Enter absolute file path\n", buf1, bufsize) == -1) {
+                            break;
                         }
+                        export_file(buf1);
                         break;
             
             default:    printf("Invalid Input\n");        
