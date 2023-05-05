@@ -1,5 +1,5 @@
-
-DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns, file_data;
+DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
+                        systems, senders_comms, sending_conns, file_data, selfinfo, sysinfo_comms;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -55,6 +55,17 @@ CREATE TABLE sysinfo (system_name CHAR(10),
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
 
+CREATE TABLE selfinfo (system_name CHAR(10) NOT NULL,
+                      ipaddress BIGINT UNIQUE NOT NULL,
+                      dataport INTEGER NOT NULL,
+                      system_capacity INTEGER NOT NULL);
+
+CREATE TABLE sysinfo_comms (sicid SERIAL PRIMARY KEY,
+                            sipaddr BIGINT NOT NULL,
+                            port INTEGER NOT NULL,
+                            capacity INTEGER NOT NULL,
+                            sctype SMALLINT NOT NULL);
+
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
                         file_name TEXT UNIQUE NOT NULL, 
                         file_data oid NOT NULL, 
@@ -99,6 +110,8 @@ BEGIN
 END;
 $$
 LANGUAGE 'plpgsql';
+
+INSERT INTO selfinfo VALUES('M2', 2130706433, 7001, 64*1024);
 
 INSERT INTO job_scheduler
     (jobdata, jstate, jtype, jsource, 

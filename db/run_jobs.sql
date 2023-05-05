@@ -237,6 +237,13 @@ jtype = encode(substr(jobdata, 69, 5), 'escape')
 WHERE jstate = 'N-3';
 
 
+-- INSERT into sysinfo_comms (sipaddr, port, capacity, type)
+-- select si.ipaddress, si.comssport,  (select system_capacity SELFINO), 1
+-- from sysinfo si, 
+-- join job_scheduler js 
+-- ON js.jdestination = sy.system_capacity
+-- WHERE dataport = 0; 
+
 -- jobs that have larger size then receivers capacity, update them to state S-2 
 -- or else update them to state S-3
 

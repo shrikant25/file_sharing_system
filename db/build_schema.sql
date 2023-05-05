@@ -1,4 +1,5 @@
-DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns, file_data;
+DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
+                        systems, senders_comms, sending_conns, file_data, selfinfo, sysinfo_comms;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -42,17 +43,32 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE systems(system_name CHAR(10) PRIMARY KEY);
+CREATE TABLE systems (system_name CHAR(10) PRIMARY KEY);
 
+-- have proper naming convention for variabels
+-- when checking on two different system only sysname and ip is required
+-- comssport can be hardcoded value a hardcoded value and thus can be removed from sysinfo table
 CREATE TABLE sysinfo (system_name CHAR(10),
                       ipaddress BIGINT UNIQUE,
-                      port INTEGER NOT NULL,
+                      dataport INTEGER,
+                      comssport INTEGER NOT NULL,
                       system_capacity INTEGER,
                       CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
                       CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
                         REFERENCES  systems(system_name) 
                         ON DELETE CASCADE 
                         ON UPDATE CASCADE);
+
+CREATE TABLE selfinfo (system_name CHAR(10) NOT NULL,
+                      ipaddress BIGINT UNIQUE NOT NULL,
+                      dataport INTEGER NOT NULL,
+                      system_capacity INTEGER NOT NULL);
+
+CREATE TABLE sysinfo_comms (sicid SERIAL PRIMARY KEY,
+                            sipaddr BIGINT NOT NULL,
+                            port INTEGER NOT NULL,
+                            capacity INTEGER NOT NULL,
+                            sctype SMALLINT NOT NULL);
 
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
                         file_name TEXT UNIQUE NOT NULL,  
@@ -98,6 +114,7 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
+INSERT INTO selfinfo VALUES('M3', 2130706433, 7000, 128*1024);
 
 INSERT INTO job_scheduler
     (jobdata, jstate, jtype, jsource, 
