@@ -1,5 +1,5 @@
 
-DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns;
+DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, systems, senders_comms, sending_conns, file_data;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -57,7 +57,6 @@ CREATE TABLE sysinfo (system_name CHAR(10),
 
 CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
                         file_name TEXT NOT NULL, 
-                        file_size BIGINT NOT NULL, 
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
@@ -91,7 +90,7 @@ BEGIN
     
   lenmsg := length(hnmessage)+32;
 
-    if lenmsg<(128 *1024) then
+        if lenmsg<(128 *1024) then
         dummy := '0';
         hnmessage := (hnmessage || (lpad(dummy, ((128*1024)-lenmsg), '0'))::bytea);
     end if;
@@ -103,9 +102,9 @@ LANGUAGE 'plpgsql';
 
 INSERT INTO job_scheduler
     (jobdata, jstate, jtype, jsource, 
-        jobid, jparent_jobid, jdestination, jpriority) 
-VALUES('__ROOT__', 'N-0', '0', '   M2', 
-    GEN_RANDOM_UUID(), NULL, '   M2', 0);
+    jobid, jparent_jobid, jdestination, jpriority) 
+    VALUES('__ROOT__', 'N-0', '0', lpad('M2', 5, ' '),
+    GEN_RANDOM_UUID(), NULL, lpad('M2', 5, ' '), 0);
 
 UPDATE job_scheduler 
 SET jparent_jobid = jobid 
@@ -138,3 +137,6 @@ AFTER INSERT on senders_comms
 FOR EACH ROW 
 WHEN (NEW.mtype = 1)
 EXECUTE FUNCTION send_noti();
+
+
+    

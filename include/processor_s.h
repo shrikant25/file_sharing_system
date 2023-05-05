@@ -14,7 +14,7 @@ int prepare_statements();
 int connect_to_database();
 
 typedef struct db_statements {
-    char statement_name;
+    char *statement_name;
     char *statement;
     int param_count;
 }db_statements;

@@ -13,37 +13,46 @@ PGconn *connection;
 int import_file (char *file_path) 
 {
     int fd = 0;
-    char file_name[pathsize];
-    size_t file_length = 0;
-    char file_length_param[20];
- 
+    char file_name[bufsize];
+    
     int pathlen = strlen(file_path);
     int i = pathlen-1;
     if (file_path[i] == '\n') {
         file_path[i] = '\0';
     }
 
-    memset(file_name, 0, sizeof(pathsize));
     while (i > 0 && file_path[i--] != '/');
+
+    memset(file_name, 0, sizeof(bufsize));
     strncpy(file_name, file_path+i+2, pathlen-i-1);
 
-    if ((fd = open(file_path, O_RDONLY)) == -1) {
-        printf("failed to open file :%s, error : %s\n",file_path, strerror(errno));
+    PGresult *res = NULL;
+    const char *const param_values[] = {file_name, file_path};
+    const int paramLengths[] = {sizeof(file_name), sizeof(file_path)};
+    const int paramFormats[] = {0, 0};
+    int resultFormat = 0;
+    
+    res = PQexecPrepared(connection, dbs[0].statement_name ,dbs[0].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("failed to store file %s, error : %s\n", file_name, PQerrorMessage(connection));
+        PQclear(res);
         return -1;
     }
 
-    file_length = lseek(fd, 0, SEEK_END);
-    close(fd);
+    PQclear(res);
+    return 0;
+}
 
-    if (file_length <= 0) {
-        printf("invalid file length %d %s, error : %s\n", file_length, file_name, strerror(errno));
-        return -1;
-    }
 
-    sprintf(file_length_param, "%d", file_length);
+int send_file (char *file_name, char *destination)
+{
+    int fd = 0;
+    char file_name[bufsize];;
+
+
 
     PGresult *res = NULL;
-    const char *const param_values[] = {file_name, file_length_param, file_path};
+    const char *const param_values[] = {file_name};
     const int paramLengths[] = {sizeof(file_name), sizeof(file_length_param), sizeof(file_path)};
     const int paramFormats[] = {0, 0, 0};
     int resultFormat = 0;
@@ -57,7 +66,6 @@ int import_file (char *file_path)
 
     PQclear(res);
     return 0;
-
 }
 
 
@@ -65,12 +73,6 @@ int export_file (char *path)
 {
     printf("not implemented\n");
 } 
-
-
-int send_file (char* path)
-{
-    printf("not implemented\n");
-}
 
 
 int connect_to_database (char *conninfo) 
@@ -107,12 +109,12 @@ int prepare_statements ()
 }
 
 
-int get_input (char *buf, int bufsize) 
+int get_input (char *prompt, char *buf, int bsize) 
 {
-    printf("Enter absolute file path\n");
-    memset(buf, 0, bufsize);
+    printf("%s", prompt);
+    memset(buf, 0, bsize);
 
-    if (fgets(buf, bufsize, stdin) != NULL) {
+    if (fgets(buf, bsize, stdin) != NULL) {
         return 0;
     }
 
@@ -123,14 +125,13 @@ int get_input (char *buf, int bufsize)
 
 int main (int argc, char *argv[]) 
 {
-
-    char path[pathsize];    
-    char confdata[confdatasize];
+    char choice1[3];
+    char buf1[bufsize];
+    char buf2[bufsize];    
     char db_conn_command[db_conn_command_size];
     char username[conn_param_size];
     char dbname[conn_param_size];
     int conffd = -1;
-    char choice1[3];
 
     if (argc != 2){
         printf("invalid arguments\n");
@@ -142,9 +143,9 @@ int main (int argc, char *argv[])
         return -1;
     }
 
-    memset(confdata, 0, confdatasize);
-    if(read(conffd, confdata, confdatasize) > 0){
-        sscanf(confdata, "USERNAME=%s\nDBNAME=%s", username, dbname);
+    memset(buf1, 0, bufsize);
+    if(read(conffd, buf1, bufsize) > 0){
+        sscanf(buf1, "USERNAME=%s\nDBNAME=%s", username, dbname);
     }
     else {
         printf("failed to read config file");
@@ -173,19 +174,23 @@ int main (int argc, char *argv[])
                         return 0;
                         break;
     
-            case '1':   if(get_input(path, pathsize) != -1) {
-                            import_file(path);
+            case '1':   if (get_input("Enter absolute file path\n", buf1, bufsize) == -1) {
+                            break;
                         }
+                        import_file(buf1);
                         break;
         
-            case '2':   if(get_input(path, pathsize) != -1) {
-                            send_file(path);
+            case '2':   if (get_input("Enter absolute file path\n", buf1, bufsize) != -1) {
+                            break;
                         }   
+                        if (get_input("Enter destination\n", buf1, bufsize) == -1) {
+                            break;
+                        }
+                        send_file (buf1, buf2);
                         break;
             
-            case '3':
-                        if(get_input(path, pathsize) != -1) {
-                            export_file(path);
+            case '3':   if (get_input("Enter absolute file path\n", buf1, bufsize) != -1) {
+                            export_file(buf1);
                         }
                         break;
             
