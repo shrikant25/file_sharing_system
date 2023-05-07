@@ -67,6 +67,22 @@ WHERE jobdata = ( SELECT file_name::bytea
 AND jstate = 'S-1';
 
 
+WITH single_job AS 
+(
+    SELECT create_message( gen_random_uuid()::text::bytea, '1'::text, ''::bytea, 
+        lo_get(fd.file_data), btrim(js.jsource, ' '), btrim(js.jdestination, ' '), js.jpriority::text) mdata, 
+        jsource, js.jobid as parent_jobid, js.jdestination, js.jpriority 
+        FROM files fd JOIN
+        job_scheduler js ON 
+        fd.file_name::bytea = js.jobdata
+        JOIN sysinfo si ON
+        js.jdestination = si.system_name
+        WHERE jstate = 'S-3'    
+)
+INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT mdata, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
+FROM single_job; 
+
 
 -- For all jobs where size of data greater than capacity, 
 -- divide the job in n jobs such that each jobs which will have size same as the message size
@@ -96,7 +112,7 @@ INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid
                             lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
                             chunk_data, btrim(jsource, ' '), btrim(jdestination, ' '),
                             jpriority::text),
-            'S-3', '2', jsource, 
+            'S-4', '2', jsource, 
             encode(uuid_data, 'escape')::uuid, 
             parent_jobid,
             jdestination, 
@@ -123,8 +139,13 @@ WITH cte_msginfo as(
         WHERE jstate = 'S-2'
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT mdata, 'S-3', '3', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+SELECT mdata, 'S-4', '3', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
 FROM cte_msginfo; 
+
+
+
+
+
 
 
 
@@ -136,7 +157,7 @@ UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
 INSERT into sending_conns (sfd, sipaddr, scstatus) 
 SELECT DISTINCT -1, jdestination::BIGINT, 1  
 FROM job_scheduler js 
-WHERE js.jstate = 'S-3' 
+WHERE js.jstate = 'S-4' 
 AND NOT EXISTS (
   SELECT 1 
   FROM sending_conns sc
@@ -175,7 +196,7 @@ AND sc.scstatus = 2;
 -- SELECT                       length(jobdata),    
 --     encode(substr(jobdata, 89, 26), 'escape') AS tm,
 --     encode(substr(jobdata, 115, 36), 'escape') AS parentjobid, encode(substr(jobdata, 151, 12), 'escape') as size, encode(substr(jobdata, 163, 10), 'escape') as cnt  
--- FROM job_scheduler WHERE jstate = 'S-3';
+-- FROM job_scheduler WHERE jstate = 'S-4';
 
 -- SELECT                           
 --     encode(substr(jobdata, 1, 32), 'escape') AS mhash,
@@ -189,7 +210,7 @@ AND sc.scstatus = 2;
 --     encode(substr(jobdata, 123, 36), 'escape') AS jobid,
 --     encode(substr(jobdata, 159, 10), 'escape') AS datalength,
 --     encode(substr(jobdata, 169), 'escape') AS data 
--- FROM job_scheduler WHERE jstate = 'S-3';
+-- FROM job_scheduler WHERE jstate = 'S-4';
 
 
 
