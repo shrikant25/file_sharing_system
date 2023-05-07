@@ -78,6 +78,7 @@ CREATE TABLE file_data (file_id UUID PRIMARY KEY,
 CREATE OR REPLACE FUNCTION create_message(
     uuid_data bytea,
     message_type text,
+    subheader bytea,
     messaget bytea,
     message_source text,
     message_destination text,
@@ -99,7 +100,7 @@ BEGIN
     
     hnmessage := uuid_data || fixed_type::bytea || 
                 fixed_source::bytea || fixed_destination::bytea || 
-                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea;
+                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || subheader;
     
     return md5(hnmessage || messaget)::bytea || hnmessage;
 END;

@@ -147,15 +147,14 @@ WITH par_job AS (
 chunk_info AS (
     SELECT idx, gen_random_uuid()::text::bytea AS uuid_data, 
     jobid AS parent_jobid, jdestination, jsource, jpriority, system_capacity,  
-    lo_get(file_data, (idx*system_capacity)::BIGINT, (idx * system_capacity + system_capacity)::INTEGER) chunk_data 
+    lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER) chunk_data 
     FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
         SELECT
-            create_message(uuid_data, '2'::text, lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || 
-                            lpad(length(chunk_data)::text, 10, ' ')::bytea || chunk_data, 
-                            btrim(jsource, ' '), 
-                            btrim(jdestination, ' '),
+            create_message( uuid_data, '2'::text, 
+                            lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
+                            chunk_data, btrim(jsource, ' '), btrim(jdestination, ' '),
                             jpriority::text),
             'S-3', '2', jsource, 
             encode(uuid_data, 'escape')::uuid, 
