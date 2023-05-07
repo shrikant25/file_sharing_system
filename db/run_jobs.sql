@@ -152,21 +152,21 @@ chunk_info AS (
 )
 INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
         SELECT
-            create_message(uuid_data, '2'::text, lpad(idx::text, 8, ' ')::bytea || jobid::text::bytea || 
+            create_message(uuid_data, '2'::text, lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || 
                             lpad(length(chunk_data)::text, 10, ' ')::bytea || chunk_data, 
                             btrim(jsource, ' '), 
                             btrim(jdestination, ' '),
                             jpriority::text),
             'S-3', '2', jsource, 
-            encode(uuid_data, 'escape'), 
+            encode(uuid_data, 'escape')::uuid, 
             parent_jobid,
             jdestination, 
             jpriority 
         FROM chunk_info;
 
-        
+
 insert into job_scheduler (jobid, jobdata, jstate, jtype, jsource, jparent_jobid, jdestination, jpriority)  
-values (gen_random_uuid(), 'hola', 'S-1', 0, '   M2', '02f7e36a-d138-4458-978a-911b4bc8bb19', 'm3', 5);
+values (gen_random_uuid(), 'hola', 'S-1', 0, '   M2', '02f7e36a-d138-4458-978a-911b4bc8bb19', '   m3', 5);
 
 insert into file_data (file_id, file_name, file_data) values(gen_random_uuid(), 'hola', lo_import('/home/shrikant/Desktop/prj/test/f9.mkv'));
 -- cte_jobdata = splits the messages into smaller chunks based on capacity of receiver

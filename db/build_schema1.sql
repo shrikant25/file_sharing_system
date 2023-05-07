@@ -73,6 +73,7 @@ CREATE TABLE file_data (file_id UUID PRIMARY KEY,
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
 CREATE OR REPLACE FUNCTION create_message(
+    uuid_data bytea,
     message_type text,
     messaget bytea,
     message_source text,
@@ -87,27 +88,17 @@ DECLARE
     fixed_source text;
     fixed_destination text;
     fixed_priority text;
-    msg bytea;
-    lenmsg int;
-    dummy text;
 BEGIN
     fixed_type := lpad(message_type, 5, ' ');
     fixed_source := lpad(message_source, 5, ' ');
     fixed_destination := lpad(message_destination, 5, ' ');
     fixed_priority := lpad(message_priority, 5, ' ');
     
-    hnmessage := gen_random_uuid()::text::bytea || fixed_type::bytea || 
+    hnmessage := uuid_data || fixed_type::bytea || 
                 fixed_source::bytea || fixed_destination::bytea || 
-                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || messaget;
+                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea;
     
-  lenmsg := length(hnmessage)+32;
-
-        if lenmsg<(128 *1024) then
-        dummy := '0';
-        hnmessage := (hnmessage || (lpad(dummy, ((128*1024)-lenmsg), '0'))::bytea);
-    end if;
-    
-    return md5(hnmessage)::bytea || hnmessage;
+    return md5(hnmessage || messaget)::bytea || hnmessage;
 END;
 $$
 LANGUAGE 'plpgsql';
