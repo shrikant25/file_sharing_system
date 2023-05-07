@@ -50,6 +50,24 @@ WHERE dataport = 0 AND
 js.jstate = 'S-1'; 
 
 
+UPDATE job_scheduler 
+SET jstate = 'S-2' 
+WHERE jobdata = ( SELECT file_name::bytea 
+                FROM files JOIN sysinfo si ON
+                jdestination = si.system_name AND
+                LENGTH(lo_get(file_data)) > system_capacity)
+AND jstate = 'S-1';
+
+UPDATE job_scheduler 
+SET jstate = 'S-3' 
+WHERE jobdata = ( SELECT file_name::bytea 
+                FROM files JOIN sysinfo si ON
+                jdestination = si.system_name AND
+                LENGTH(lo_get(file_data)) <= system_capacity)
+AND jstate = 'S-1';
+
+
+
 -- For all jobs where size of data greater than capacity, 
 -- divide the job in n jobs such that each jobs which will have size same as the message size
 -- except for last message it may have the same size of less
@@ -58,7 +76,7 @@ WITH par_job AS (
     
     SELECT fd.file_data, js.jobid, as parent_jobid length(lo_get(file_data)) datal, 
     js.jdestination, js.jsource, js.jpriority, si.system_capacity FROM 
-    file_data fd JOIN
+    files fd JOIN
     job_scheduler js ON 
     fd.file_name::bytea = js.jobdata
     JOIN sysinfo si ON
@@ -97,7 +115,7 @@ WITH cte_msginfo as(
                             lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
                             ''::bytea, btrim(jsource, ' '), btrim(jdestination, ' '), jpriority::text)as mdata, 
         js.jobid, js.jdestination, js.jsource, js.jpriority, si.system_capacity
-        FROM file_data fd JOIN
+        FROM files fd JOIN
         job_scheduler js ON 
         fd.file_name::bytea = js.jobdata
         JOIN sysinfo si ON

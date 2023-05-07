@@ -17,12 +17,12 @@ typedef struct db_statements {
 db_statements dbs[statement_count] = {
     {
       .statement_name = "import_file",
-      .statement = "INSERT INTO FILE_DATA(file_id, file_name, file_data) VALUES(GEN_RANDOM_UUID(), $1, lo_import($2));",
+      .statement = "INSERT INTO files(file_id, file_name, file_data) VALUES(GEN_RANDOM_UUID(), $1, lo_import($2));",
       .param_count = 2,
     },
     {
       .statement_name = "check_file_existence",
-      .statement = "SELECT 1 FROM file_data WHERE file_name = $1;",
+      .statement = "SELECT 1 FROM files WHERE file_name = $1;",
       .param_count = 1,
     },
     {

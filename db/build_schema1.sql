@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
-                        systems, senders_comms, sending_conns, file_data, selfinfo, sysinfo_comms;
+                        systems, senders_comms, sending_conns, files, selfinfo, sysinfo_comms;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -67,7 +67,7 @@ CREATE TABLE sysinfo_comms (sicid SERIAL PRIMARY KEY,
                             capacity INTEGER NOT NULL,
                             sctype SMALLINT NOT NULL);
 
-CREATE TABLE file_data (file_id UUID PRIMARY KEY, 
+CREATE TABLE files (file_id UUID PRIMARY KEY, 
                         file_name TEXT UNIQUE NOT NULL, 
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
