@@ -62,14 +62,21 @@ INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdesti
 SELECT ipaddress, dataport, siccapacity, '2', '1' 
 WHERE siccapacity <= system_capacity;
 
-INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
-SELECT si.ipaddress, si.comssport,  (SELECT system_capacity FROM SELFINO), 1, 1
-FROM sysinfo si 
-JOIN job_scheduler js 
-ON js.jdestination = si.system_name
-WHERE dataport = 0 AND
-js.jstate = 'S-1'; 
 
+WITH conn_info AS (
+    SELECT si.system_name as destination, 1, 1
+    FROM sysinfo si 
+    JOIN job_scheduler js 
+    ON js.jdestination = si.system_name
+    WHERE dataport = 0 AND
+    js.jstate = 'S-1'; 
+),
+INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority)
+SELECT create_message (gen_random_uuid()::text::bytea, '4', ""::bytea, 
+                        (SELECT system_capacity FROM selfinfo)::bytea,
+                        (SELECT system_name FROM selfinfo), 
+                        destination, 5),
+        0, '4', 'H', (SELECT system_name FROM selfinfo), destination, 5 FROM conn_info;
 
 
 UPDATE job_scheduler 
@@ -79,6 +86,7 @@ WHERE jobdata = ( SELECT file_name::bytea
                 jdestination = si.system_name AND
                 LENGTH(lo_get(file_data)) > system_capacity)
 AND jstate = 'S-1';
+
 
 UPDATE job_scheduler 
 SET jstate = 'S-3' 
