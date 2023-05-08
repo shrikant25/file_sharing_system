@@ -56,7 +56,7 @@ WHERE jstate = 'N-3';
 
 WITH conn_info_sending AS (
     SELECT gen_random_uuid() as uuid_data,
-    (SELECT system_capacity, system_name) as sysdata,
+    (SELECT system_capacity, system_name, dataport) as sysdata,
     js.parent_jobid,
     si.system_name as destination, 1, 1
     FROM sysinfo si 
@@ -67,7 +67,7 @@ WITH conn_info_sending AS (
 ),
 INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
 SELECT create_message (uuid_data::text::bytea, '4', ""::bytea, 
-                        lpad(sysdata.system_capacity::text,' ', 11)::bytea,
+                        (lpad(sysdata.system_capacity::text,' ', 11) || (lpad(sysdata.dataport::text, ' ', 11)))::bytea,
                         sysdata.system_name::bytea, 
                         destination, 5),
         0, '4', 'S-5', sysdata.system_name, 
@@ -85,7 +85,7 @@ WITH conn_info_receiving AS (
 conn_info AS(
     SELECT gen_random_uuid() as uuid_data, 
         message_source as destination, jparent_jobid,
-        (select system_name from selfinfo),
+        (select system_name, dataport from selfinfo) as sysdata,
         (
             CASE 
                 WHEN rcapacity > (SELECT system_capacity FROM selfinfo) THEN system_capacity
@@ -94,13 +94,24 @@ conn_info AS(
     FROM conn_info_receiving;
 )
 INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
-SELECT create_message (uuid_data::text::bytea, '4', ""::bytea,
-                        lpad(data_capacity::text,' ', 11)::bytea, 
-                        system_name::bytea, destination, 5),
-        0, '4', 'S-5', system_name,
+SELECT create_message (uuid_data::text::bytea, '5', ""::bytea,
+                        (lpad(data_capacity::text,' ', 11) || (lpad(sysdata.dataport::text, ' ', 11)))::bytea, 
+                        sysdata.system_name::bytea, destination, 5),
+        0, '5', 'S-5', sysdata.system_name,
         destination, 5, uuid_data, jparent_jobid FROM conn_info;
 
 
+
+UPDATE sysinfo set system_capacity, dataport = (
+SELECT encode(substr(js.jobdata, 115, 11), 'escape')::INTEGER as system_capacity, 
+        encode(substr(js.jobdata, 126, 11), 'escape')::INTEGER as dataport
+FROM job_scheduler js JOIN
+sysinfo si ON
+(encode(substr(js.jobdata, 74, 5), 'escape')) = si.system_name,
+js.jsource = si.ipaddress
+WHERE 
+jstate = 'N-4' AND 
+jtype = '5'); 
 
 
 UPDATE job_scheduler 
