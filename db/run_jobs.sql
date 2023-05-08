@@ -41,13 +41,35 @@ WHERE jstate = 'N-3';
 -- VALUES (gen_random_uuid(), 'hola', 'N-1', 0, lpad('M2', 5, ' '), 
 --     (SELECT jobid FROM job_scheduler WHERE jobid = jparent_jobid), lpad('m3', 5, ' '), 5);
 
-INSERT INTO sysinfo_comms (sipaddr, port, capacity, sctype)
-SELECT si.ipaddress, si.comssport,  (SELECT system_capacity FROM SELFINO), 1
+
+-- destination 1 means for others
+-- destination 2 means for self
+
+-- siccommtypes
+-- type 1 : system 'A' sends info
+-- type 2 : system 'B' sends response
+
+-- insert into job_scheduler (jobid,)
+
+INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
+SELECT sc.sicpaddr, si.dataport, si.system_capacity, '2', '1'
+FROM selfinfo si, sysinfo_comms sc 
+WHERE sc.system_capacity < si.siccapacity,
+siccommtype = '2'; 
+
+
+INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
+SELECT ipaddress, dataport, siccapacity, '2', '1' 
+WHERE siccapacity <= system_capacity;
+
+INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
+SELECT si.ipaddress, si.comssport,  (SELECT system_capacity FROM SELFINO), 1, 1
 FROM sysinfo si 
 JOIN job_scheduler js 
 ON js.jdestination = si.system_name
 WHERE dataport = 0 AND
 js.jstate = 'S-1'; 
+
 
 
 UPDATE job_scheduler 
@@ -188,6 +210,10 @@ AND js.jstate != 'C'
 WHERE js.jdestination IS NULL
 AND sc.scstatus = 2;
 
+
+-- type 1 = single data job
+-- type 2 = chunk of larger message
+-- type 3 = metadata about chunks
 
 
 

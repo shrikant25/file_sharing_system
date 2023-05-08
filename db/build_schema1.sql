@@ -44,7 +44,7 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE systems(system_name CHAR(10) PRIMARY KEY);
+CREATE TABLE systems (system_name CHAR(10) PRIMARY KEY);
 
 CREATE TABLE sysinfo (system_name CHAR(10),
                       ipaddress BIGINT UNIQUE,
@@ -60,20 +60,16 @@ CREATE TABLE sysinfo (system_name CHAR(10),
 CREATE TABLE selfinfo (system_name CHAR(10) NOT NULL,
                       ipaddress BIGINT UNIQUE NOT NULL,
                       dataport INTEGER NOT NULL,
+                      comssport INTEGER NOT NULL,
                       system_capacity INTEGER NOT NULL);
 
-CREATE TABLE sysinfo_comms (sicid SERIAL PRIMARY KEY,
-                            sipaddr BIGINT NOT NULL,
-                            port INTEGER NOT NULL,
-                            capacity INTEGER NOT NULL,
-                            sctype SMALLINT NOT NULL);
 
 CREATE TABLE files (file_id UUID PRIMARY KEY, 
                         file_name TEXT UNIQUE NOT NULL, 
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);
 
-CREATE OR REPLACE FUNCTION create_message(
+CREATE OR REPLACE FUNCTION create_message (
     uuid_data bytea,
     message_type text,
     subheader bytea,

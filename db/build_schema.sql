@@ -63,13 +63,9 @@ CREATE TABLE sysinfo (system_name CHAR(10),
 CREATE TABLE selfinfo (system_name CHAR(10) NOT NULL,
                       ipaddress BIGINT UNIQUE NOT NULL,
                       dataport INTEGER NOT NULL,
+                      comssport INTEGER NOT NULL,
                       system_capacity INTEGER NOT NULL);
 
-CREATE TABLE sysinfo_comms (sicid SERIAL PRIMARY KEY,
-                            sipaddr BIGINT NOT NULL,
-                            port INTEGER NOT NULL,
-                            capacity INTEGER NOT NULL,
-                            sctype SMALLINT NOT NULL);
 
 CREATE TABLE files (file_id UUID PRIMARY KEY, 
                         file_name TEXT UNIQUE NOT NULL,  
@@ -111,7 +107,7 @@ LANGUAGE 'plpgsql';
 INSERT INTO selfinfo VALUES('M3', 2130706433, 7000, 128*1024);
 
 INSERT INTO job_scheduler
-    (jobdata, data_offset,jstate, jtype, jsource, 
+    (jobdata, data_offset, jstate, jtype, jsource, 
     jobid, jparent_jobid, jdestination, jpriority) 
     VALUES('__ROOT__', 0, 'N-0', '0', lpad('M3', 5, ' '), 
     GEN_RANDOM_UUID(), NULL, lpad('M3', 5, ' '), 0);
