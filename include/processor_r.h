@@ -24,9 +24,9 @@ int prepare_statements();
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "r_insert_data",  
-      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, \
+      .statement = "INSERT INTO job_scheduler(jobdata, data_offset, jstate, jtype, \
                     jsource, jobid, jparent_jobid, jdestination, \
-                    jpriority) VALUES($2, 'N-0', '0', $1, GEN_RANDOM_UUID(), \
+                    jpriority) VALUES($2, 0, 'N-0', '0', $1, GEN_RANDOM_UUID(), \
                     (select jobid from job_scheduler where jparent_jobid = jobid), 0, 0);",
       .param_count = 2,
     },

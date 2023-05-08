@@ -8,6 +8,7 @@ UNLISTEN noti_2sys;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
+                            data_offset INTEGER NOT NULL,
                             jstate CHAR(5) NOT NULL DEFAULT 'N-1',
                             jtype TEXT NOT NULL DEFAULT '1',
                             jsource TEXT NOT NULL,
@@ -107,9 +108,9 @@ LANGUAGE 'plpgsql';
 INSERT INTO selfinfo VALUES('M2', 2130706433, 7001, 64*1024);
 
 INSERT INTO job_scheduler
-    (jobdata, jstate, jtype, jsource, 
+    (jobdata, data_offset, jstate, jtype, jsource, 
     jobid, jparent_jobid, jdestination, jpriority) 
-    VALUES('__ROOT__', 'N-0', '0', lpad('M2', 5, ' '),
+    VALUES('__ROOT__', 0,'N-0', '0', lpad('M2', 5, ' '),
     GEN_RANDOM_UUID(), NULL, lpad('M2', 5, ' '), 0);
 
 UPDATE job_scheduler 

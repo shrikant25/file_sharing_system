@@ -37,9 +37,9 @@ SET jstate = 'N-4',
 jtype = encode(substr(jobdata, 69, 5), 'escape')
 WHERE jstate = 'N-3';
 
-INSERT INTO job_scheduler (jobid,  jobdata, jstate, jtype, jsource, jparent_jobid, jdestination, jpriority) 
-VALUES (gen_random_uuid(), 'hola', 'N-1', 0, lpad('M2', 5, ' '), 
-    (SELECT jobid FROM job_scheduler WHERE jobid = jparent_jobid), lpad('m3', 5, ' '), 5);
+-- INSERT INTO job_scheduler (jobid,  jobdata, jstate, jtype, jsource, jparent_jobid, jdestination, jpriority) 
+-- VALUES (gen_random_uuid(), 'hola', 'N-1', 0, lpad('M2', 5, ' '), 
+--     (SELECT jobid FROM job_scheduler WHERE jobid = jparent_jobid), lpad('m3', 5, ' '), 5);
 
 INSERT INTO sysinfo_comms (sipaddr, port, capacity, sctype)
 SELECT si.ipaddress, si.comssport,  (SELECT system_capacity FROM SELFINO), 1
@@ -79,8 +79,8 @@ WITH single_job AS
         js.jdestination = si.system_name
         WHERE jstate = 'S-3'    
 )
-INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT mdata, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
+INSERT INTO job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT mdata, 0, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
 FROM single_job; 
 
 
@@ -106,13 +106,13 @@ chunk_info AS (
     lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER) chunk_data 
     FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
 )
-INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+INSERT INTO job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
         SELECT
             create_message( uuid_data, '2'::text, 
                             lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
                             chunk_data, btrim(jsource, ' '), btrim(jdestination, ' '),
                             jpriority::text),
-            'S-4', '2', jsource, 
+            idx, 'S-4', '2', jsource, 
             encode(uuid_data, 'escape')::uuid, 
             parent_jobid,
             jdestination, 
