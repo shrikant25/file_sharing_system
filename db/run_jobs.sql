@@ -51,32 +51,56 @@ WHERE jstate = 'N-3';
 
 -- insert into job_scheduler (jobid,)
 
-INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
-SELECT sc.sicpaddr, si.dataport, si.system_capacity, '2', '1'
-FROM selfinfo si, sysinfo_comms sc 
-WHERE sc.system_capacity < si.siccapacity,
-siccommtype = '2'; 
 
 
-INSERT INTO sysinfo_comms (sicpaddr, sicport, siccapacity, siccommtype, sicdestination)
-SELECT ipaddress, dataport, siccapacity, '2', '1' 
-WHERE siccapacity <= system_capacity;
 
-
-WITH conn_info AS (
-    SELECT si.system_name as destination, 1, 1
+WITH conn_info_sending AS (
+    SELECT gen_random_uuid() as uuid_data,
+    (SELECT system_capacity, system_name) as sysdata,
+    js.parent_jobid,
+    si.system_name as destination, 1, 1
     FROM sysinfo si 
     JOIN job_scheduler js 
     ON js.jdestination = si.system_name
     WHERE dataport = 0 AND
     js.jstate = 'S-1'; 
 ),
-INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority)
-SELECT create_message (gen_random_uuid()::text::bytea, '4', ""::bytea, 
-                        (SELECT system_capacity FROM selfinfo)::bytea,
-                        (SELECT system_name FROM selfinfo), 
+INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+SELECT create_message (uuid_data::text::bytea, '4', ""::bytea, 
+                        lpad(sysdata.system_capacity::text,' ', 11)::bytea,
+                        sysdata.system_name::bytea, 
                         destination, 5),
-        0, '4', 'H', (SELECT system_name FROM selfinfo), destination, 5 FROM conn_info;
+        0, '4', 'S-5', sysdata.system_name, 
+        destination, 5, uuid_data, parent_jobid FROM conn_info_sending;
+
+
+WITH conn_info_receiving AS (    
+    SELECT encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
+    encode(substr(jobdata, 74, 5), 'escape') AS message_source,
+    jparent_jobid,
+    FROM job_scheduler 
+    WHERE jstate = 'N-4'
+    AND jtype = '4'
+),
+conn_info AS(
+    SELECT gen_random_uuid() as uuid_data, 
+        message_source as destination, jparent_jobid,
+        (select system_name from selfinfo),
+        (
+            CASE 
+                WHEN rcapacity > (SELECT system_capacity FROM selfinfo) THEN system_capacity
+                ELSE rcapacity
+        ) as data_capacity
+    FROM conn_info_receiving;
+)
+INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+SELECT create_message (uuid_data::text::bytea, '4', ""::bytea,
+                        lpad(data_capacity::text,' ', 11)::bytea, 
+                        system_name::bytea, destination, 5),
+        0, '4', 'S-5', system_name,
+        destination, 5, uuid_data, jparent_jobid FROM conn_info;
+
+
 
 
 UPDATE job_scheduler 
