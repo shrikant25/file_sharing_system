@@ -74,6 +74,9 @@ SELECT create_message (uuid_data::text::bytea, '4', ""::bytea,
         destination, 5, uuid_data, parent_jobid FROM conn_info_sending;
 
 
+
+
+
 WITH conn_info_receiving AS (    
     SELECT encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
     encode(substr(jobdata, 74, 5), 'escape') AS message_source,
@@ -86,10 +89,11 @@ conn_info AS(
     SELECT gen_random_uuid() as uuid_data, 
         message_source as destination, jparent_jobid,
         (select system_name, dataport from selfinfo) as sysdata,
-        (
+        (select
             CASE 
                 WHEN rcapacity > (SELECT system_capacity FROM selfinfo) THEN system_capacity
                 ELSE rcapacity
+            FROM conn_info_receiving
         ) as data_capacity
     FROM conn_info_receiving;
 )
@@ -99,6 +103,32 @@ SELECT create_message (uuid_data::text::bytea, '5', ""::bytea,
                         sysdata.system_name::bytea, destination, 5),
         0, '5', 'S-5', sysdata.system_name,
         destination, 5, uuid_data, jparent_jobid FROM conn_info;
+
+
+WITH conn_info_receiving AS (    
+    SELECT encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
+           encode(substr(jobdata, 126, 11), 'escape')::INTEGER As rport
+    encode(substr(jobdata, 74, 5), 'escape') AS source_name,
+    jsource as source_ip,
+    FROM job_scheduler 
+    WHERE jstate = 'N-4'
+    AND jtype = '4'
+),
+conn_info AS(
+    SELECT  source_name, source_ipt, rport,
+        (select
+            CASE 
+                WHEN rcapacity > (SELECT system_capacity FROM selfinfo) THEN system_capacity
+                ELSE rcapacity
+        ) as data_capacity
+    FROM conn_info_receiving;
+)
+UPDATE sysinfo set system_capacity, dataport = (
+    SELECT data_capacity, rport
+    FROM conn_info 
+    WHERE source_name = sysinfo.system_name
+    AND source_ip = sysinfo.ipaddress
+);
 
 
 
@@ -114,6 +144,8 @@ jstate = 'N-4' AND
 jtype = '5'); 
 
 
+
+
 UPDATE job_scheduler 
 SET jstate = 'S-2' 
 WHERE jobdata = ( SELECT file_name::bytea 
@@ -123,6 +155,9 @@ WHERE jobdata = ( SELECT file_name::bytea
 AND jstate = 'S-1';
 
 
+
+
+
 UPDATE job_scheduler 
 SET jstate = 'S-3' 
 WHERE jobdata = ( SELECT file_name::bytea 
@@ -130,6 +165,9 @@ WHERE jobdata = ( SELECT file_name::bytea
                 jdestination = si.system_name AND
                 LENGTH(lo_get(file_data)) <= system_capacity)
 AND jstate = 'S-1';
+
+
+
 
 
 WITH single_job AS 
@@ -216,6 +254,8 @@ FROM cte_msginfo;
 
 -- since jobs is split into multiple jobs, send to waiting state
 UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
+
+
 
 -- create a record for every ipaddress where messages are intended for
 -- and it is not present in sending_connections
