@@ -1,5 +1,5 @@
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
-                        systems, senders_comms, sending_conns, files, selfinfo, sysinfo_comms;
+                        systems, senders_comms, sending_conns, files, selfinfo;
 DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
@@ -101,7 +101,7 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-INSERT INTO selfinfo VALUES('M2', 2130706433, 7001, 64*1024);
+INSERT INTO selfinfo VALUES('   M2', 2130706433, 7001, 7002, 64*1024);
 
 INSERT INTO job_scheduler
     (jobdata, data_offset, jstate, jtype, jsource, 

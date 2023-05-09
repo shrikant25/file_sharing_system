@@ -1,41 +1,72 @@
 
 
 -- updates state of message from N-1 to N-2 if md5 hash matches, otherewise the message is marked as dead
-UPDATE job_scheduler 
-SET jstate = 
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 
     CASE 
-        WHEN jstate = 'N-1' AND 
+        WHEN 
+            jstate = 'N-1' 
+        AND 
             encode(substr(jobdata, 1, 32), 'escape') = md5(substr(jobdata, 33)) 
-        THEN 'N-2'
-        WHEN jstate = 'N-1' AND 
+        THEN 
+            'N-2'
+        WHEN 
+            jstate = 'N-1' 
+        AND 
             encode(substr(jobdata, 1, 32), 'escape') != md5(substr(jobdata, 33)) 
-        THEN 'D'
-        ELSE jstate
+        THEN 
+            'D'
+        ELSE 
+            jstate
     END;
 
 
 -- if message is for same system, then update the state to N-3
-UPDATE job_scheduler 
-SET jstate = 'N-3' 
-WHERE jstate = 'N-2' 
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'N-3' 
+WHERE 
+    jstate = 'N-2' 
 AND 
-encode(substr(jobdata, 79, 5), 'escape') = (SELECT jdestination FROM job_scheduler WHERE jobid = jparent_jobid);
+    encode(substr(jobdata, 79, 5), 'escape') = (
+                                                SELECT 
+                                                    jdestination 
+                                                FROM 
+                                                    job_scheduler 
+                                                WHERE 
+                                                    jobid = jparent_jobid
+                                                );
 
 
 -- if message is for some other system, then update the state to S-1 
-UPDATE job_scheduler 
-SET jstate = 'S-1', 
-jdestination = encode(substr(jobdata, 79, 5), 'escape') 
-WHERE jstate = 'N-2' 
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'S-1', 
+    jdestination = encode(substr(jobdata, 79, 5), 'escape') 
+WHERE 
+    jstate = 'N-2' 
 AND 
-encode(substr(jobdata, 79, 5), 'escape') != (SELECT jdestination FROM job_scheduler WHERE jobid = jparent_jobid);
+    encode(substr(jobdata, 79, 5), 'escape') != (
+                                                SELECT 
+                                                    jdestination 
+                                                FROM 
+                                                    job_scheduler 
+                                                WHERE 
+                                                    jobid = jparent_jobid);
 
 
 -- identify the type, and update the state to N-4
-UPDATE job_scheduler 
-SET jstate = 'N-4', 
-jtype = encode(substr(jobdata, 69, 5), 'escape')
-WHERE jstate = 'N-3';
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'N-4', 
+    jtype = encode(substr(jobdata, 69, 5), 'escape')
+WHERE 
+    jstate = 'N-3';
 
 -- INSERT INTO job_scheduler (jobid,  jobdata, jstate, jtype, jsource, jparent_jobid, jdestination, jpriority) 
 -- VALUES (gen_random_uuid(), 'hola', 'N-1', 0, lpad('M2', 5, ' '), 
@@ -55,23 +86,41 @@ WHERE jstate = 'N-3';
 
 
 WITH conn_info_sending AS (
-    SELECT gen_random_uuid() as uuid_data,
-    (SELECT system_capacity, system_name, dataport) as sysdata,
-    js.parent_jobid,
-    si.system_name as destination, 1, 1
-    FROM sysinfo si 
-    JOIN job_scheduler js 
-    ON js.jdestination = si.system_name
-    WHERE dataport = 0 AND
-    js.jstate = 'S-1'; 
-),
-INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
-SELECT create_message (uuid_data::text::bytea, '4', ""::bytea, 
-                        (lpad(sysdata.system_capacity::text,' ', 11) || (lpad(sysdata.dataport::text, ' ', 11)))::bytea,
-                        sysdata.system_name::bytea, 
-                        destination, 5),
-        0, '4', 'S-5', sysdata.system_name, 
-        destination, 5, uuid_data, parent_jobid FROM conn_info_sending;
+    SELECT 
+        gen_random_uuid() AS uuid_data,
+        sf.system_capacity, 
+        sf.system_name, 
+        sf.dataport,
+        js.jparent_jobid,
+        si.system_name AS destination, 1, 1
+    FROM 
+        selfinfo sf, 
+        sysinfo si 
+    JOIN 
+            job_scheduler js 
+    ON 
+            js.jdestination = si.system_name
+    WHERE 
+        si.dataport = 0
+    AND 
+        js.jstate = 'S-1' 
+)
+INSERT INTO 
+        job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+        SELECT create_message (
+                                uuid_data::text::bytea, 
+                                '4'::text, 
+                                ''::bytea, 
+                                (lpad(system_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')))::bytea,
+                                system_name::text, 
+                                destination::text, 
+                                '5'::text
+                            ),
+                0, '4', 'S-5', system_name, 
+                destination, 5, uuid_data, 
+                jparent_jobid 
+        FROM 
+            conn_info_sending;
 
 
 
@@ -98,8 +147,8 @@ conn_info AS(
     FROM conn_info_receiving;
 )
 INSERT INTO job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
-SELECT create_message (uuid_data::text::bytea, '5', ""::bytea,
-                        (lpad(data_capacity::text,' ', 11) || (lpad(sysdata.dataport::text, ' ', 11)))::bytea, 
+SELECT create_message (uuid_data::text::bytea, '5', ''::bytea,
+                        (lpad(data_capacity::text, 11, ' ') || (lpad(sysdata.dataport::text, 11, ' ')))::bytea, 
                         sysdata.system_name::bytea, destination, 5),
         0, '5', 'S-5', sysdata.system_name,
         destination, 5, uuid_data, jparent_jobid FROM conn_info;
@@ -146,24 +195,45 @@ jtype = '5');
 
 
 
-UPDATE job_scheduler 
-SET jstate = 'S-2' 
-WHERE jobdata = ( SELECT file_name::bytea 
-                FROM files JOIN sysinfo si ON
-                jdestination = si.system_name AND
-                LENGTH(lo_get(file_data)) > system_capacity)
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'S-2' 
+WHERE 
+    jobdata = ( 
+                SELECT 
+                    file_name::bytea 
+                FROM 
+                    files f 
+                JOIN 
+                    sysinfo si 
+                ON
+                    jdestination = si.system_name 
+                AND
+                    LENGTH(lo_get(f.file_data)) > si.system_capacity
+                )
 AND jstate = 'S-1';
 
 
 
 
 
-UPDATE job_scheduler 
-SET jstate = 'S-3' 
-WHERE jobdata = ( SELECT file_name::bytea 
-                FROM files JOIN sysinfo si ON
-                jdestination = si.system_name AND
-                LENGTH(lo_get(file_data)) <= system_capacity)
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'S-3' 
+WHERE 
+    jobdata = ( 
+                SELECT 
+                    file_name::bytea 
+                FROM 
+                    files 
+                JOIN 
+                    sysinfo si 
+                ON
+                    jdestination = si.system_name 
+                AND
+                    LENGTH(lo_get(file_data)) <= system_capacity)
 AND jstate = 'S-1';
 
 
@@ -172,19 +242,38 @@ AND jstate = 'S-1';
 
 WITH single_job AS 
 (
-    SELECT create_message( gen_random_uuid()::text::bytea, '1'::text, ''::bytea, 
-        lo_get(fd.file_data), btrim(js.jsource, ' '), btrim(js.jdestination, ' '), js.jpriority::text) mdata, 
-        jsource, js.jobid as parent_jobid, js.jdestination, js.jpriority 
-        FROM files fd JOIN
-        job_scheduler js ON 
+    SELECT 
+        create_message( 
+                        gen_random_uuid()::text::bytea, 
+                        '1'::text, 
+                        ''::bytea, 
+                        lo_get(fd.file_data), 
+                        btrim(js.jsource, ' '), 
+                        btrim(js.jdestination, ' '), 
+                        js.jpriority
+                    ) 
+        mdata, jsource, 
+        js.jobid AS parent_jobid, 
+        js.jdestination, js.jpriority 
+    FROM 
+        files fd 
+    JOIN
+        job_scheduler js 
+    ON 
         fd.file_name::bytea = js.jobdata
-        JOIN sysinfo si ON
+    JOIN 
+        sysinfo si 
+    ON
         js.jdestination = si.system_name
-        WHERE jstate = 'S-3'    
+    WHERE 
+        jstate = 'S-3'    
 )
-INSERT INTO job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT mdata, 0, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
-FROM single_job; 
+INSERT INTO 
+    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT 
+    mdata, 0, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
+FROM 
+    single_job; 
 
 
 -- For all jobs where size of data greater than capacity, 
@@ -192,35 +281,64 @@ FROM single_job;
 -- except for last message it may have the same size of less
 
 WITH par_job AS (
-    
-    SELECT fd.file_data, js.jobid, as parent_jobid length(lo_get(file_data)) datal, 
-    js.jdestination, js.jsource, js.jpriority, si.system_capacity FROM 
-    files fd JOIN
-    job_scheduler js ON 
-    fd.file_name::bytea = js.jobdata
-    JOIN sysinfo si ON
-    js.jdestination = si.system_name
-    WHERE jstate = 'S-2'
-
+        
+    SELECT 
+        fd.file_data, 
+        js.jobid AS parent_jobid, 
+        length(lo_get(file_data)) AS datal, 
+        js.jdestination, 
+        js.jsource, 
+        js.jpriority, 
+        si.system_capacity 
+    FROM 
+        files fd 
+    JOIN
+        job_scheduler js 
+    ON 
+        fd.file_name::bytea = js.jobdata
+    JOIN 
+        sysinfo si 
+    ON
+        js.jdestination = si.system_name
+    WHERE 
+        jstate = 'S-2'
 ),
 chunk_info AS (
-    SELECT idx, gen_random_uuid()::text::bytea AS uuid_data, 
-    parent_jobid, jdestination, jsource, jpriority, system_capacity,  
-    lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER) chunk_data 
-    FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
+    SELECT 
+        idx, 
+        gen_random_uuid()::text::bytea AS uuid_data, 
+        parent_jobid, 
+        jdestination, 
+        jsource, 
+        jpriority, 
+        system_capacity,  
+        lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER) chunk_data 
+    FROM 
+        par_job, 
+        generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
 )
-INSERT INTO job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-        SELECT
-            create_message( uuid_data, '2'::text, 
-                            lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
-                            chunk_data, btrim(jsource, ' '), btrim(jdestination, ' '),
-                            jpriority::text),
-            idx, 'S-4', '2', jsource, 
-            encode(uuid_data, 'escape')::uuid, 
-            parent_jobid,
-            jdestination, 
-            jpriority 
-        FROM chunk_info;
+INSERT INTO 
+    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+    SELECT
+        create_message( 
+                        uuid_data, 
+                        '2'::text, 
+                        lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
+                        chunk_data, 
+                        btrim(jsource, ' '), 
+                        btrim(jdestination, ' '),
+                        jpriority::text
+                    ),
+        idx, 
+        'S-4', 
+        '2', 
+        jsource, 
+        encode(uuid_data, 'escape')::uuid, 
+        parent_jobid,
+        jdestination, 
+        jpriority 
+    FROM 
+        chunk_info;
 
 
 
