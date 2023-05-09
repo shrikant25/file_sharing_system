@@ -265,6 +265,14 @@ SET (system_capacity, dataport) = (
 );
 
 
+UPDATE
+    job_scheduler
+SET 
+    jstate = 'C'
+WHERE 
+    jstate = 'N-4'
+AND 
+    jtype = '    4';
 
 
 
@@ -287,6 +295,15 @@ SET (system_capacity, dataport) = (
         jtype = '    5'
 ); 
 
+
+UPDATE
+    job_scheduler
+SET
+    jstate = 'C'
+WHERE
+    jstate = 'N-4'
+AND
+    jtype = '   5';
 
 
 
