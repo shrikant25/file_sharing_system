@@ -104,22 +104,47 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-INSERT INTO selfinfo VALUES('   M3', 2130706433, 7000, 128*1024);
 
-INSERT INTO job_scheduler
-    (jobdata, data_offset, jstate, jtype, jsource, 
+INSERT INTO 
+    selfinfo 
+VALUES(
+        '   M3', 
+        2130706433, 
+        7000, 
+        128*1024
+);
+
+
+INSERT INTO 
+    job_scheduler(jobdata, data_offset, jstate, jtype, jsource, 
     jobid, jparent_jobid, jdestination, jpriority) 
-    VALUES('__ROOT__', 0, 'N-0', '0', lpad('M3', 5, ' '), 
-    GEN_RANDOM_UUID(), NULL, lpad('M3', 5, ' '), 0);
+VALUES (
+        '__ROOT__', 
+        0, 
+        'N-0', 
+        '0', 
+        lpad('M3', 5, ' '), 
+        GEN_RANDOM_UUID(), 
+        NULL, 
+        lpad('M3', 5, ' '), 
+        0
+);
 
 
-UPDATE job_scheduler 
-SET jparent_jobid = jobid 
-WHERE jobdata = '__ROOT__';
+UPDATE 
+    job_scheduler 
+SET 
+    jparent_jobid = jobid 
+WHERE 
+    jobdata = '__ROOT__';
 
-ALTER TABLE job_scheduler 
-ALTER COLUMN jparent_jobid
+
+ALTER TABLE 
+    job_scheduler 
+ALTER COLUMN 
+    jparent_jobid
 SET NOT NULL;
+
 
 
 CREATE OR REPLACE FUNCTION send_noti()
@@ -133,18 +158,26 @@ $$
 LANGUAGE plpgsql;
 
 
-CREATE TRIGGER msg_for_sender1
-AFTER UPDATE ON job_scheduler
+CREATE TRIGGER 
+    msg_for_sender1
+AFTER UPDATE ON 
+    job_scheduler
 FOR EACH ROW 
-WHEN (NEW.jstate = 'S-3')
-EXECUTE FUNCTION send_noti();
+WHEN 
+    (NEW.jstate = 'S-3')
+EXECUTE FUNCTION 
+    send_noti();
 
 
-CREATE TRIGGER msg_for_sender2
-AFTER INSERT on senders_comms
+CREATE TRIGGER 
+    msg_for_sender2
+AFTER INSERT ON 
+    senders_comms
 FOR EACH ROW 
-WHEN (NEW.mtype = 1)
-EXECUTE FUNCTION send_noti();
+WHEN 
+    (NEW.mtype = 1)
+EXECUTE FUNCTION 
+    send_noti();
 
 
 

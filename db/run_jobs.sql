@@ -106,21 +106,21 @@ WITH conn_info_sending AS (
         js.jstate = 'S-1' 
 )
 INSERT INTO 
-        job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
-        SELECT create_message (
-                                uuid_data::text::bytea, 
-                                '4'::text, 
-                                ''::bytea, 
-                                (lpad(system_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')))::bytea,
-                                system_name::text, 
-                                destination::text, 
-                                '5'::text
-                            ),
-                0, '4', 'S-5', system_name, 
-                destination, 5, uuid_data, 
-                jparent_jobid 
-        FROM 
-            conn_info_sending;
+    job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+SELECT create_message (
+                        uuid_data::text::bytea, 
+                        '4'::text, 
+                        ''::bytea, 
+                        (lpad(system_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')))::bytea,
+                        system_name::text, 
+                        destination::text, 
+                        '5'::text
+                    ),
+    0, '4', 'S-5', system_name, 
+    destination, 5, uuid_data, 
+    jparent_jobid 
+FROM 
+    conn_info_sending;
 
 
 
@@ -319,26 +319,26 @@ chunk_info AS (
 )
 INSERT INTO 
     job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-    SELECT
-        create_message( 
-                        uuid_data, 
-                        '2'::text, 
-                        lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
-                        chunk_data, 
-                        btrim(jsource, ' '), 
-                        btrim(jdestination, ' '),
-                        jpriority::text
-                    ),
-        idx, 
-        'S-4', 
-        '2', 
-        jsource, 
-        encode(uuid_data, 'escape')::uuid, 
-        parent_jobid,
-        jdestination, 
-        jpriority 
-    FROM 
-        chunk_info;
+SELECT
+    create_message( 
+                    uuid_data, 
+                    '2'::text, 
+                    lpad(idx::text, 8, ' ')::bytea || parent_jobid::text::bytea || lpad(length(chunk_data)::text, 10, ' ')::bytea, 
+                    chunk_data, 
+                    btrim(jsource, ' '), 
+                    btrim(jdestination, ' '),
+                    jpriority::text
+                ),
+    idx, 
+    'S-4', 
+    '2', 
+    jsource, 
+    encode(uuid_data, 'escape')::uuid, 
+    parent_jobid,
+    jdestination, 
+    jpriority 
+FROM 
+    chunk_info;
 
 
 
@@ -347,69 +347,124 @@ INSERT INTO
 -- insert that message in scheduler
 WITH cte_msginfo as(
 
-    SELECT create_message(  gen_random_uuid()::text::bytea, '3'::text,
-                            js.jobid::text::bytea || lpad(length((lo_get(file_data)))::text, 12, ' ')::bytea || 
-                            lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
-                            ''::bytea, btrim(jsource, ' '), btrim(jdestination, ' '), jpriority::text)as mdata, 
-        js.jobid, js.jdestination, js.jsource, js.jpriority, si.system_capacity
-        FROM files fd JOIN
-        job_scheduler js ON 
+    SELECT 
+        create_message(  
+                        gen_random_uuid()::text::bytea, '3'::text,
+                        js.jobid::text::bytea || 
+                        lpad(length((lo_get(file_data)))::text, 12, ' ')::bytea || 
+                        lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
+                        ''::bytea, 
+                        btrim(jsource, ' '), 
+                        btrim(jdestination, ' '), 
+                        jpriority::text
+                    )as mdata, 
+        js.jobid, 
+        js.jdestination, 
+        js.jsource, 
+        js.jpriority, 
+        si.system_capacity
+    FROM 
+        files fd 
+    JOIN
+        job_scheduler js 
+    ON 
         fd.file_name::bytea = js.jobdata
-        JOIN sysinfo si ON
+    JOIN 
+        sysinfo si 
+    ON
         js.jdestination = si.system_name
-        WHERE jstate = 'S-2'
+    WHERE jstate = 'S-2'
 )
-INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
-SELECT mdata, 'S-4', '3', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, jobid, jdestination, jpriority 
+INSERT INTO 
+    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+SELECT 
+    mdata,
+    0, 
+    'S-4', 
+    '3', 
+    jsource, 
+    encode(substr(mdata, 33, 36), 'escape')::uuid, 
+    jobid, 
+    jdestination, 
+    jpriority 
 FROM cte_msginfo; 
 
 
 
 
-
-
-
-
 -- since jobs is split into multiple jobs, send to waiting state
-UPDATE job_scheduler SET jstate = 'S-2W' WHERE jstate = 'S-2';
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'S-2W' 
+WHERE 
+    jstate = 'S-2';
 
 
 
 -- create a record for every ipaddress where messages are intended for
 -- and it is not present in sending_connections
-INSERT into sending_conns (sfd, sipaddr, scstatus) 
-SELECT DISTINCT -1, jdestination::BIGINT, 1  
-FROM job_scheduler js 
-WHERE js.jstate = 'S-4' 
+INSERT INTO 
+    sending_conns (sfd, sipaddr, scstatus) 
+SELECT 
+DISTINCT 
+    -1, 
+    jdestination::BIGINT, 
+    1  
+FROM 
+    job_scheduler js 
+WHERE 
+    js.jstate = 'S-4' 
 AND NOT EXISTS (
-  SELECT 1 
-  FROM sending_conns sc
-  WHERE sc.sipaddr::text = js.jdestination
+    SELECT 
+        1 
+    FROM 
+        sending_conns sc
+    WHERE 
+        sc.sipaddr::text = js.jdestination
 );   
 
 
 -- take all record from sending_conns where state = 1(means closed) and
 -- create a message for sender to open a connection for that particular ip
-INSERT INTO senders_comms (mdata1, mdata2, mtype)
-SELECT si.ipaddress, si.port, 1 
-FROM sysinfo si
-JOIN sending_conns sc 
-ON si.ipaddress = sc.sipaddr
-WHERE sc.scstatus = 1;
+INSERT INTO 
+    senders_comms (mdata1, mdata2, mtype)
+SELECT 
+    si.ipaddress, 
+    si.port, 
+    1 
+FROM 
+    sysinfo si
+JOIN 
+    sending_conns sc 
+ON 
+    si.ipaddress = sc.sipaddr
+WHERE 
+    sc.scstatus = 1;
 
 
 
 -- take all fd which belong to an open connection,
 -- but none of the job in scheduler have destination same as the ip that belong to those fd
 -- and create a message to close them
-INSERT INTO senders_comms (mdata1, mdata2, mtype)
-SELECT sc.sfd, sc.sipaddr, 2
-FROM sending_conns sc
-LEFT JOIN job_scheduler js 
-ON sc.sipaddr::text = js.jdestination 
-AND js.jstate != 'C'
-WHERE js.jdestination IS NULL
-AND sc.scstatus = 2;
+INSERT INTO 
+    senders_comms (mdata1, mdata2, mtype)
+SELECT 
+    sc.sfd, 
+    sc.sipaddr, 
+    2
+FROM 
+    sending_conns sc
+LEFT JOIN 
+    job_scheduler js 
+ON 
+    sc.sipaddr::text = js.jdestination 
+AND 
+    js.jstate != 'C'
+WHERE 
+    js.jdestination IS NULL
+AND 
+    sc.scstatus = 2;
 
 
 -- type 1 = single data job
