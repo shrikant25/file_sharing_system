@@ -280,11 +280,11 @@ SET (system_capacity, dataport) = (
     ON
         (encode(substr(js.jobdata, 74, 5), 'escape')) = si.system_name
     AND
-        js.jsource = si.ipaddress
+        js.jsource::BIGINT = si.ipaddress
     WHERE 
         jstate = 'N-4' 
     AND 
-        jtype = '5'
+        jtype = '    5'
 ); 
 
 
