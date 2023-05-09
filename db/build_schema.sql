@@ -72,6 +72,15 @@ CREATE TABLE files (file_id UUID PRIMARY KEY,
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); 
 
+SELECT file_data from files
+where file_name =
+SELECT jobdata from job_scheduler
+where jobid =
+SELECT jparent_jobid 
+FROM job_scheduler
+WHERE js.jstate = 'S-4';
+
+
 CREATE OR REPLACE FUNCTION create_message(
     uuid_data bytea,
     message_type text,
