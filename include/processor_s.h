@@ -25,33 +25,10 @@ typedef struct db_statements {
 db_statements dbs[statement_count] = {
     { 
       .statement_name = "s_get_data", 
-      .statement = "SELECT \
-                        sc.sfd, js.jobid, js.jobdata || (lo_get(f.file_data, js.data_offset, system_capacity))
-                    FROM \
-                        job_scheduler js
-                    JOIN \
-                        job_scheduler js2
-                    ON \
-                        js.jparent_jobid = js2.jobid
-                    JOIN \
-                        files f
-                    ON \
-                        f.file_name = encode(js2.jobdata, 'escape')
-                    JOIN \
-                        sysinfo si
-                    ON \
-                        js.jdestination = si.system_name
-                    JOIN\
-                        sending_conns sc 
-                    ON \
-                        sc.sipaddr = si.ipaddress
-                    WHERE \
-                        sc.scstatus = 2
-                    AND \
-                        js.jstate = 'S-4'
-                    ORDER BY \
-                        js.jpriority \
-                    DESC LIMIT 1;",
+      .statement = "SELECT sc.sfd, js.jobid, js.jobdata || (lo_get(f.file_data, js.data_offset, system_capacity)) FROM job_scheduler js \
+                    JOIN job_scheduler js2 ON js.jparent_jobid = js2.jobid JOIN files f ON f.file_name = encode(js2.jobdata, 'escape') \
+                    JOIN sysinfo si ON  js.jdestination = si.system_name JOIN sending_conns sc ON sc.sipaddr = si.ipaddress WHERE \
+                    sc.scstatus = 2 AND js.jstate = 'S-4' ORDER BY js.jpriority DESC LIMIT 1;",
       .param_count = 0,
     },
     { 
