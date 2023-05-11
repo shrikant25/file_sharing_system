@@ -17,24 +17,26 @@ server_info s_info;
 PGconn *connection;
 char error[100];
 
-void store_data_in_database(char *info) {
+void store_data_in_database(int client_socket, char *data) {
 
     PGresult *res = NULL;
-    char data[100];
-    memset(data, 0, sizeof(data));
-    strncpy(data, info, strlen(info));
 
-    const char *const param_values[] = {info};
-    const int paramLengths[] = {sizeof(info)};
-    const int paramFormats[] = {0};
+    char fd[11];
+    sprintf(fd, "%d", client_socket);
+    
+    const char *const param_values[] = {fd, data};
+    const int paramLengths[] = {sizeof(fd), MESSAGE_SIZE};
+    const int paramFormats[] = {0, 0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
+        memset(error, 0, sizeof(error));
+        sprintf(error, "Message storing failed in initial receiver : %s", PQerrorMessage(connection));
+        store_log(error);
     }
 
-
+    PQclear(res);
 }
 
 
@@ -52,7 +54,7 @@ void run_server() {
         memset(error, 0, sizeof(error));
         sprintf(error, "intial receiver failed to create a socket for listening %s", strerror(errno));
         store_log(error);
-        return -1;
+        return;
     }
     
     server_address.sin_family = htonl(AF_INET);    
@@ -63,14 +65,14 @@ void run_server() {
         memset(error, 0, sizeof(error));
         sprintf(error, "initial receiver failed to bind %s", strerror(errno));
         store_log(error);
-        return -1;
+        return;
     }
 
     if (listen(s_info.servsoc_fd, 100) == -1) {
         memset(error, 0, sizeof(error));
         sprintf(error, "initial receiver failed to listen %s", strerror(errno));
         store_log("error");
-        return -1;
+        return;
     }  
 
     while (1) {
@@ -85,8 +87,8 @@ void run_server() {
                 dread += read(client_socket, data, MESSAGE_SIZE);     
             } while(dread <= MESSAGE_SIZE);
 
+            store_data_in_database(client_socket, data);
             close(client_socket);
-            store_data_in_database(data);
         }
         else {
 
@@ -193,6 +195,7 @@ int main(int argc, char *argv[])
     if (prepare_statements() == -1) { return -1; }     
 
     run_server();
+    PQfinish(connection);
 
     return 0;
 }

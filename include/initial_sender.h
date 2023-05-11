@@ -1,5 +1,5 @@
-#ifndef I_RECEIVER_H
-#define I_RECEIVER_H
+#ifndef I_SENDER_H
+#define I_SENDER_H
 
 #define MESSAGE_SIZE 136
 
