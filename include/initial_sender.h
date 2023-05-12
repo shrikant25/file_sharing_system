@@ -5,15 +5,16 @@
 
 
 typedef struct server_info{
-    unsigned short int port;
-    unsigned int servsoc_fd;
-    unsigned long ipaddress;
+  unsigned int port;
+  unsigned int servsoc_fd;
+  unsigned long ipaddress;
+  char data[MESSAGE_SIZE];
 }server_info;
 
 typedef struct db_statements {
-    char *statement_name;
-    char *statement;
-    int param_count;
+  char *statement_name;
+  char *statement;
+  int param_count;
 }db_statements;
 
 

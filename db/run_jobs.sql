@@ -237,7 +237,7 @@ SELECT
         conn_info_receiving, 
         selfinfo
     ) data_capacity
-FROM S
+FROM 
     conn_info_receiving
 )
 INSERT INTO
@@ -394,7 +394,7 @@ FROM
 -- For all jobs where size of data greater than capacity, 
 -- divide the job in n jobs such that each jobs which will have size same as the message size
 -- except for last message it may have the same size of less
-RECEIV
+
 WITH par_job AS (
         
     SELECT 
@@ -414,7 +414,7 @@ WITH par_job AS (
     JOIN 
         sysinfo si 
     ON
-        js.jdestination = si.system_naRECEIVme
+        js.jdestination = si.system_name
     WHERE 
         jstate = 'S-2'
 ),
@@ -565,7 +565,7 @@ WHERE
 INSERT INTO 
     senders_comms (mdata1, mdata2, mtype)
 SELECT 
-    sc.sfd, RECEIV
+    sc.sfd, 
     sc.sipaddr, 
     2
 FROM 
