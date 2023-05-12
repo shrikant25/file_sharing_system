@@ -3,33 +3,38 @@
 
 #define MESSAGE_SIZE 136
 
-
-typedef struct server_info{
+typedef struct server_info {
   unsigned int port;
   unsigned int servsoc_fd;
   unsigned long ipaddress;
+  char uuid[37];
   char data[MESSAGE_SIZE];
-}server_info;
+} server_info;
 
 typedef struct db_statements {
   char *statement_name;
   char *statement;
   int param_count;
-}db_statements;
+} db_statements;
 
 
-#define statement_count 2
+#define statement_count 3
 
 db_statements dbs[statement_count] = {
     { 
-      .statement_name = "ir_storelog",  
+      .statement_name = "is_storelog",  
       .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1
     },
     { 
-      .statement_name = "store_data",  
-      .statement = "INSERT INTO job_scheduler(jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) \
-                    VALUES ($2, 0, 'N-1', 0, $1, GEN_RANDOM_UUID(), (SELECT jobid from job_scheduler where jobid = jparent_jobid), 0, 5);",
+      .statement_name = "get_data",  
+      .statement = "SELECT si.comssport, si.ipaddress, js.jobid, js.jobdata FROM job_scheduler js JOIN \
+                    sysinfo si ON js.jdestination = si.system_name WHERE js.jstate = 'S-5' ORDER BY js.jpriority LIMIT 1;",
+      .param_count = 0
+    },
+    {
+      .statement_name = "update_status",
+      .statement = "UPDATE job_scheduler SET jstate = (SELECT CASE WHEN $1 > 0 THEN 'C' ELSE 'D') WHERE jobid = $2::uuid;",
       .param_count = 2
     }
 };
@@ -38,5 +43,6 @@ int connect_to_database();
 int prepare_statements();
 void store_log(char *);
 void store_data_in_database(int, char *);
+int read_data_from_database (server_info *);
 
 #endif

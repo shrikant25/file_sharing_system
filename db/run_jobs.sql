@@ -133,7 +133,6 @@ FROM
     conn_info_sending;
 
 
-
 WITH conn_info_receiving AS ( 
 
 SELECT 

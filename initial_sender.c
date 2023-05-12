@@ -28,8 +28,9 @@ int read_data_from_database (server_info *servinfo) {
     }    
     else {
         servinfo->port = atoi(PQgetvalue(res, 0, 0));
-        servinfo->ipaddress = atoi(PQgetvalue(res, 0, 1)); 
-        strncpy(servinfo->data, PQgetvalue(res, 0, 2), MESSAGE_SIZE);
+        servinfo->ipaddress = atoi(PQgetvalue(res, 0, 1));
+        strncpy(servinfo->uuid, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2)); 
+        strncpy(servinfo->data, PQgetvalue(res, 0, 3), PQgetlength(res, 0, 3));
         status = 0;
     }
 
@@ -37,6 +38,25 @@ int read_data_from_database (server_info *servinfo) {
     return status;
 }
 
+void update_status (char *uuid, int status) {
+
+    PGresult *res;
+    char status_param[2];
+
+    sprintf(status_param, "%d", status);
+    char *param_values[] = {status_param, uuid};
+    int param_lengths[] = {sizeof(status_param), strlen(uuid)};
+    int param_format[] = {0, 0};
+    int result_format = 0;  
+
+    res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        memset(error, 0, sizeof(error));
+        sprintf(error, "failed to update status of message %s status %d error %s", uuid, status, PQerrorMessage(connection));
+    }
+    
+    PQclear(res);
+}
 
 void run_server () {
     
@@ -65,7 +85,7 @@ void run_server () {
                         memset(error, 0, sizeof(error));
                         sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
                         store_log(error);
-                        return;
+                        update_statue(servinfo.uuid, -1);
                     }
                     else {
                     
@@ -77,6 +97,7 @@ void run_server () {
                             memset(error, 0, sizeof(error));
                             sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
                             store_log(error);
+                            update_statue(servinfo.uuid, -1);
                         }
                         else {
                             send_size = send(servinfo.servsoc_fd, servinfo.data, MESSAGE_SIZE, 0);
@@ -84,6 +105,10 @@ void run_server () {
                                 memset(error, 0, sizeof(error));
                                 sprintf(error, "failed to send data %s", strerror(errno));
                                 store_log(error);
+                                update_statue(servinfo.uuid, -1);
+                            }
+                            else {
+                                update_statue(servinfo.uuid, send_size);
                             }
                         }
 
