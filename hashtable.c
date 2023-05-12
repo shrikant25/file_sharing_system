@@ -3,7 +3,7 @@
 #include <errno.h>
 #include "hashtable.h"
 
-int get_hash (hashtable *htable, int key) {
+int hget_hash (hashtable *htable, int key) {
 
     int i;
     unsigned int hash = htable->hash_seed;
@@ -17,7 +17,7 @@ int get_hash (hashtable *htable, int key) {
 }
 
 
-int put (hashtable *htable, int key, int value) {
+int hput (hashtable *htable, int key, int value) {
 
     if (htable->available_node_count < 1) {
         return -1;
@@ -28,6 +28,7 @@ int put (hashtable *htable, int key, int value) {
 
     int hash = get_hash(htable, key);
     if (hash == -1) { return -2; }
+
     temp = &htable->table[hash];
 
     while (*temp != NULL) {
@@ -39,19 +40,19 @@ int put (hashtable *htable, int key, int value) {
     *temp->data = value;
     *temp->next = NULL;
 
-    htable->curnode += 1;
     htable->available_node_count -= 1;
 
     return 0;
 }
 
 
-int get (hashtable *htable, int key) {
+int hget (hashtable *htable, int key) {
 
     datanode **temp = NULL;
 
     int hash = get_hash(htable, key);
     if (hash == -1) { return -1; }
+
     temp = &htable->table[hash];
 
     while (*temp != NULL && *temp->key != key) {
@@ -66,13 +67,14 @@ int get (hashtable *htable, int key) {
 }
 
 
-int del (hashtable *htable, int key) {
+int hdel (hashtable *htable, int key) {
 
     datanode **temp = NULL;
     datanode *freed_node = NULL;
 
     int hash = get_hash(htable, key);
     if (hash == -1) { return -1; }
+
     temp = &htable->table[hash];
 
     while (*temp != NULL && *temp->key != key) {
@@ -88,14 +90,14 @@ int del (hashtable *htable, int key) {
     htable->availabel_node_count += 1;
     
     freed_node->next = htable->nodepool;
-    htable->nodepool = freed_node->next;
+    htable->nodepool = freed_node;
 
     return 0;
 
 }
 
 
-int create_table(hashtable *htable, int size, int hash_seed) {
+int hcreate_table(hashtable *htable, int size, int hash_seed) {
 
     int i = 0;
     datanode * temp;
@@ -106,18 +108,18 @@ int create_table(hashtable *htable, int size, int hash_seed) {
     htable->table = (datanode **)calloc(sizeof(datanode *), htable->table_size);
     if (htable->table == NULL) { return -1; }
 
-    temp = htable->table;
+    temp = NULL;
 
     for (i = 0; i<htable->table_size) {
         
         newnode = (datanode *)calloc(sizeof(datanode), 1);
         if (newnode == NULL) { 
-            htable->table = NULL;
+            memset(htable, 0, sizeof(hashtable));
             return -2; 
         }
 
         if (temp == NULL) {
-            temp = newnode;
+            htable->nodepool = temp = newnode;
         }    
         else {
             temp->next = newnode;
@@ -125,10 +127,9 @@ int create_table(hashtable *htable, int size, int hash_seed) {
         }
     }
 
+    
     htable->hash_seed = hash_seed;
-    htable->curnode = 0;
-    htable->table_size = size;
-    htable->available_node_count = size;
+    htable->available_node_count = htable->table_size = size;
 
     return 0;
 

@@ -15,10 +15,10 @@ typedef struct hashtable {
     unsigned int hash_seed;
 } hashtable;
 
-int get_hash(int);
-int put(hashtable *, int);
-int get(hashtable *, int);
-int del(hashtable *, int);
-int create_table(hashtable *, int, int);
+int hdel (hashtable *, int)
+int hcreate_table(hashtable *, int, int);
+int hget (hashtable *, int);
+int hput (hashtable *, int, int);
+int hget_hash (hashtable *, int);
 
 #endif // H_HASH_TABLE
