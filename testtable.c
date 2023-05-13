@@ -14,7 +14,7 @@ int main (int argc, char *args[]) {
     int i, op, status = 0;
     hashtable htable;
 
-    status = hcreate_table(&htable, 10, 11); 
+    status = hcreate_table(&htable, 10); 
     if (status == -2) {
         printf("failed at pp for table");
         return -1;

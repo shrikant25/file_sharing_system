@@ -7,7 +7,7 @@
 int hget_hash (hashtable *htable, int key) {
 
     int i;
-    unsigned int hash = htable->hash_seed;
+    unsigned int hash = hash_seed;
     char *str = (char*)&key;
     
     for (int i = 0; i < sizeof(key); i++) {
@@ -98,7 +98,7 @@ int hdel (hashtable *htable, int key) {
 }
 
 
-int hcreate_table(hashtable *htable, int size, int hash_seed) {
+int hcreate_table(hashtable *htable, int size) {
 
     int i = 0;
     datanode *temp;
@@ -125,9 +125,7 @@ int hcreate_table(hashtable *htable, int size, int hash_seed) {
             temp = temp->next;
         }
     }
-
-    
-    htable->hash_seed = hash_seed;
+   
     htable->available_node_count = htable->table_size = size;
 
     return 0;
