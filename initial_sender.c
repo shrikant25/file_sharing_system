@@ -12,7 +12,6 @@
 #include <libpq-fe.h>
 #include "initial_sender.h"
 
-server_info s_info;
 PGconn *connection;
 char error[100];
 
@@ -198,7 +197,7 @@ int main (int argc, char *argv[])
     }
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
-        sscanf(buf, "USERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%lu\nNOTI_CHANNEL=%s", username, dbname, &s_info.port, &s_info.ipaddress, noti_channel);
+        sscanf(buf, "USERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s", username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
