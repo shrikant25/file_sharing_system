@@ -15,10 +15,11 @@ typedef struct hashtable {
     unsigned int hash_seed;
 } hashtable;
 
-int hdel (hashtable *, int)
-int hcreate_table(hashtable *, int, int);
-int hget (hashtable *, int);
-int hput (hashtable *, int, int);
-int hget_hash (hashtable *, int);
+int hdel (hashtable *_htable_name, int _hkey);
+int hcreate_table(hashtable *_hhtable, int _hsize, int _hhash_seed);
+int hget (hashtable *_htable_name, int _hkey);
+int hput (hashtable *_htable_name, int _hkey, int _hvalue);
+int hget_hash (hashtable *_htable_name, int _hkey);
 
+//1009 is prime close to 1000 use it
 #endif // H_HASH_TABLE
