@@ -39,10 +39,11 @@ db_statements dbs[statement_count] = {
     }
 };
 
-int connect_to_database();
+int connect_to_database (char * _conninfo); 
 int prepare_statements();
-void store_log(char *);
-void store_data_in_database(int, char *);
-int read_data_from_database (server_info *);
+void store_log(char * _logtext);
+int read_data_from_database (server_info * _servinfo);
+void run_server();
+void update_status(char * _uuid, int __status);
 
-#endif
+#endif  

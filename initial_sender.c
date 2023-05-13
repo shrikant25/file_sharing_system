@@ -44,9 +44,9 @@ void update_status (char *uuid, int status) {
     char status_param[2];
 
     sprintf(status_param, "%d", status);
-    char *param_values[] = {status_param, uuid};
-    int param_lengths[] = {sizeof(status_param), strlen(uuid)};
-    int param_format[] = {0, 0};
+    const char *const param_values[] = {status_param, uuid};
+    const int param_lengths[] = {sizeof(status_param), strlen(uuid)};
+    const int param_format[] = {0, 0};
     int result_format = 0;  
 
     res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
@@ -85,7 +85,7 @@ void run_server () {
                         memset(error, 0, sizeof(error));
                         sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
                         store_log(error);
-                        update_statue(servinfo.uuid, -1);
+                        update_status(servinfo.uuid, -1);
                     }
                     else {
                     
@@ -97,7 +97,7 @@ void run_server () {
                             memset(error, 0, sizeof(error));
                             sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
                             store_log(error);
-                            update_statue(servinfo.uuid, -1);
+                            update_status(servinfo.uuid, -1);
                         }
                         else {
                             send_size = send(servinfo.servsoc_fd, servinfo.data, MESSAGE_SIZE, 0);
@@ -105,10 +105,10 @@ void run_server () {
                                 memset(error, 0, sizeof(error));
                                 sprintf(error, "failed to send data %s", strerror(errno));
                                 store_log(error);
-                                update_statue(servinfo.uuid, -1);
+                                update_status(servinfo.uuid, -1);
                             }
                             else {
-                                update_statue(servinfo.uuid, send_size);
+                                update_status(servinfo.uuid, send_size);
                             }
                         }
 

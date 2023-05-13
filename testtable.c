@@ -41,10 +41,9 @@ int main (int argc, char *args[]) {
     printf("key %d get %d\n", 7, hget(&htable, 7));
     printf("key %d get %d\n", 13, hget(&htable, 13));
 
-    printf("key %d del %d\n", 3,hdel(&htable, 3));
     printf("key %d del %d\n", 5,hdel(&htable, 5));
     printf("key %d del %d\n", 6,hdel(&htable, 6));
-    printf("key %d del %d\n", 15,hdel(&htable, 15));
+    printf("key %d del %d\n", 7,hdel(&htable, 7));
     printf("key %d del %d\n", 13,hdel(&htable, 13));
 
     printf("key %d get %d\n",3,hdel(&htable, 3));
@@ -52,8 +51,16 @@ int main (int argc, char *args[]) {
     printf("key %d get %d\n",6,hdel(&htable, 6));
     printf("key %d get %d\n",15,hdel(&htable, 15));
     printf("key %d get %d\n",13, hdel(&htable, 13));
-
     printf("key %d get %d\n",7, hget(&htable, 7));
 
+    printf("key %d put %d\n",7, hput(&htable, 7, 7+1));
+    printf("key %d put %d\n",13, hput(&htable, 13, 13+1));
+    printf("key %d put %d\n",5, hput(&htable, 5, 5+1));
+
+
+    printf("key %d get %d\n",7, hget(&htable, 7));
+    printf("key %d get %d\n",13, hget(&htable, 13));
+    printf("key %d get %d\n",5, hget(&htable, 5));
+    
     return 0;
 } 
