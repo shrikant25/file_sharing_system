@@ -44,4 +44,4 @@ launcher:
 	$(CC) $(user_program_files) -o $(user_program_target) $(CFLAGS)
 
 clean:
-	rm processor_r processor_s receiver sender sender_notif launcher user_program
+	rm processor_r processor_s receiver sender sender_notif launcher user_program initial_receiver initial_sender

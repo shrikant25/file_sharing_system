@@ -15,17 +15,19 @@
 
 server_info s_info;
 PGconn *connection;
-char error[100];
+char error[1000];
 
 void store_data_in_database(int client_socket, char *data) {
 
     PGresult *res = NULL;
 
     char fd[11];
+    char data_param[MESSAGE_SIZE+1];
     sprintf(fd, "%d", client_socket);
+    strncpy(data_param, data, MESSAGE_SIZE);
     
-    const char *const param_values[] = {fd, data};
-    const int paramLengths[] = {sizeof(fd), MESSAGE_SIZE};
+    const char *const param_values[] = {fd, data_param};
+    const int paramLengths[] = {sizeof(fd), MESSAGE_SIZE+1};
     const int paramFormats[] = {0, 0};
     int resultFormat = 0;
     
@@ -45,7 +47,7 @@ void run_server() {
     int client_socket;
     int dread = 0;
     int netowrk_status;
-    char data[MESSAGE_SIZE];
+    char data[MESSAGE_SIZE+1];
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
     socklen_t addr_len;
@@ -77,16 +79,26 @@ void run_server() {
 
     while (1) {
         
+        memset(&client_address, 0, sizeof(struct sockaddr_in));
+
         client_socket = accept(s_info.servsoc_fd, (struct  sockaddr *)&client_address, &addr_len);
        
         if (client_socket >= 0) {
             
             memset(data, 0, sizeof(data));
+            dread = 0;
 
             do {    
                 dread += read(client_socket, data, MESSAGE_SIZE);     
-            } while(dread <= MESSAGE_SIZE);
 
+                memset(error, 0, sizeof(error));
+                sprintf(error, "slice data receiving successfull size %d ip %d fd %d %s", dread, client_address, client_socket, data);
+                store_log(error);
+            } while(dread < MESSAGE_SIZE);
+
+            memset(error, 0, sizeof(error));
+            sprintf(error, "data receiving successfull size %d ip %d fd %d %s", dread, client_address, client_socket, data);
+            store_log(error);
             store_data_in_database(client_socket, data);
             close(client_socket);
         }
@@ -108,7 +120,7 @@ void store_log(char *logtext)
 {
 
     PGresult *res = NULL;
-    char log[100];
+    char log[1000];
     memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 

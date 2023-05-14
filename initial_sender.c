@@ -99,6 +99,7 @@ void run_server () {
                             update_status(servinfo.uuid, -1);
                         }
                         else {
+                            
                             send_size = send(servinfo.servsoc_fd, servinfo.data, MESSAGE_SIZE, 0);
                             if (send_size <= 0) {
                                 memset(error, 0, sizeof(error));
@@ -108,6 +109,10 @@ void run_server () {
                             }
                             else {
                                 update_status(servinfo.uuid, send_size);
+                                memset(error, 0, sizeof(error));
+                                sprintf(error, "data sending successfull size %d ip %d port %d fd %d", send_size, server.sin_addr.s_addr, server.sin_port, servinfo.servsoc_fd);
+                                store_log(error);
+                            
                             }
                         }
 
