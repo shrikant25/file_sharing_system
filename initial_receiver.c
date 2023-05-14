@@ -35,6 +35,7 @@ void store_data_in_database(int client_socket, char *data) {
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "Message storing failed in initial receiver : %s", PQerrorMessage(connection));
+        syslog(LOG_NOTICE,"%s", error);
         store_log(error);
     }
 
@@ -50,11 +51,12 @@ void run_server() {
     char data[MESSAGE_SIZE+1];
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
-    socklen_t addr_len;
+    socklen_t addr_len = sizeof(client_address);
 
     if ((s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         memset(error, 0, sizeof(error));
         sprintf(error, "intial receiver failed to create a socket for listening %s", strerror(errno));
+        syslog(LOG_NOTICE,"%s", error);
         store_log(error);
         return;
     }
@@ -66,6 +68,7 @@ void run_server() {
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         memset(error, 0, sizeof(error));
         sprintf(error, "initial receiver failed to bind %s", strerror(errno));
+        syslog(LOG_NOTICE,"%s", error);
         store_log(error);
         return;
     }
@@ -73,13 +76,13 @@ void run_server() {
     if (listen(s_info.servsoc_fd, 100) == -1) {
         memset(error, 0, sizeof(error));
         sprintf(error, "initial receiver failed to listen %s", strerror(errno));
-        store_log("error");
+        syslog(LOG_NOTICE,"%s", error);
+        store_log(error);
         return;
     }  
 
     while (1) {
         
-        memset(&client_address, 0, sizeof(struct sockaddr_in));
 
         client_socket = accept(s_info.servsoc_fd, (struct  sockaddr *)&client_address, &addr_len);
        
@@ -92,12 +95,14 @@ void run_server() {
                 dread += read(client_socket, data, MESSAGE_SIZE);     
 
                 memset(error, 0, sizeof(error));
-                sprintf(error, "slice data receiving successfull size %d ip %d fd %d %s", dread, client_address, client_socket, data);
+                sprintf(error, "slice data receiving successfull size %d fd %d data %s", dread, client_socket, data);
+                syslog(LOG_NOTICE,"%s", error);
                 store_log(error);
             } while(dread < MESSAGE_SIZE);
 
             memset(error, 0, sizeof(error));
-            sprintf(error, "data receiving successfull size %d ip %d fd %d %s", dread, client_address, client_socket, data);
+            sprintf(error, "data receiving successfull size %d fd %d data %s", dread, client_socket, data);
+            syslog(LOG_NOTICE,"%s", error);
             store_log(error);
             store_data_in_database(client_socket, data);
             close(client_socket);
@@ -106,7 +111,8 @@ void run_server() {
 
             memset(error, 0, sizeof(error));
             sprintf(error, "inital receiver failed to accept client connection %s", strerror(errno));
-            store_log("error");
+            syslog(LOG_NOTICE,"%s", error);
+            store_log(error);
             
         }
     }
