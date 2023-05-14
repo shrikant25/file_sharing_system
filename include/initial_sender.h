@@ -34,7 +34,7 @@ db_statements dbs[statement_count] = {
     },
     {
       .statement_name = "update_status",
-      .statement = "UPDATE job_scheduler SET jstate = (SELECT CASE WHEN $1 > 0 THEN 'C' ELSE 'D') WHERE jobid = $2::uuid;",
+      .statement = "UPDATE job_scheduler SET jstate = (SELECT CASE WHEN $1 > 0 THEN 'C' ELSE 'D' END) WHERE jobid = $2::uuid;",
       .param_count = 2
     }
 };

@@ -57,9 +57,9 @@ void run_server() {
         return;
     }
     
-    server_address.sin_family = htonl(AF_INET);    
+    server_address.sin_family = AF_INET;    
     server_address.sin_port = htons(s_info.port);  
-    server_address.sin_addr.s_addr = s_info.ipaddress; 
+    server_address.sin_addr.s_addr = htonl(s_info.ipaddress); 
 
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         memset(error, 0, sizeof(error));

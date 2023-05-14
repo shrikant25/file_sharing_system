@@ -4,7 +4,7 @@ DROP FUNCTION IF EXISTS send_noti(), create_message();
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
 UNLISTEN noti_2sys;
-
+UNLISTEN noti_2initial;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
@@ -177,6 +177,29 @@ WHEN
     (NEW.mtype = 1)
 EXECUTE FUNCTION 
     send_noti();
+
+
+CREATE OR REPLACE FUNCTION send_noti1()
+RETURNS TRIGGER AS 
+$$
+BEGIN
+    PERFORM pg_notify('noti_2initial', 'get_data');
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+
+CREATE TRIGGER 
+    msg_for_initial_sender
+AFTER INSERT ON 
+    job_scheduler
+FOR EACH ROW 
+WHEN 
+    (NEW.jstate = 'S-5')
+EXECUTE FUNCTION 
+    send_noti2();
 
 
     

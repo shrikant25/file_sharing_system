@@ -8,3 +8,5 @@ processor_r
 processor_s
 user_program
 sender_notif
+initial_sender
+initial_receiver

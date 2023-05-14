@@ -88,9 +88,9 @@ void run_server () {
                     }
                     else {
                     
-                        server.sin_addr.s_addr = servinfo.ipaddress;
                         server.sin_family = AF_INET;
                         server.sin_port = htons(servinfo.port);
+                        server.sin_addr.s_addr = htonl(servinfo.ipaddress);
                         
                         if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
                             memset(error, 0, sizeof(error));
