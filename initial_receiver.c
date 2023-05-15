@@ -22,13 +22,11 @@ void store_data_in_database(int client_socket, char *data) {
     PGresult *res = NULL;
 
     char fd[11];
-    char data_param[MESSAGE_SIZE+1];
     sprintf(fd, "%d", client_socket);
-    strncpy(data_param, data, MESSAGE_SIZE);
-    
-    const char *const param_values[] = {fd, data_param};
-    const int paramLengths[] = {sizeof(fd), MESSAGE_SIZE+1};
-    const int paramFormats[] = {0, 0};
+   
+    const char *const param_values[] = {fd, data};
+    const int paramLengths[] = {sizeof(fd), strlen(data)};
+    const int paramFormats[] = {0, 1};
     int resultFormat = 0;
     
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, 0);
@@ -45,9 +43,7 @@ void store_data_in_database(int client_socket, char *data) {
 
 void run_server() {
     
-    int client_socket;
-    int dread = 0;
-    int netowrk_status;
+    int client_socket, data_read, total_data_read, network_status;
     char data[MESSAGE_SIZE+1];
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
@@ -89,22 +85,24 @@ void run_server() {
         if (client_socket >= 0) {
             
             memset(data, 0, sizeof(data));
-            dread = 0;
+            data_read = total_data_read = 0;
 
             do {    
-                dread += read(client_socket, data, MESSAGE_SIZE);     
 
+                data_read = read(client_socket, data+total_data_read, MESSAGE_SIZE);     
+                total_data_read += data_read;
+
+            } while(total_data_read < MESSAGE_SIZE && data_read > 0);
+
+            if (total_data_read != MESSAGE_SIZE) {
                 memset(error, 0, sizeof(error));
-                sprintf(error, "slice data receiving successfull size %d fd %d data %s", dread, client_socket, data);
+                sprintf(error, "data receiving failure size %d fd %d", total_data_read, client_socket);
                 syslog(LOG_NOTICE,"%s", error);
                 store_log(error);
-            } while(dread < MESSAGE_SIZE);
-
-            memset(error, 0, sizeof(error));
-            sprintf(error, "data receiving successfull size %d fd %d data %s", dread, client_socket, data);
-            syslog(LOG_NOTICE,"%s", error);
-            store_log(error);
-            store_data_in_database(client_socket, data);
+            }
+            else {
+                store_data_in_database(client_socket, data);
+            }
             close(client_socket);
         }
         else {

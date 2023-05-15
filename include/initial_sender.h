@@ -1,7 +1,7 @@
 #ifndef I_SENDER_H
 #define I_SENDER_H
 
-#define MESSAGE_SIZE 136
+#define MESSAGE_SIZE (136)
 
 typedef struct server_info {
   unsigned int port;
@@ -18,7 +18,7 @@ typedef struct db_statements {
 } db_statements;
 
 
-#define statement_count 3
+#define statement_count 4
 
 db_statements dbs[statement_count] = {
     { 
@@ -27,10 +27,15 @@ db_statements dbs[statement_count] = {
       .param_count = 1
     },
     { 
-      .statement_name = "get_data",  
+      .statement_name = "get_info",  
       .statement = "SELECT si.comssport, si.ipaddress, js.jobid, js.jobdata FROM job_scheduler js JOIN \
                     sysinfo si ON js.jdestination = si.system_name WHERE js.jstate = 'S-5' ORDER BY js.jpriority LIMIT 1;",
       .param_count = 0
+    },
+    {
+      .statement_name = "get_data",  
+      .statement = "SELECT jobdata FROM job_scheduler WHERE jobid = $1::uuid;",
+      .param_count = 1
     },
     {
       .statement_name = "update_status",

@@ -44,18 +44,12 @@ CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
                    lgtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE systems (system_name CHAR(10) PRIMARY KEY);
-
 CREATE TABLE sysinfo (system_name CHAR(10),
                       ipaddress BIGINT UNIQUE,
                       dataport INTEGER,
                       comssport INTEGER NOT NULL,
                       system_capacity INTEGER,
-                      CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress),
-                      CONSTRAINT fk_sys_capacity FOREIGN KEY (system_name)
-                        REFERENCES  systems(system_name) 
-                        ON DELETE CASCADE 
-                        ON UPDATE CASCADE);
+                      CONSTRAINT pk_sysinfo PRIMARY KEY(system_name, ipaddress));
 
 CREATE TABLE selfinfo (system_name CHAR(10) NOT NULL,
                       ipaddress BIGINT UNIQUE NOT NULL,

@@ -26,11 +26,29 @@ int read_data_from_database (server_info *servinfo) {
         store_log(error);
     }    
     else {
+
         servinfo->port = atoi(PQgetvalue(res, 0, 0));
-        servinfo->ipaddress = atoi(PQgetvalue(res, 0, 1));
+        servinfo->ipaddress = atoi((PQgetvalue(res, 0, 1)));
         strncpy(servinfo->uuid, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2)); 
-        strncpy(servinfo->data, PQgetvalue(res, 0, 3), PQgetlength(res, 0, 3));
-        status = 0;
+
+        const char *const param_values[] = {servinfo->uuid};
+        const int param_lengths[] = {strlen(servinfo->uuid)};
+        const int param_format[] = {0};
+        int result_format = 1;  
+
+        PQclear(res);
+
+        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
+        if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+            memset(error, 0, sizeof(error));
+            sprintf(error, "failed to get message data %s status %d error %s", servinfo->uuid, status, PQerrorMessage(connection));
+            store_log(error);
+        }
+        else {
+            strncpy(servinfo->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+            status = 0;
+        }
+             
     }
 
     PQclear(res);
@@ -45,10 +63,10 @@ void update_status (char *uuid, int status) {
     sprintf(status_param, "%d", status);
     const char *const param_values[] = {status_param, uuid};
     const int param_lengths[] = {sizeof(status_param), strlen(uuid)};
-    const int param_format[] = {0, 0};
+    const int param_format[] = {0, 1};
     int result_format = 0;  
 
-    res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
+    res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, param_lengths, param_format, result_format);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "failed to update status of message %s status %d error %s", uuid, status, PQerrorMessage(connection));
@@ -57,9 +75,10 @@ void update_status (char *uuid, int status) {
     PQclear(res);
 }
 
-void run_server () {
+void run_server () 
+{
     
-    int hSocket, send_size, idx, fd;
+    int hSocket, data_sent, total_data_sent, idx, fd;
     unsigned int ipaddress;
     struct sockaddr_in server;
     server_info servinfo;
@@ -99,20 +118,20 @@ void run_server () {
                             update_status(servinfo.uuid, -1);
                         }
                         else {
-                            
-                            send_size = send(servinfo.servsoc_fd, servinfo.data, MESSAGE_SIZE, 0);
-                            if (send_size <= 0) {
-                                memset(error, 0, sizeof(error));
-                                sprintf(error, "failed to send data %s", strerror(errno));
-                                store_log(error);
+                         
+                            total_data_sent = 0;
+                            data_sent = 0;
+
+                            do {
+                                data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, MESSAGE_SIZE, 0);
+                                total_data_sent += data_sent;
+                            } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
+                                     
+                            if (total_data_sent != MESSAGE_SIZE) {
                                 update_status(servinfo.uuid, -1);
                             }
                             else {
-                                update_status(servinfo.uuid, send_size);
-                                memset(error, 0, sizeof(error));
-                                sprintf(error, "data sending successfull size %d ip %d port %d fd %d", send_size, server.sin_addr.s_addr, server.sin_port, servinfo.servsoc_fd);
-                                store_log(error);
-                            
+                                update_status(servinfo.uuid, total_data_sent);
                             }
                         }
 
