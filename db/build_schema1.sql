@@ -1,7 +1,7 @@
 DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
-                        systems, senders_comms, sending_conns, files, selfinfo;
+                        senders_comms, sending_conns, files, selfinfo;
 DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), create_message(bytea, text, bytea, bytea, text, text, text);
 UNLISTEN noti_2sys;
 UNLISTEN noti_2initial;
@@ -95,7 +95,6 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-INSERT INTO systems VALUES('   M3');
 INSERT INTO sysinfo VALUES('   M3', 2130706433, 0, 6000, 0);
 
 

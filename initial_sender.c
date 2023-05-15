@@ -94,7 +94,7 @@ void run_server ()
         else{
 
             while ((notify = PQnotifies(connection)) != NULL) {
-
+                    store_log("got one");
                 memset(&servinfo, 0, sizeof(servinfo)); 
                 if (read_data_from_database(&servinfo) != -1) {
 
@@ -220,6 +220,7 @@ int main (int argc, char *argv[])
         return -1;
     }
 
+    memset(buf, 0, sizeof(buf));
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf, "USERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s", username, dbname, noti_channel);
     }
