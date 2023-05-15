@@ -2,7 +2,7 @@ DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS send_noti11(), send_noti21(), create_message(bytea, text, bytea, bytea, text, text, text);
+DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), create_message(bytea, text, bytea, bytea, text, text, text);
 UNLISTEN noti_1sys;
 UNLISTEN noti_1initial;
 
@@ -140,7 +140,7 @@ SET NOT NULL;
 
 
 
-CREATE OR REPLACE FUNCTION send_noti11()
+CREATE OR REPLACE FUNCTION send_noti1()
 RETURNS TRIGGER AS 
 $$
 BEGIN
@@ -159,7 +159,7 @@ FOR EACH ROW
 WHEN 
     (NEW.jstate = 'S-3')
 EXECUTE FUNCTION 
-    send_noti11();
+    send_noti1();
 
 
 CREATE TRIGGER 
@@ -170,11 +170,11 @@ FOR EACH ROW
 WHEN 
     (NEW.mtype = 1)
 EXECUTE FUNCTION 
-    send_noti11();
+    send_noti1();
 
 
 
-CREATE OR REPLACE FUNCTION send_noti21()
+CREATE OR REPLACE FUNCTION send_noti2()
 RETURNS TRIGGER AS 
 $$
 BEGIN
@@ -195,7 +195,7 @@ FOR EACH ROW
 WHEN 
     (NEW.jstate = 'S-5')
 EXECUTE FUNCTION 
-    send_noti21();
+    send_noti2();
 
 
 

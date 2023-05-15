@@ -1,7 +1,7 @@
 #ifndef I_SENDER_H
 #define I_SENDER_H
 
-#define MESSAGE_SIZE (136)
+#define MESSAGE_SIZE 147
 
 typedef struct server_info {
   unsigned int port;

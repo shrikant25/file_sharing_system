@@ -94,6 +94,7 @@ SELECT
     sf.system_capacity, 
     sf.system_name, 
     sf.dataport,
+    sf.ipaddress,
     js.jparent_jobid,
     si.system_name AS destination, 1, 1
 FROM 
@@ -115,7 +116,7 @@ SELECT
     create_message (
         uuid_data::text::bytea, 
         '4'::text, 
-        (lpad(system_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')))::bytea,
+        (lpad(system_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')) || (lpad(ipaddress::text, 11, ' ')))::bytea ,
         ''::bytea, 
         system_name::text, 
         destination::text, 
@@ -140,8 +141,8 @@ WITH conn_info_receiving AS (
 SELECT 
     encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
     encode(substr(jobdata, 126, 11), 'escape')::INTEGER As rport,
+    encode(substr(jobdata, 126, 11), 'escape')::INTEGER As source_ip,
     encode(substr(jobdata, 74, 5), 'escape') AS source_name,
-    jsource AS source_ip
 FROM 
     job_scheduler 
 WHERE 
@@ -221,6 +222,7 @@ SELECT gen_random_uuid() AS uuid_data,
     jparent_jobid,
     selfinfo.system_name, 
     selfinfo.dataport,
+    selfinfo.ipaddress
     (
     SELECT
         CASE 
@@ -249,7 +251,7 @@ SELECT
     create_message (
         uuid_data::text::bytea, 
         '5'::text, 
-        ( lpad(data_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')) )::bytea, 
+        ( lpad(data_capacity::text, 11, ' ') || (lpad(dataport::text, 11, ' ')) || (lpad(ipaddress::text, 11, ' ')) )::bytea, 
         ''::bytea,
         system_name::text, 
         destination::text, 
