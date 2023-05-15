@@ -545,7 +545,7 @@ INSERT INTO
     senders_comms (mdata1, mdata2, mtype)
 SELECT 
     si.ipaddress, 
-    si.port, 
+    si.dataport, 
     1 
 FROM 
     sysinfo si

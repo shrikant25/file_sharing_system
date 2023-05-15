@@ -201,5 +201,5 @@ EXECUTE FUNCTION
 ./initial_sender "./conf/initial_sender.conf" &
 ./initial_sender "./conf/initial_sender1.conf" &
 ./initial_receiver "./conf/initial_receiver1.conf" &
-./initial_receiver "./conf/initial_receiver.conf" 
+./initial_receiver "./conf/initial_receiver.conf" & 
 ./user_program "./conf/user_program1.conf" 
