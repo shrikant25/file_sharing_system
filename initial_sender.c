@@ -65,7 +65,7 @@ void update_status (char *uuid, int status) {
     const int param_lengths[] = {sizeof(status_param), strlen(uuid)};
     const int param_format[] = {0, 1};
     int result_format = 0;  
-
+    store_log("trying to updaet status");
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, param_lengths, param_format, result_format);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
@@ -110,6 +110,9 @@ void run_server ()
                         server.sin_family = AF_INET;
                         server.sin_port = htons(servinfo.port);
                         server.sin_addr.s_addr = htonl(servinfo.ipaddress);
+                        memset(error, 0, sizeof(error));
+                            sprintf(error, "info ip %ld %d %s", servinfo.ipaddress, servinfo.port, servinfo.uuid);
+                            store_log(error);
                         store_log("trying to make connection");
                         if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
                             memset(error, 0, sizeof(error));
@@ -130,9 +133,11 @@ void run_server ()
                             } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
                                     store_log("done");
                             if (total_data_sent != MESSAGE_SIZE) {
+                                store_log("failed");
                                 update_status(servinfo.uuid, -1);
                             }
                             else {
+                                store_log("sucess");
                                 update_status(servinfo.uuid, total_data_sent);
                             }
                         }

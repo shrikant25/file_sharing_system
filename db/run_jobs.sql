@@ -136,64 +136,64 @@ FROM
 
 
 
-    WITH conn_info_receiving AS (    
-    
+WITH conn_info_receiving AS (    
+
+SELECT 
+    encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
+    encode(substr(jobdata, 126, 11), 'escape')::INTEGER As rport,
+    encode(substr(jobdata, 137, 11), 'escape')::INTEGER As source_ip,
+    encode(substr(jobdata, 74, 5), 'escape') AS source_name
+FROM 
+    job_scheduler 
+WHERE 
+    jstate = 'N-4'
+AND 
+    jtype = '    4'
+),
+conn_info AS (   
+SELECT  
+    source_name, 
+    source_ip, 
+    rport,
+    (
+    SELECT
+        CASE 
+        WHEN rcapacity > selfinfo.system_capacity 
+        THEN 
+            selfinfo.system_capacity
+        ELSE
+            rcapacity
+        END
+    FROM
+        conn_info_receiving, 
+        selfinfo
+    ) data_capacity
+FROM 
+    conn_info_receiving
+)
+INSERT INTO
+    sysinfo (system_name, ipaddress, dataport, comssport, system_capacity)
+SELECT 
+    lpad(source_name, 5, ' '),
+    source_ip::BIGINT,
+    rport,
+    7000,
+    data_capacity
+FROM 
+    conn_info
+ON CONFLICT (system_name, ipaddress) 
+DO UPDATE 
+SET (system_capacity, dataport) = (
     SELECT 
-        encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
-        encode(substr(jobdata, 126, 11), 'escape')::INTEGER As rport,
-        encode(substr(jobdata, 137, 11), 'escape')::INTEGER As source_ip,
-        encode(substr(jobdata, 74, 5), 'escape') AS source_name
+        ci.data_capacity, 
+        ci.rport
     FROM 
-        job_scheduler 
+        conn_info ci
     WHERE 
-        jstate = 'N-4'
+        ci.source_name = sysinfo.system_name
     AND 
-        jtype = '    4'
-    ),
-    conn_info AS (   
-    SELECT  
-        source_name, 
-        source_ip, 
-        rport,
-        (
-        SELECT
-            CASE 
-            WHEN rcapacity > selfinfo.system_capacity 
-            THEN 
-                selfinfo.system_capacity
-            ELSE
-                rcapacity
-            END
-        FROM
-            conn_info_receiving, 
-            selfinfo
-        ) data_capacity
-    FROM 
-        conn_info_receiving
-    )
-    INSERT INTO
-        sysinfo (system_name, ipaddress, dataport, comssport, system_capacity)
-    SELECT 
-        lpad(source_name, 5, ' '),
-        source_ip::BIGINT,
-        rport,
-        7000,
-        data_capacity
-    FROM 
-        conn_info
-    ON CONFLICT (system_name, ipaddress) 
-    DO UPDATE 
-    SET (system_capacity, dataport) = (
-        SELECT 
-            ci.data_capacity, 
-            ci.rport
-        FROM 
-            conn_info ci
-        WHERE 
-            ci.source_name = sysinfo.system_name
-        AND 
-            ci.source_ip::BIGINT = sysinfo.ipaddress
-    );
+        ci.source_ip::BIGINT = sysinfo.ipaddress
+);
 
 
 
@@ -295,7 +295,7 @@ SET (system_capacity, dataport) = (
     ON
         (encode(substr(js.jobdata, 74, 5), 'escape')) = si.system_name
     AND
-        js.jsource::BIGINT = si.ipaddress
+        (encode(substr(js.jobdata, 137, 11), 'escape'))::BIGINT = si.ipaddress
     WHERE 
         jstate = 'N-4' 
     AND 
