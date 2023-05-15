@@ -15,7 +15,7 @@
 
 server_info s_info;
 PGconn *connection;
-char error[1000];
+char error[100];
 
 void store_data_in_database(int client_socket, char *data) {
 
@@ -124,7 +124,7 @@ void store_log(char *logtext)
 {
 
     PGresult *res = NULL;
-    char log[1000];
+    char log[100];
     memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
@@ -194,6 +194,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    memset(buf, 0, sizeof(buf));
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
         sscanf(buf, "USERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%lu", username, dbname, &s_info.port, &s_info.ipaddress);

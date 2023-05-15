@@ -141,8 +141,8 @@ WITH conn_info_receiving AS (
 SELECT 
     encode(substr(jobdata, 115, 11), 'escape')::INTEGER AS rcapacity,
     encode(substr(jobdata, 126, 11), 'escape')::INTEGER As rport,
-    encode(substr(jobdata, 126, 11), 'escape')::INTEGER As source_ip,
-    encode(substr(jobdata, 74, 5), 'escape') AS source_name,
+    encode(substr(jobdata, 137, 11), 'escape')::INTEGER As source_ip,
+    encode(substr(jobdata, 74, 5), 'escape') AS source_name
 FROM 
     job_scheduler 
 WHERE 
@@ -222,7 +222,7 @@ SELECT gen_random_uuid() AS uuid_data,
     jparent_jobid,
     selfinfo.system_name, 
     selfinfo.dataport,
-    selfinfo.ipaddress
+    selfinfo.ipaddress,
     (
     SELECT
         CASE 

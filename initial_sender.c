@@ -97,7 +97,7 @@ void run_server ()
                     store_log("got one");
                 memset(&servinfo, 0, sizeof(servinfo)); 
                 if (read_data_from_database(&servinfo) != -1) {
-
+                    store_log("read something");
                     servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
                     if (servinfo.servsoc_fd == -1) {
                         memset(error, 0, sizeof(error));
@@ -110,7 +110,7 @@ void run_server ()
                         server.sin_family = AF_INET;
                         server.sin_port = htons(servinfo.port);
                         server.sin_addr.s_addr = htonl(servinfo.ipaddress);
-                        
+                        store_log("trying to make connection");
                         if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
                             memset(error, 0, sizeof(error));
                             sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
@@ -118,7 +118,7 @@ void run_server ()
                             update_status(servinfo.uuid, -1);
                         }
                         else {
-                         
+                            store_log("sending");
                             total_data_sent = 0;
                             data_sent = 0;
 
