@@ -123,10 +123,12 @@ void run_server ()
                             data_sent = 0;
 
                             do {
+                                store_log("start");
                                 data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, MESSAGE_SIZE, 0);
                                 total_data_sent += data_sent;
+                                store_log("ohhhh");
                             } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
-                                     
+                                    store_log("done");
                             if (total_data_sent != MESSAGE_SIZE) {
                                 update_status(servinfo.uuid, -1);
                             }
