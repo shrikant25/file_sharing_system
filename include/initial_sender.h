@@ -28,7 +28,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "get_info",  
-      .statement = "SELECT si.comssport, si.ipaddress, js.jobid, js.jobdata FROM job_scheduler js JOIN \
+      .statement = "SELECT si.comssport, si.ipaddress, js.jobid FROM job_scheduler js JOIN \
                     sysinfo si ON js.jdestination = si.system_name WHERE js.jstate = 'S-5' ORDER BY js.jpriority LIMIT 1;",
       .param_count = 0
     },

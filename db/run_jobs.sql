@@ -300,7 +300,10 @@ SET (system_capacity, dataport) = (
         jstate = 'N-4' 
     AND 
         jtype = '    5'
-); 
+)
+WHERE system_capacity = 0 
+AND
+dataport = 0; 
 
 
 UPDATE
@@ -526,15 +529,19 @@ WHERE
 
 -- create a record for every ipaddress where messages are intended for
 -- and it is not present in sending_connections
-INSERT INTO 
+INSERT INTO
     sending_conns (sfd, sipaddr, scstatus) 
 SELECT 
 DISTINCT 
     -1, 
-    jdestination::BIGINT, 
+    si.ipaddress, 
     1  
 FROM 
     job_scheduler js 
+JOIN
+    sysinfo si
+ON
+    si.system_name = jdestination
 WHERE 
     js.jstate = 'S-4' 
 AND NOT EXISTS (
@@ -543,7 +550,7 @@ AND NOT EXISTS (
     FROM 
         sending_conns sc
     WHERE 
-        sc.sipaddr::text = js.jdestination
+        sc.sipaddr = si.ipaddress
 );   
 
 

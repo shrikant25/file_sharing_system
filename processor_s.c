@@ -13,7 +13,6 @@
 #include "partition.h"
 #include "processor_s.h"
 
-
 semlocks sem_lock_datas;
 semlocks sem_lock_comms;
 semlocks sem_lock_sigs;
@@ -23,7 +22,7 @@ datablocks comms_block;
 PGconn *connection;
 
 
-int retrive_data_from_database(char *blkptr) 
+int retrive_data_from_database (char *blkptr) 
 {
     int row_count;
     int status = -1;
@@ -33,35 +32,44 @@ int retrive_data_from_database(char *blkptr)
 
     res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, 
                                     NULL, NULL, NULL, 0);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "%s %s", "failed to retrive data from db", PQerrorMessage(connection));
+        sprintf(error, "failed to retrive info from db %s", PQerrorMessage(connection));
         store_log(error);
     }    
     else {
-
-        row_count = PQntuples(res);
-        if (row_count > 0) {
         
-            sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
-            strncpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
-            strncpy(sndmsg->data, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2));
+        sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
+        strncpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+        PQclear(res);
+
+        const char *const param_values[] = {sndmsg->uuid};
+        const int paramLengths[] = {sizeof(sndmsg->uuid)};
+        const int paramFormats[] = {0};
+        int resultFormat = 1;
+
+        res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values,   
+                                        paramLengths, paramFormats, resultFormat);
+        
+        if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+            memset(error, 0, sizeof(error));
+            sprintf(error, "failed to retrive data from db %s", PQerrorMessage(connection));
+            store_log(error);
+        }
+        else {
+
+            strncpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
             PQclear(res);
 
-            const char *const param_values[] = {sndmsg->uuid};
-            const int paramLengths[] = {sizeof(sndmsg->uuid)};
-            const int paramFormats[] = {0};
-            int resultFormat = 0;
-            
             res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
                                     param_values, paramLengths, paramFormats, resultFormat);
+
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 memset(error, 0, sizeof(error));
-                sprintf(error, "%s %s", "failed update job status", PQerrorMessage(connection));
+                sprintf(error, "failed update job status %s", PQerrorMessage(connection));
                 store_log(error);
-                status  = -1;
             }
-            else{
+            else {
                 status = 0;
             }
         }
@@ -72,7 +80,7 @@ int retrive_data_from_database(char *blkptr)
 }
 
 
-int store_comms_into_database(char *blkptr) 
+int store_comms_into_database (char *blkptr) 
 {
     int resultFormat = 0;
     char ipaddress[11];
@@ -128,7 +136,7 @@ int store_comms_into_database(char *blkptr)
 }
 
 
-int retrive_comms_from_database(char *blkptr) 
+int retrive_comms_from_database (char *blkptr) 
 {
     PGresult *res = NULL;
     int status = -1;
@@ -172,7 +180,7 @@ int retrive_comms_from_database(char *blkptr)
 }
 
 
-void store_log(char *logtext) 
+void store_log (char *logtext) 
 {
 
     PGresult *res = NULL;
@@ -194,7 +202,7 @@ void store_log(char *logtext)
 }
 
 
-int give_data_to_sender() 
+int give_data_to_sender () 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -217,7 +225,7 @@ int give_data_to_sender()
 }
 
 
-int send_msg_to_sender() 
+int send_msg_to_sender () 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -239,7 +247,7 @@ int send_msg_to_sender()
 }
 
 
-int read_msg_from_sender() 
+int read_msg_from_sender () 
 {
 
     int subblock_position = -1;
@@ -259,7 +267,7 @@ int read_msg_from_sender()
 }
 
 
-int run_process() 
+int run_process () 
 {
     while (1) {
 
@@ -271,7 +279,7 @@ int run_process()
 }
 
 
-int connect_to_database(char *conninfo) 
+int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
 
@@ -284,7 +292,7 @@ int connect_to_database(char *conninfo)
 }
 
 
-int prepare_statements() 
+int prepare_statements () 
 {    
     int i, status = 0;
 
@@ -305,7 +313,7 @@ int prepare_statements()
 }
 
 
-int main(int argc, char *argv[]) 
+int main (int argc, char *argv[]) 
 {
     int status = -1;
     int conffd = -1;
