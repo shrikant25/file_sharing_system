@@ -107,7 +107,7 @@ ON
 WHERE 
     si.dataport = 0
 AND 
-    js.jstate = 'S-1' 
+    js.jstate = 'S' 
 
 )
 INSERT INTO 
@@ -133,6 +133,21 @@ SELECT
 FROM 
     conn_info_sending;
 
+
+UPDATE
+    job_scheduler
+SET
+    jstate = 'S-1'
+WHERE
+    js.jdestination = (
+        SELECT
+            si.system_name
+        FROM
+            sysinfo        
+        WHERE 
+            si.dataport = 0)
+AND 
+    js.jstate = 'S';
 
 
 
@@ -333,6 +348,8 @@ WHERE
             jdestination = si.system_name 
         AND
             LENGTH(lo_get(f.file_data)) > si.system_capacity
+        AND 
+            si.system_capacity != 0
     )
 AND 
     jstate = 'S-1';
@@ -356,7 +373,9 @@ WHERE
         ON
             jdestination = si.system_name 
         AND
-            LENGTH(lo_get(file_data)) <= system_capacity
+            LENGTH(lo_get(file_data)) <= si.system_capacity
+        AND 
+            si.system_capacity != 0
     )
 AND 
     jstate = 'S-1';
@@ -516,7 +535,6 @@ FROM cte_msginfo;
 
 
 
-
 -- since jobs is split into multiple jobs, send to waiting state
 UPDATE 
     job_scheduler 
@@ -524,6 +542,13 @@ SET
     jstate = 'S-2W' 
 WHERE 
     jstate = 'S-2';
+AND 
+    jdestination = (
+        SELECT 
+            system_name
+        FROM 
+            sysinfo;
+        );
 
 
 
