@@ -5,11 +5,11 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <libpq-fe.h>
-#include "processor_r.h"
 #include "shared_memory.h"
 
 PGconn *connection;
-semlocks sem_lock_sigps;
+semlocks sem_lock_sig;
+
 char error[100];
 
 void store_log(char *logtext) 
@@ -51,7 +51,7 @@ int init(char *confg_filename)
 
     memset(noti_channel, 0 , sizeof(noti_channel));
     if (read(conffd, buf, sizeof(buf)) > 0) {
-        sscanf(buf,"SEM_LOCK_SIG_PS=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sigps.key, username, dbname, noti_channel);
+        sscanf(buf,"SEM_LOCK_SIG=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sig.key, username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -88,9 +88,9 @@ int init(char *confg_filename)
     }
     PQclear(res);
     
-    if ((sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
+    if ((sem_lock_sig.var = sem_open(sem_lock_sig.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "error creating semphore sigps: %s", PQerrorMessage(connection));
+        sprintf(error, "error creating semphore %s: %s", sem_lock_sig.key, PQerrorMessage(connection));
         store_log(error);
         return -1;
     }
@@ -119,15 +119,14 @@ int main(int argc, char *argv[])
         }
         else{
             while ((notify = PQnotifies(connection)) != NULL) {
-                sem_post(sem_lock_sigps.var);
-                store_log("did");
+                sem_post(sem_lock_sig.var);
                 PQfreemem(notify);
             }
         }
     
     }
     
-    sem_close(sem_lock_sigps.var);
+    sem_close(sem_lock_sig.var);
     PQfinish(connection);
 
     return 0;

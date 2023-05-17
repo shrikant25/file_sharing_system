@@ -63,13 +63,14 @@ void update_status (char *uuid, int status) {
     sprintf(status_param, "%d", status);
     const char *const param_values[] = {status_param, uuid};
     const int param_lengths[] = {sizeof(status_param), strlen(uuid)};
-    const int param_format[] = {0, 1};
+    const int param_format[] = {0, 0};
     int result_format = 0;  
     store_log("trying to updaet status");
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, param_lengths, param_format, result_format);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "failed to update status of message %s status %d error %s", uuid, status, PQerrorMessage(connection));
+        store_log(error);
     }
     
     PQclear(res);
@@ -145,6 +146,7 @@ void run_server ()
                         close(servinfo.servsoc_fd);
                     }
                 }
+                PQfreemem(notify);
             }
         }
     }

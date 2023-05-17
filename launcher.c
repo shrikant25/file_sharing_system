@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-#define TOTAL_PROCESSES 5
+#define TOTAL_PROCESSES 9
 
 struct launch_processes
 {
@@ -17,7 +17,7 @@ struct launch_processes
 
 int main(int argc, char *argv[]) {
 	
-    if (argc !=4) {
+    if (argc !=7) {
         syslog(LOG_NOTICE, "invalid arguments");
         return -1;
     }
@@ -48,9 +48,33 @@ int main(int argc, char *argv[]) {
             .args[2] = NULL,
         },
         {
-            .path = "./sender_notif",
-            .args[0] = "sender_notif",
+            .path = "./notif",
+            .args[0] = "notif",
             .args[1] = argv[3],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./notif",
+            .args[0] = "notif",
+            .args[1] = argv[4],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./initial_receiver",
+            .args[0] = "initial_receiver",
+            .args[1] = argv[5],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./initial_sender",
+            .args[0] = "initial_sender",
+            .args[1] = argv[6],
+            .args[2] = NULL,
+        },
+        {
+            .path = "./user_program",
+            .args[0] = "user_program",
+            .args[1] = argv[7],
             .args[2] = NULL,
         }
     };

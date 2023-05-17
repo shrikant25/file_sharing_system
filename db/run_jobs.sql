@@ -135,19 +135,19 @@ FROM
 
 
 UPDATE
-    job_scheduler
+    job_scheduler 
 SET
     jstate = 'S-1'
 WHERE
-    js.jdestination = (
+    jdestination = (
         SELECT
-            si.system_name
+            system_name
         FROM
-            sysinfo        
+            sysinfo     
         WHERE 
-            si.dataport = 0)
+            dataport = 0)
 AND 
-    js.jstate = 'S';
+    jstate = 'S';
 
 
 

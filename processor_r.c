@@ -175,7 +175,7 @@ int run_process()
         sem_wait(sem_lock_sigr.var); 
         get_message_from_receiver();
         get_data_from_receiver();           
-  
+        // get_data_from_database 
     }  
 }
 

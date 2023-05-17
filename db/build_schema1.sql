@@ -2,9 +2,10 @@ DROP TRIGGER IF EXISTS msg_for_sender1 ON job_scheduler;
 DROP TRIGGER IF EXISTS msg_for_sender2 ON senders_comms;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), create_message(bytea, text, bytea, bytea, text, text, text);
+DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_message(bytea, text, bytea, bytea, text, text, text);
 UNLISTEN noti_2sys;
 UNLISTEN noti_2initial;
+UNLISTEN noti_2receiver;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
@@ -139,6 +140,30 @@ ALTER TABLE
 ALTER COLUMN 
     jparent_jobid
 SET NOT NULL;
+
+
+
+CREATE OR REPLACE FUNCTION send_noti3()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    PERFORM pg_notify('noti_2receiver', 'get_data');
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE TRIGGER
+    msg_for_receiver
+AFTER INSERT OR UPDATE ON
+    sysinfo
+FOR EACH ROW 
+WHEN
+    (NEW.system_capacity != 0)
+EXECUTE FUNCTION
+    send_noti3();
+
 
 
 CREATE OR REPLACE FUNCTION send_noti1()
