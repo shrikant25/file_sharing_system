@@ -4,21 +4,20 @@
 #include <errno.h>
 #include "./include/hashtable.h"
 
-int hget_hash (hashtable *htable, int key) {
+int hget_hash (hashtable *htable, char *key) {
 
     int i;
     unsigned int hash = hash_seed;
-    char *str = (char*)&key;
     
-    for (int i = 0; i < sizeof(key); i++) {
-        hash = ((hash << 5) + hash) + str[i];
+    for (int i = 0; i < strlen(key); i++) {
+        hash = ((hash << 5) + hash) + key[i];
     }
 
     return (hash % htable->table_size);
 }
 
 
-int hput (hashtable *htable, int key, int value) {
+int hput (hashtable *htable, char *key, int value) {
 
     if (htable->available_node_count < 1) {
         return -1;
@@ -38,7 +37,7 @@ int hput (hashtable *htable, int key, int value) {
 
     *temp = htable->nodepool;
     htable->nodepool = htable->nodepool->next;
-    (*temp)->key = key;
+    strncpy((*temp)->key, key, strlen(key));
     (*temp)->value = value;
     (*temp)->next = NULL;
 
@@ -48,7 +47,7 @@ int hput (hashtable *htable, int key, int value) {
 }
 
 
-int hget (hashtable *htable, int key) {
+int hget (hashtable *htable, char *key) {
 
     datanode **temp = NULL;
 
@@ -57,7 +56,7 @@ int hget (hashtable *htable, int key) {
 
     temp = &htable->table[hash];
 
-    while (*temp != NULL && (*temp)->key != key) {
+    while (*temp != NULL && (strcmp((*temp)->key, key))) {
         temp = &(*temp)->next;
     }
 
@@ -69,7 +68,7 @@ int hget (hashtable *htable, int key) {
 }
 
 
-int hdel (hashtable *htable, int key) {
+int hdel (hashtable *htable, char *key) {
 
     datanode **temp = NULL;
     datanode *freed_node = NULL;
@@ -79,7 +78,7 @@ int hdel (hashtable *htable, int key) {
 
     temp = &htable->table[hash];
 
-    while (*temp != NULL && (*temp)->key != key) {
+    while (*temp != NULL && strcmp((*temp)->key, key)) {
         temp = &(*temp)->next;
     }
 

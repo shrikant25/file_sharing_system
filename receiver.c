@@ -16,6 +16,7 @@
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
+#include "hashtable.h"
 
 
 char error[100];
@@ -26,6 +27,7 @@ semlocks sem_lock_commr;
 semlocks sem_lock_sigr;
 datablocks datar_block;
 datablocks commr_block;
+hashtable htable;
 
 
 int make_nonblocking(int active_fd) 
@@ -183,17 +185,27 @@ int accept_connection()
 
 int run_receiver() 
 {
-    int i;
+    char key[17];
+    int i, message_size, bytes_read, total_bytes_read;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
-    int bytes_read = 0;
-    int total_bytes_read = 0;
+    struct sockaddr_in addr;
     newmsg_data nmsg;
     receivers_message rcvm;
+    capacity_info cpif;
 
     while (1) {
         
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
+
+        if (get_message_from_processor(&cpif) != -1) {
+            // sprintf(key, "%d", cpif.ipaddress);
+            // if (hput(&htable, key, cpif.capacity) < 0) {
+           //       store_log(failed to insert key value in table);
+            // };
+        }
+
+
         if (act_events_cnt == -1) {
             memset(error, 0, sizeof(error));
             sprintf(error, "epoll wait failed %s, epollfd : %d .", strerror(errno), s_info.epoll_fd);
@@ -208,6 +220,13 @@ int run_receiver()
                 
                 if (remove_from_list(events[i].data.fd) == -1)
                     return -1;
+                 
+                //memset(key, 0, sizeof(key));
+                //getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
+                //inet_ntop(AF_INET, addr.sin_addr, key, sizeof(key));
+                // if (hdel(&htable, key) < 0) {
+                // failed to delete value from table
+               // }
                 close(events[i].data.fd);
 
                 memset(&rcvm, 0, sizeof(rcvm));
@@ -226,39 +245,51 @@ int run_receiver()
             else if (events[i].events & EPOLLIN) {
                 
                 // use get sokcopt to get socket buffer size, assign it to message_size
-
-                memset(&nmsg, 0, MESSAGE_SIZE);
-                nmsg.data1 = events[i].data.fd;
-                bytes_read = 0;
-                total_bytes_read = 0;
-                
-                while (1) {
-
-                    bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
-                    if (bytes_read <= 0) {
-                        memset(error, 0, sizeof(error));
-                        sprintf(error, "read failed %s %d", strerror(errno), bytes_read);
-                        store_log(error);
-                        break;    
-                    }
-                    else {
-
-                        total_bytes_read += bytes_read;
-                        memset(error, 0, sizeof(error));
-                        sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
-                        store_log(error);
+                //memset(key, 0, sizeof(key));
+                //getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
+                //inet_ntop(AF_INET, addr.sin_addr, key, sizeof(key));
+                // message_size = hget(&htable, key);
+                if (message_size >= 0) {
+    
+                    memset(&nmsg, 0, MESSAGE_SIZE);
+                    nmsg.data1 = events[i].data.fd;
+                    bytes_read = 0;
+                    total_bytes_read = 0;
                     
-                        if (total_bytes_read >= MESSAGE_SIZE) {
-                            store_log("treu");
-                            send_to_processor(&nmsg);
-                            total_bytes_read = 0;
-                            memset(&nmsg, 0, MESSAGE_SIZE);
-                            nmsg.data1 = events[i].data.fd;
-                        }
+                    while (1) {
 
+                        bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
+                        if (bytes_read <= 0) {
+                            
+                            memset(error, 0, sizeof(error));
+                            sprintf(error, "read failed %s %d", strerror(errno), bytes_read);
+                            store_log(error);
+                            break;    
+                        
+                        }
+                        else {
+
+                            total_bytes_read += bytes_read;
+                            memset(error, 0, sizeof(error));
+                            sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
+                            store_log(error);
+                        
+                            if (total_bytes_read >= MESSAGE_SIZE) {
+
+                                send_to_processor(&nmsg);
+                                
+                                total_bytes_read = 0;
+                                memset(&nmsg, 0, MESSAGE_SIZE);
+                                nmsg.data1 = events[i].data.fd;
+                            }
+
+                        }
                     }
                 }
-               
+                else {
+                    // get fd and close
+                    store_log("failed to size for fd");
+                }
             }
             
         }
@@ -297,6 +328,26 @@ int send_to_processor(newmsg_data *nmsg)
 }
 
 
+int get_message_from_processor (capacity_info *cpif) 
+{
+    int subblock_position = -1;
+    char *blkptr = NULL;
+
+    sem_wait(sem_lock_commr.var);
+    subblock_position = get_subblock(commr_block.var, 1, 1);
+
+    if (subblock_position >= 0) {
+        memset(cpif, 0, sizeof(capacity_info));
+        blkptr = commr_block.var = (TOTAL_PARTITIONS/8) + subblock_position + CPARTITION_SIZE;
+        memcpy(cpif, blkptr, sizeof(capacity_info));
+        toggle_bit(subblock_position, commr_block.var, 1);
+    } 
+
+    sem_post(sem_lock_commr.var);
+    return subblock_position;
+}
+
+
 int send_message_to_processor(receivers_message *rcvm)
 {
     int subblock_position = -1;
@@ -304,7 +355,7 @@ int send_message_to_processor(receivers_message *rcvm)
     char msg_type;
     
     sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 0, 3);
+    subblock_position = get_subblock(commr_block.var, 0, 2);
     
     if (subblock_position >= 0) {
 
@@ -313,7 +364,7 @@ int send_message_to_processor(receivers_message *rcvm)
         memset(blkptr, 0, CPARTITION_SIZE);
         memcpy(blkptr, rcvm, sizeof(receivers_message));
 
-        toggle_bit(subblock_position, commr_block.var, 3);
+        toggle_bit(subblock_position, commr_block.var, 2);
         sem_post(sem_lock_sigr.var);
     }
     else {
@@ -462,6 +513,11 @@ int main(int argc, char *argv[])
 
     if (add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
     
+    if (hcreate_table(&htable, 100) != 0) {
+        store_log("failed to create table");
+        return -1;
+    }
+
     run_receiver(); // recieve connections, data and communicate with database
  
     PQfinish(connection); // close connection to db

@@ -4,7 +4,7 @@
 #define hash_seed 1009
 
 typedef struct datanode {
-    unsigned int key;
+    char key[17];
     unsigned int value;
     struct datanode *next;
 } datanode;
@@ -16,11 +16,11 @@ typedef struct hashtable {
     unsigned int table_size;
 } hashtable;
 
-int hdel (hashtable *_htable_name, int _hkey);
+int hdel (hashtable *_htable_name, char * _hkey);
 int hcreate_table(hashtable *_hhtable, int _hsize);
-int hget (hashtable *_htable_name, int _hkey);
-int hput (hashtable *_htable_name, int _hkey, int _hvalue);
-int hget_hash (hashtable *_htable_name, int _hkey);
+int hget (hashtable *_htable_name, char * _hkey);
+int hput (hashtable *_htable_name, char * _hkey, int _hvalue);
+int hget_hash (hashtable *_htable_name, char * _hkey);
 
 //1009 is prime close to 1000 use it
 #endif // H_HASH_TABLE

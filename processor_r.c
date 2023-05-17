@@ -24,7 +24,7 @@ datablocks datar_block;
 datablocks commr_block;
 
 
-void store_log(char *logtext) 
+void store_log (char *logtext) 
 {
 
     PGresult *res = NULL;
@@ -46,7 +46,7 @@ void store_log(char *logtext)
 }
 
 
-int store_data_in_database(newmsg_data *nmsg) 
+int store_data_in_database (newmsg_data *nmsg) 
 {
     PGresult *res = NULL;
     
@@ -76,7 +76,7 @@ int store_data_in_database(newmsg_data *nmsg)
 }
 
 
-int store_commr_into_database(receivers_message *rcvm) 
+int store_commr_into_database (receivers_message *rcvm) 
 {
     PGresult *res = NULL;
 
@@ -110,7 +110,7 @@ int store_commr_into_database(receivers_message *rcvm)
 }
 
 
-int get_data_from_receiver() 
+int get_data_from_receiver () 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -138,14 +138,15 @@ int get_data_from_receiver()
 }
 
 
-int get_message_from_receiver() {
+int get_message_from_receiver () 
+{
     
     int subblock_position = -1;
     char *blkptr = NULL;
     receivers_message rcvm;
 
     sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 1, 3);
+    subblock_position = get_subblock(commr_block.var, 1, 2);
     
     if (subblock_position >= 0) {
 
@@ -154,9 +155,7 @@ int get_message_from_receiver() {
         memset(&rcvm, 0, sizeof(rcvm));
         memcpy(&rcvm, blkptr, sizeof(rcvm));
         store_commr_into_database(&rcvm);
-          
-        blkptr = NULL;
-        toggle_bit(subblock_position, commr_block.var, 3);
+        toggle_bit(subblock_position, commr_block.var, 2);
     
     }
 
@@ -165,7 +164,57 @@ int get_message_from_receiver() {
 }
 
 
-int run_process() 
+int get_comms_from_database (char *blkptr) 
+{
+    PGresult *res = NULL;
+    capacity_info cpif;
+
+    char error[100];
+    
+    res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
+   
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+        memset(error, 0, sizeof(error));
+        sprintf(error, "retriving comms for receiver failed %s", PQerrorMessage(connection));
+        store_log(error);
+        PQclear(res);
+        return -1;
+    }    
+    
+    memset(&cpif, 0, sizeof(capacity_info));
+    cpif.ipaddress = atoi(PQgetvalue(res, 0, 0));
+    cpif.capacity = atoi(PQgetvalue(res, 0, 1));
+    memcpy(blkptr, &cpif, sizeof(capacity_info));
+
+    PQclear(res);
+    return 0;
+}
+
+
+int send_msg_to_receiver () 
+{
+
+    int subblock_position;
+    char *blkptr = NULL;
+    
+    sem_wait(sem_lock_commr.var);
+    subblock_position = get_subblock(commr_block.var, 0, 1);
+
+    if (subblock_position >= 0) {
+
+        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
+        
+        if (get_comms_from_database(blkptr) != -1) {
+            toggle_bit(subblock_position, commr_block.var, 1);
+        }
+    }
+
+    sem_post(sem_lock_commr.var);
+    return subblock_position;
+} 
+
+
+int run_process () 
 {
     int status = 0;
     char data[CPARTITION_SIZE];
@@ -175,12 +224,12 @@ int run_process()
         sem_wait(sem_lock_sigr.var); 
         get_message_from_receiver();
         get_data_from_receiver();           
-        // get_data_from_database 
+        send_msg_to_receiver(); 
     }  
 }
 
 
-int connect_to_database(char *conninfo) 
+int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
 
@@ -193,7 +242,7 @@ int connect_to_database(char *conninfo)
 }
 
 
-int prepare_statements() 
+int prepare_statements () 
 {    
     int i, status = 0;
 
@@ -214,7 +263,7 @@ int prepare_statements()
 }
 
 
-int main(int argc, char *argv[]) 
+int main (int argc, char *argv[]) 
 {
     int status = -1;
     int conffd = -1;

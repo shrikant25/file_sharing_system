@@ -4,7 +4,7 @@
 #define MESSAGE_SIZE (1024 * 128)
 
 // todo - increase size of partitions to accomodate some meta info
-#define TOTAL_PARTITIONS 80
+#define TOTAL_PARTITIONS 80 // alway keep it in multiples of 
 #define DPARTITION_SIZE (MESSAGE_SIZE + 42)
 #define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 10)
 #define CPARTITION_SIZE 20
@@ -17,6 +17,11 @@
 //                            |  |                        
 // 1024 * 64 * 40 + 5
 // 1024 * 64 * 40 + 5 
+
+typedef struct capacity_info {
+    unsigned int ipaddress;
+    unsigned int capacity;
+}capacity_info;
 
 typedef struct receivers_message {
     unsigned int fd;

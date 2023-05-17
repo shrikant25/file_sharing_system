@@ -3,12 +3,16 @@
 
 #include "partition.h"
 
-void store_log(char *);
-int run_process();
-int store_data_in_database(newmsg_data *);
-int store_commr_into_database(receivers_message *);
-int get_data_from_receiver();
+void store_log (char *);
+int run_process ();
+int store_data_in_database (newmsg_data *);
+int store_commr_into_database (receivers_message *);
+int get_data_from_receiver ();
 int get_message_from_receiver();
+int send_msg_to_receiver ();
+int get_comms_from_database (char *);
+int connect_to_database ();
+int prepare_statements ();
 
 typedef struct db_statements {
     char *statement_name;
@@ -16,10 +20,8 @@ typedef struct db_statements {
     int param_count;
 }db_statements;
 
-int connect_to_database();
-int prepare_statements();
 
-#define statement_count 3
+#define statement_count 4
 
 db_statements dbs[statement_count] = {
     { 
@@ -40,6 +42,12 @@ db_statements dbs[statement_count] = {
       .statement_name = "pr_storelogs", 
       .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1,
+    },
+    {
+      .statement_name = "pr_getcomms", 
+      .statement = "with rdata as (SELECT rcomid, rdata1, rdata2 FROM receivers_comms LIMIT 1) \
+                  DELETE FROM receivers_comms WHERE rcomid = (SELECT rcomid FROM rdata) RETURNING rdata1, rdata2;",
+      .param_count = 0,
     }
 };
 
