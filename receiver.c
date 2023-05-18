@@ -462,8 +462,7 @@ int main (int argc, char *argv[])
     char db_conn_command[100];
     char username[30];
     char dbname[30];
-    hashtable htable;
-
+    
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
         return -1;
@@ -534,8 +533,8 @@ int main (int argc, char *argv[])
 
     if (add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
     
-    if (hcreate_table(&htable, 100) != 0) {
-        store_log("failed to create table");
+    if (hcreate_table(&htable, 1000) != 0) {
+        store_log("failed to create fd-capacity table");
         return -1;
     }
 

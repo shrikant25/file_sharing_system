@@ -203,7 +203,7 @@ int run_sender()
             
             msgsts.status = total_data_sent < strlen(sndmsg.data) ? 0 : 1;
             memset(error, 0, sizeof(error));
-            sprintf(error, "total bytes sent %d\n", total_data_sent);
+            sprintf(error, " msg size %d total bytes sent %d\n", strlen(sndmsg.data),total_data_sent);
             store_log(error);
 
             msgsts.type = 4;
