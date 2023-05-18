@@ -183,16 +183,17 @@ int accept_connection()
 }
 
 
-void close_connection (int fd, struct sockaddr_in addr) 
+int end_connection (int fd, struct sockaddr_in addr) 
 {
     char key[17];
     receivers_message rcvm;
+    socklen_t addrlen = sizeof(addr);
     
     if (remove_from_list(fd) == -1)
         return -1;
         
     memset(key, 0, sizeof(key));
-    getsockname(fd, (struct sockaddr *) &addr, sizeof(addr));
+    getsockname(fd, (struct sockaddr *) &addr, &addrlen);
     sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
     
     if (hdel(&htable, key) < 0) {
@@ -208,6 +209,7 @@ void close_connection (int fd, struct sockaddr_in addr)
     rcvm.status = 1;
 
     send_message_to_processor(&rcvm);
+    return 0;
 }
 
 
@@ -218,6 +220,7 @@ int run_receiver()
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
     newmsg_data nmsg;
     capacity_info cpif;
 
@@ -246,7 +249,7 @@ int run_receiver()
             
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
-                close_connection(events[i].data.fd, addr);  
+                if (end_connection(events[i].data.fd, addr) == -1) { return -1; }  
                 continue;
             
             }
@@ -256,7 +259,7 @@ int run_receiver()
             
             else if (events[i].events & EPOLLIN) {
                 
-                getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
+                getsockname(events[i].data.fd, (struct sockaddr *) &addr, &addrlen);
                 memset(key, 0, sizeof(key));
                 sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
                 message_size = hget(&htable, key);
@@ -302,7 +305,7 @@ int run_receiver()
                     memset(error, 0, sizeof(error));
                     sprintf(error, "invalid size %d for fd %d ip %s", message_size, events[i].data.fd, key);
                     store_log(error);
-                    close_connection(events[i].data.fd, addr);
+                    if (end_connection(events[i].data.fd, addr) == -1) { return -1; }
                 }
             }
             
@@ -352,7 +355,7 @@ int get_message_from_processor (capacity_info *cpif)
 
     if (subblock_position >= 0) {
         memset(cpif, 0, sizeof(capacity_info));
-        blkptr = commr_block.var = (TOTAL_PARTITIONS/8) + subblock_position + CPARTITION_SIZE;
+        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position + CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
         toggle_bit(subblock_position, commr_block.var, 1);
     } 
@@ -455,6 +458,7 @@ int main(int argc, char *argv[])
     char db_conn_command[100];
     char username[30];
     char dbname[30];
+    hashtable htable;
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");

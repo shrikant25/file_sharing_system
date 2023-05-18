@@ -32,7 +32,7 @@ void store_log(char *logtext)
     PQclear(res);
 }
 
-int init(char *confg_filename) 
+int initnotif(char *confg_filename) 
 {
     
     int conffd = -1;
@@ -41,7 +41,7 @@ int init(char *confg_filename)
     char dbname[30];
     char noti_channel[30];
     char noti_command[100];
-    char db_conn_commnand[100];
+    char db_conn_command[100];
 
     PGresult *res = NULL;
     if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
@@ -49,7 +49,12 @@ int init(char *confg_filename)
         return -1;
     }
 
+    memset(buf, 0, sizeof(buf));
     memset(noti_channel, 0 , sizeof(noti_channel));
+    memset(db_conn_command, 0, sizeof(db_conn_command));
+    memset(username, 0, sizeof(username));
+    memset(dbname, 0, sizeof(dbname));
+
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf,"SEM_LOCK_SIG=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sig.key, username, dbname, noti_channel);
     }
@@ -59,11 +64,11 @@ int init(char *confg_filename)
     }
 
     sprintf(noti_command, "LISTEN %s", noti_channel);
-    sprintf(db_conn_commnand, "user=%s dbname=%s", username, dbname);
+    sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
-    connection = PQconnectdb(db_conn_commnand);
+    connection = PQconnectdb(db_conn_command);
     if (PQstatus(connection) != CONNECTION_OK) {
-        syslog(LOG_NOTICE, "failed to create connection to database %s", PQerrorMessage(connection));
+        syslog(LOG_NOTICE, "failed to create connection to database user %s dbname %s noti_channel %s error %s", username, dbname, noti_channel, PQerrorMessage(connection));
         return -1;
     }
 
@@ -107,8 +112,8 @@ int main(int argc, char *argv[])
     if (argc != 2) {
         syslog(LOG_NOTICE, "invlaid arguments");
     }
-
-    if(init(argv[1]) == -1) {return -1;}
+    
+    if(initnotif(argv[1]) == -1) {return -1;}
 
     while (1) {
 

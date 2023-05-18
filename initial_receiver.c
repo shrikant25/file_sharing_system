@@ -206,6 +206,7 @@ int main(int argc, char *argv[])
 
     close(conffd);
 
+    memset(db_conn_command, 0, sizeof(db_conn_command));
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     if (connect_to_database(db_conn_command) == -1) { return -1; }

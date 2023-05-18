@@ -181,7 +181,7 @@ int get_comms_from_database (char *blkptr)
     }    
     
     memset(&cpif, 0, sizeof(capacity_info));
-    strncy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+    strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
     cpif.capacity = atoi(PQgetvalue(res, 0, 1));
     memcpy(blkptr, &cpif, sizeof(capacity_info));
 

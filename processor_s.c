@@ -193,7 +193,7 @@ void store_log (char *logtext)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "ps_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
