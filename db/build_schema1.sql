@@ -25,8 +25,8 @@ CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY,
 
 
 CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY, 
-                              mdata bytea NOT NULL, 
-                              mtype INTEGER NOT NULL);
+                              rdata1 BIGINT NOT NULL,
+                              rdata2 BIGINT NOT NULL);
 
 CREATE TABLE receiving_conns (rfd INTEGER PRIMARY KEY, 
                               ripaddr BIGINT NOT NULL, 
@@ -180,10 +180,10 @@ LANGUAGE plpgsql;
 CREATE TRIGGER
     create_msg_receiver
 AFTER INSERT OR UPDATE ON
-    system_capacity
+    sysinfo
+FOR EACH ROW
 WHEN
     (NEW.system_capacity != 0)
-FOR EACH ROW
 EXECUTE FUNCTION
     create_comms();
 

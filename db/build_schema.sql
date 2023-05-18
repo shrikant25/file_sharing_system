@@ -176,10 +176,10 @@ LANGUAGE plpgsql;
 CREATE TRIGGER
     create_msg_receiver
 AFTER INSERT OR UPDATE ON
-    system_capacity
+    sysinfo
+FOR EACH ROW
 WHEN
     (NEW.system_capacity != 0)
-FOR EACH ROW
 EXECUTE FUNCTION
     create_comms();
 

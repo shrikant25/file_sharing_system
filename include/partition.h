@@ -19,7 +19,7 @@
 // 1024 * 64 * 40 + 5 
 
 typedef struct capacity_info {
-    unsigned int ipaddress;
+    char ipaddress[17];
     unsigned int capacity;
 }capacity_info;
 

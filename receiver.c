@@ -183,6 +183,34 @@ int accept_connection()
 }
 
 
+void close_connection (int fd, struct sockaddr_in addr) 
+{
+    char key[17];
+    receivers_message rcvm;
+    
+    if (remove_from_list(fd) == -1)
+        return -1;
+        
+    memset(key, 0, sizeof(key));
+    getsockname(fd, (struct sockaddr *) &addr, sizeof(addr));
+    sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
+    
+    if (hdel(&htable, key) < 0) {
+        memset(error, 0, sizeof(error));
+        sprintf(error, "failed to delete key from table %s", key);
+        store_log(error);
+    }
+    close(fd);
+
+    memset(&rcvm, 0, sizeof(rcvm));
+    rcvm.fd = fd;
+    rcvm.ipaddr = 0;
+    rcvm.status = 1;
+
+    send_message_to_processor(&rcvm);
+}
+
+
 int run_receiver() 
 {
     char key[17];
@@ -191,18 +219,19 @@ int run_receiver()
     struct epoll_event events[s_info.maxevents];
     struct sockaddr_in addr;
     newmsg_data nmsg;
-    receivers_message rcvm;
     capacity_info cpif;
 
     while (1) {
         
-        act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, -1);
+        act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, 10);
 
         if (get_message_from_processor(&cpif) != -1) {
-            // sprintf(key, "%d", cpif.ipaddress);
-            // if (hput(&htable, key, cpif.capacity) < 0) {
-           //       store_log(failed to insert key value in table);
-            // };
+            
+                if (hput(&htable, cpif.ipaddress, cpif.capacity) != 0) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "failed to insert key, value in table ip = %s capacity = %d", cpif.ipaddress, cpif.capacity);
+                    store_log(error);
+                };
         }
 
 
@@ -217,24 +246,7 @@ int run_receiver()
             
             // error or hangup
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
-                
-                if (remove_from_list(events[i].data.fd) == -1)
-                    return -1;
-                 
-                //memset(key, 0, sizeof(key));
-                //getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
-                //inet_ntop(AF_INET, addr.sin_addr, key, sizeof(key));
-                // if (hdel(&htable, key) < 0) {
-                // failed to delete value from table
-               // }
-                close(events[i].data.fd);
-
-                memset(&rcvm, 0, sizeof(rcvm));
-                rcvm.fd = events[i].data.fd;
-                rcvm.ipaddr = 0;
-                rcvm.status = 1;
-
-                send_message_to_processor(&rcvm);
+                close_connection(events[i].data.fd, addr);  
                 continue;
             
             }
@@ -244,21 +256,21 @@ int run_receiver()
             
             else if (events[i].events & EPOLLIN) {
                 
-                // use get sokcopt to get socket buffer size, assign it to message_size
-                //memset(key, 0, sizeof(key));
-                //getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
-                //inet_ntop(AF_INET, addr.sin_addr, key, sizeof(key));
-                // message_size = hget(&htable, key);
+                getsockname(events[i].data.fd, (struct sockaddr *) &addr, sizeof(addr));
+                memset(key, 0, sizeof(key));
+                sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
+                message_size = hget(&htable, key);
+                
                 if (message_size >= 0) {
     
-                    memset(&nmsg, 0, MESSAGE_SIZE);
+                    memset(&nmsg, 0, message_size);
                     nmsg.data1 = events[i].data.fd;
                     bytes_read = 0;
                     total_bytes_read = 0;
                     
                     while (1) {
 
-                        bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, MESSAGE_SIZE-total_bytes_read);
+                        bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, message_size-total_bytes_read);
                         if (bytes_read <= 0) {
                             
                             memset(error, 0, sizeof(error));
@@ -274,12 +286,12 @@ int run_receiver()
                             sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
                             store_log(error);
                         
-                            if (total_bytes_read >= MESSAGE_SIZE) {
+                            if (total_bytes_read >= message_size) {
 
                                 send_to_processor(&nmsg);
                                 
                                 total_bytes_read = 0;
-                                memset(&nmsg, 0, MESSAGE_SIZE);
+                                memset(&nmsg, 0, message_size);
                                 nmsg.data1 = events[i].data.fd;
                             }
 
@@ -287,8 +299,10 @@ int run_receiver()
                     }
                 }
                 else {
-                    // get fd and close
-                    store_log("failed to size for fd");
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "invalid size %d for fd %d ip %s", message_size, events[i].data.fd, key);
+                    store_log(error);
+                    close_connection(events[i].data.fd, addr);
                 }
             }
             
@@ -504,7 +518,6 @@ int main(int argc, char *argv[])
         return -1;
     }
  
-    
     s_info.epoll_fd = epoll_create1(0); // create epoll instance
     if (s_info.epoll_fd == -2) {
         store_log("failed to create epoll instance");

@@ -140,7 +140,6 @@ int get_data_from_receiver ()
 
 int get_message_from_receiver () 
 {
-    
     int subblock_position = -1;
     char *blkptr = NULL;
     receivers_message rcvm;
@@ -182,7 +181,7 @@ int get_comms_from_database (char *blkptr)
     }    
     
     memset(&cpif, 0, sizeof(capacity_info));
-    cpif.ipaddress = atoi(PQgetvalue(res, 0, 0));
+    strncy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
     cpif.capacity = atoi(PQgetvalue(res, 0, 1));
     memcpy(blkptr, &cpif, sizeof(capacity_info));
 

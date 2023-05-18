@@ -2,24 +2,6 @@
 #include "partition.h"
 #include <stdio.h>
 
-// // state = 0 means empty position, state = 1 means filled position
-// int get_subblock(char *block, int state) 
-// {
-
-//     int i, j;
-//     char bmap[TOTAL_PARTITIONS/8] = 0;
-//     memcpy(&bmap, block, TOTAL_PARTITIONS/8); // retrive bitmap
-    
-//     for(i = 0; i<TOTAL_PARTITIONS/8; i++) {
-//         for(j = 0; j<8; j++) {
-//             if (state == ((bmap[i]>>j) & 1) )
-//                 return i;
-//         }
-//     }
-       
-//     return -1;
-// }
-
 // 1 = bitmap present at start representing TOTAL_PARTITIONS blocks 
 // 2 = bitmap present at start representing TOTAL_PARTITIONS/2 blocks
 // 3 = bitmap present at start but take next TOTAL_PARTITIONS/2 blocks
@@ -56,27 +38,11 @@ void toggle_bit(int idx, char *block, int type)
     int bmap_size = TOTAL_PARTITIONS/8;
     char bmap[bmap_size];
 
-//    if (type == 1) { 
-
     memcpy(&bmap, block, bmap_size); // retrive bitmap    
     bmap[idx/8] ^= 1<<(idx%8);  // toggle bit
     memcpy(block, &bmap, bmap_size);  // store bitmap
 
-//     }
-//     else if (block_type == 2) {
 
-//         memcpy(&bmap, block, 2); // retrive bitmap    
-//         bmap ^= 1<<idx;  // toggle bit
-//         memcpy(block, &bmap, 2);  // store bitmap
-
-//    }
-    // else if (block_type == 3) {
-
-    //     memcpy(&bmap, block+COMM_BLOCK_SIZE/2, 2); // retrive bitmap    
-    //     bmap ^= 1<<idx;  // toggle bit
-    //     memcpy(block+COMM_BLOCK_SIZE/2, &bmap, 2);  // store bitmap
-
-    // }
 }
 
 
