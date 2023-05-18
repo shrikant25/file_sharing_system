@@ -4,7 +4,7 @@
 #define hash_seed 1009
 
 typedef struct datanode {
-    char key[17];
+    char key[20];
     unsigned int value;
     struct datanode *next;
 } datanode;

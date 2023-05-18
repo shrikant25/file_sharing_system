@@ -30,7 +30,7 @@ datablocks commr_block;
 hashtable htable;
 
 
-int make_nonblocking(int active_fd) 
+int make_nonblocking (int active_fd) 
 {
     // get current flags for file descriptor
     int flags = fcntl(active_fd, F_GETFL, 0);
@@ -52,7 +52,7 @@ int make_nonblocking(int active_fd)
 }
 
 
-int create_socket() 
+int create_socket () 
 {
     int optval;
     struct sockaddr_in servaddr;
@@ -90,7 +90,7 @@ int create_socket()
 }
 
 
-int add_to_list(int active_fd) 
+int add_to_list (int active_fd) 
 {
     struct epoll_event event;
  
@@ -110,7 +110,7 @@ int add_to_list(int active_fd)
 }
 
 
-int remove_from_list(int active_fd) 
+int remove_from_list (int active_fd) 
 {
     struct epoll_event event;
 
@@ -129,7 +129,7 @@ int remove_from_list(int active_fd)
 }
 
 
-int accept_connection() 
+int accept_connection () 
 {   
     int client_fd = -1;
     int optval;
@@ -213,10 +213,10 @@ int end_connection (int fd, struct sockaddr_in addr)
 }
 
 
-int run_receiver() 
+int run_receiver () 
 {
     char key[17];
-    int i, message_size, bytes_read, total_bytes_read;
+    int i, message_size, bytes_read, total_bytes_read, status;
     int act_events_cnt = -1;
     struct epoll_event events[s_info.maxevents];
     struct sockaddr_in addr;
@@ -230,9 +230,9 @@ int run_receiver()
 
         if (get_message_from_processor(&cpif) != -1) {
             
-                if (hput(&htable, cpif.ipaddress, cpif.capacity) != 0) {
+                if ((status = hput(&htable, cpif.ipaddress, cpif.capacity)) != 0) {
                     memset(error, 0, sizeof(error));
-                    sprintf(error, "failed to insert key, value in table ip = %s capacity = %d", cpif.ipaddress, cpif.capacity);
+                    sprintf(error, "failed to insert key, value in table status = %d ip = %s capacity = %d", status, cpif.ipaddress, cpif.capacity);
                     store_log(error);
                 };
         }
@@ -316,7 +316,7 @@ int run_receiver()
 }
  
     
-int send_to_processor(newmsg_data *nmsg)
+int send_to_processor (newmsg_data *nmsg)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -358,9 +358,9 @@ int get_message_from_processor (capacity_info *cpif)
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
         memset(error, 0, sizeof(error));
-    sprintf(error, "ip %s, cp %d", cpif->ipaddress, cpif->capacity);
-    store_log(error);
-    memcpy(blkptr, &cpif, sizeof(capacity_info));
+        sprintf(error, "ip %s, cp %d", cpif->ipaddress, cpif->capacity);
+        store_log(error);
+        memcpy(blkptr, &cpif, sizeof(capacity_info));
         toggle_bit(subblock_position, commr_block.var, 1);
     } 
 
@@ -369,7 +369,7 @@ int get_message_from_processor (capacity_info *cpif)
 }
 
 
-int send_message_to_processor(receivers_message *rcvm)
+int send_message_to_processor (receivers_message *rcvm)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
@@ -397,7 +397,7 @@ int send_message_to_processor(receivers_message *rcvm)
 }
 
 
-void store_log(char *logtext) 
+void store_log (char *logtext) 
 {
 
     PGresult *res = NULL;
@@ -419,7 +419,7 @@ void store_log(char *logtext)
 }
 
 
-int connect_to_database(char *conninfo) 
+int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
 
@@ -432,7 +432,7 @@ int connect_to_database(char *conninfo)
 }
 
 
-int prepare_statements() 
+int prepare_statements () 
 {    
     int i, status = 0;
 
@@ -453,7 +453,7 @@ int prepare_statements()
 }
 
 
-int main(int argc, char *argv[]) 
+int main (int argc, char *argv[]) 
 {
 
     int status = -1;

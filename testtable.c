@@ -29,38 +29,39 @@ int main (int argc, char *args[]) {
 
     printf("%d\n", argc);
     printf("%s\n", args[0]);
-
+char key[10];
     srand(time(0));
     for (i = 0; i < 15; i++) {
-        hput(&htable, i, i+1);
-        printf("key %d value %d\n",i, i+1 );
+        sprintf(key, "val%d", i);
+        hput(&htable, key, i+1);
+        printf("key %s value %d\n", key , i+1 );
     }
 
-    printf("key %d get %d\n", 3, hget(&htable, 3));
-    printf("key %d get %d\n", 5, hget(&htable, 5));
-    printf("key %d get %d\n", 7, hget(&htable, 7));
-    printf("key %d get %d\n", 13, hget(&htable, 13));
+    printf("key %s get %d\n", "val3", hget(&htable, "val3"));
+    printf("key %s get %d\n", "val5", hget(&htable, "val5"));
+    printf("key %s get %d\n", "val7", hget(&htable, "val7"));
+    printf("key %s get %d\n", "val13", hget(&htable, "val13"));
 
-    printf("key %d del %d\n", 5,hdel(&htable, 5));
-    printf("key %d del %d\n", 6,hdel(&htable, 6));
-    printf("key %d del %d\n", 7,hdel(&htable, 7));
-    printf("key %d del %d\n", 13,hdel(&htable, 13));
+    printf("key %s del %d\n", "val5",hdel(&htable, "val5"));
+    printf("key %s del %d\n", "val6",hdel(&htable, "val6"));
+    printf("key %s del %d\n", "val7",hdel(&htable, "val7"));
+    printf("key %s del %d\n", "val13",hdel(&htable, "val13"));
 
-    printf("key %d get %d\n",3,hdel(&htable, 3));
-    printf("key %d get %d\n",5,hdel(&htable, 5));
-    printf("key %d get %d\n",6,hdel(&htable, 6));
-    printf("key %d get %d\n",15,hdel(&htable, 15));
-    printf("key %d get %d\n",13, hdel(&htable, 13));
-    printf("key %d get %d\n",7, hget(&htable, 7));
+    printf("key %s get %d\n","val3",hdel(&htable, "val3"));
+    printf("key %s get %d\n","val5",hdel(&htable, "val5"));
+    printf("key %s get %d\n","val6",hdel(&htable, "val6"));
+    printf("key %s get %d\n","val15",hdel(&htable, "val15"));
+    printf("key %s get %d\n","val13", hdel(&htable, "val13"));
+    printf("key %s get %d\n","val7", hget(&htable, "val7"));
 
-    printf("key %d put %d\n",7, hput(&htable, 7, 7+1));
-    printf("key %d put %d\n",13, hput(&htable, 13, 13+1));
-    printf("key %d put %d\n",5, hput(&htable, 5, 5+1));
+    printf("key %s put %d\n","val7", hput(&htable, "val7", 7+1));
+    printf("key %s put %d\n","val13", hput(&htable, "val13", 13+1));
+    printf("key %s put %d\n","val5", hput(&htable, "val5", 5+1));
 
 
-    printf("key %d get %d\n",7, hget(&htable, 7));
-    printf("key %d get %d\n",13, hget(&htable, 13));
-    printf("key %d get %d\n",5, hget(&htable, 5));
+    printf("key %s get %d\n","val7", hget(&htable, "val7"));
+    printf("key %s get %d\n","val13", hget(&htable, "val13"));
+    printf("key %s get %d\n","val5", hget(&htable, "val5"));
     
     return 0;
 } 

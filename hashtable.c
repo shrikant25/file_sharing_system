@@ -103,6 +103,8 @@ int hcreate_table(hashtable *htable, int size) {
     datanode *temp;
     datanode *newnode;
 
+    htable->available_node_count = htable->table_size = size;
+    
     htable->table = (datanode **)calloc(sizeof(datanode *), htable->table_size);
     if (htable->table == NULL) { return -1; }
 
@@ -125,7 +127,6 @@ int hcreate_table(hashtable *htable, int size) {
         }
     }
    
-    htable->available_node_count = htable->table_size = size;
 
     return 0;
 
