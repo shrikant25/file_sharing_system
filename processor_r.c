@@ -183,6 +183,9 @@ int get_comms_from_database (char *blkptr)
     memset(&cpif, 0, sizeof(capacity_info));
     strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
     cpif.capacity = atoi(PQgetvalue(res, 0, 1));
+    memset(error, 0, sizeof(error));
+    sprintf(error, "ip %s, cp %d", cpif.ipaddress, cpif.capacity);
+    store_log(error);
     memcpy(blkptr, &cpif, sizeof(capacity_info));
 
     PQclear(res);
@@ -192,7 +195,6 @@ int get_comms_from_database (char *blkptr)
 
 int send_msg_to_receiver () 
 {
-
     int subblock_position;
     char *blkptr = NULL;
     

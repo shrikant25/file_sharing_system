@@ -1,4 +1,6 @@
 
+./launcher "./conf/receiver.conf" "./conf/sender.conf" "./conf/receiver_notif.conf" "./conf/sender_notif.conf" "./conf/initial_receiver.conf" "./conf/initial_sender.conf"
+./launcher "./conf/receiver1.conf" "./conf/sender1.conf" "./conf/receiver_notif1.conf" "./conf/sender_notif1.conf" "./conf/initial_receiver1.conf" "./conf/initial_sender1.conf"
 
 -- updates state of message from N-1 to N-2 if md5 hash matches, otherewise the message is marked as dead
 UPDATE 
@@ -541,13 +543,13 @@ UPDATE
 SET 
     jstate = 'S-2W' 
 WHERE 
-    jstate = 'S-2';
+    jstate = 'S-2'
 AND 
     jdestination = (
         SELECT 
             system_name
         FROM 
-            sysinfo;
+            sysinfo
         );
 
 
