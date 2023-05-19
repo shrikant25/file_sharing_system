@@ -326,7 +326,6 @@ int send_to_processor (newmsg_data *nmsg)
     int subblock_position = -1;
     char *blkptr = NULL;
     
-    store_log("send_to_processor waiting for lock");
     sem_wait(sem_lock_datar.var);         
     subblock_position = get_subblock(datar_block.var, 0, 3);
 
@@ -360,7 +359,7 @@ int get_message_from_processor (capacity_info *cpif)
     subblock_position = get_subblock(commr_block.var, 1, 1);
 
     if (subblock_position >= 0) {
-        store_log("get_message_from_processor got some");
+       
         memset(cpif, 0, sizeof(capacity_info));
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
@@ -382,7 +381,6 @@ int send_message_to_processor (receivers_message *rcvm)
     char *blkptr = NULL;
     char msg_type;
     
-    store_log("send_message_to_processor waiting for lock");
     sem_wait(sem_lock_commr.var);         
     subblock_position = get_subblock(commr_block.var, 0, 2);
     

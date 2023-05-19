@@ -458,7 +458,7 @@ chunk_info AS (
         jsource, 
         jpriority, 
         system_capacity,  
-        lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER) chunk_data 
+        lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER - 168) chunk_data 
     FROM 
         par_job, 
         generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
