@@ -5,7 +5,7 @@
 
 // todo - increase size of partitions to accomodate some meta info
 #define TOTAL_PARTITIONS 80 // alway keep it in multiples of 
-#define DPARTITION_SIZE (MESSAGE_SIZE + 42)
+#define DPARTITION_SIZE (MESSAGE_SIZE + 46)
 #define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 10)
 #define CPARTITION_SIZE 20
 #define COMM_BLOCK_SIZE (CPARTITION_SIZE * TOTAL_PARTITIONS + 10)
@@ -54,7 +54,7 @@ typedef struct connection_status {
 }connection_status;
 
 typedef struct send_message {
-    unsigned char type;
+    unsigned int size;
     unsigned int fd;
     char uuid[37];
     char data[MESSAGE_SIZE];

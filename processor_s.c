@@ -53,12 +53,17 @@ int retrive_data_from_database (char *blkptr)
         
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
             memset(error, 0, sizeof(error));
-            sprintf(error, "failed to retrive data from db %s", PQerrorMessage(connection));
+            sprintf(error, "failed to retrive data from db  . %s", PQerrorMessage(connection));
             store_log(error);
         }
         else {
-
+            
+            sndmsg->size = PQgetlength(res, 0, 0);
             strncpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+            
+            memset(error, 0, sizeof(error));
+            sprintf(error, "data got from db %d %s", PQgetlength(res, 0, 0),PQerrorMessage(connection));
+            store_log(error);
             PQclear(res);
 
             res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 

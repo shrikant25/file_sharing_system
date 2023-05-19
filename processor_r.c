@@ -37,7 +37,7 @@ void store_log (char *logtext)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "pr_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection,  dbs[2].statement_name,  dbs[2].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
@@ -116,6 +116,7 @@ int get_data_from_receiver ()
     char *blkptr = NULL;
     newmsg_data nmsg;
 
+    store_log("get_data_from_receiver waiting for lock");
     sem_wait(sem_lock_datar.var);         
     subblock_position = get_subblock(datar_block.var, 1, 3);
     
@@ -144,9 +145,10 @@ int get_message_from_receiver ()
     char *blkptr = NULL;
     receivers_message rcvm;
 
+    store_log("get_message_from_receiver waiting for lock");
     sem_wait(sem_lock_commr.var);         
     subblock_position = get_subblock(commr_block.var, 1, 2);
-    
+    store_log("get_message_from_receiver got lock");
     if (subblock_position >= 0) {
 
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
@@ -198,7 +200,9 @@ int send_msg_to_receiver ()
     int subblock_position;
     char *blkptr = NULL;
     
+    store_log("send_message_to_receiver waiting for lock");
     sem_wait(sem_lock_commr.var);
+    store_log("send_message_to_receiver got lock");
     subblock_position = get_subblock(commr_block.var, 0, 1);
 
     if (subblock_position >= 0) {
@@ -222,7 +226,9 @@ int run_process ()
 
     while (1) {
 
+        store_log("processor waiting for sig r");
         sem_wait(sem_lock_sigr.var); 
+        store_log("got one in rc");
         get_message_from_receiver();
         get_data_from_receiver();           
         send_msg_to_receiver(); 

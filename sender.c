@@ -193,17 +193,20 @@ int run_sender()
             data_sent = 0;
             total_data_sent = 0;
             
-            
+            memset(error, 0, sizeof(error));
+            sprintf(error, " msg in sender before sending size %d \n", sndmsg.size);
+            store_log(error);
+
             do {
 
-                data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, strlen(sndmsg.data), 0);
+                data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, sndmsg.size, 0);
                 total_data_sent += data_sent;
 
-            } while (total_data_sent < strlen(sndmsg.data) && data_sent != 0);
+            } while (total_data_sent < sndmsg.size && data_sent != 0);
             
-            msgsts.status = total_data_sent < strlen(sndmsg.data) ? 0 : 1;
+            msgsts.status = total_data_sent < sndmsg.size ? 0 : 1;
             memset(error, 0, sizeof(error));
-            sprintf(error, " msg size %d total bytes sent %d\n", strlen(sndmsg.data),total_data_sent);
+            sprintf(error, " msg size %d total bytes sent %d\n", sndmsg.size, total_data_sent);
             store_log(error);
 
             msgsts.type = 4;
@@ -227,7 +230,7 @@ void store_log(char *logtext)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, "s_storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count , param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }
