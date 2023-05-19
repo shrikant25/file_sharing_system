@@ -58,7 +58,7 @@ db_statements dbs[statement_count] = {
     },
     {
       .statement_name = "s_get_data",
-      .statement = " SELECT length(js.jobdata|| lo_get(f.file_data, js.data_offset * (si.system_capacity-168), si.system_capacity-168) \
+      .statement = " SELECT (js.jobdata|| lo_get(f.file_data, js.data_offset * (si.system_capacity-168), si.system_capacity-168) \
                 || (lpad('',si.system_capacity-length(js.jobdata||\
         lo_get(f.file_data,js.data_offset*(si.system_capacity-168), si.system_capacity-168)), ' '))::bytea) FROM job_scheduler \
         js JOIN job_scheduler js2 ON js.jparent_jobid = js2.jobid \
