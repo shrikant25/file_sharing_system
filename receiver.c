@@ -294,8 +294,9 @@ int run_receiver ()
                             sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
                             store_log(error);
                         
-                            if (total_bytes_read >= message_size) {
-
+                            if (total_bytes_read == message_size) {
+                                
+                                nmsg.data2 = total_bytes_read;
                                 send_to_processor(&nmsg);
                                 
                                 total_bytes_read = 0;

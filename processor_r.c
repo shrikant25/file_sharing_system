@@ -55,7 +55,7 @@ int store_data_in_database (newmsg_data *nmsg)
 
     sprintf(fd, "%d", nmsg->data1);
 
-    const int paramLengths[] = {sizeof(nmsg->data1), sizeof(nmsg->data)};
+    const int paramLengths[] = {sizeof(nmsg->data1), nmsg->data2};
     const int paramFormats[] = {0, 1};
     int resultFormat = 0;
 

@@ -4,14 +4,13 @@ DROP TRIGGER IF EXISTS msg_for_receiver ON receivers_comms;
 DROP TRIGGER IF EXISTS create_msg_receiver ON sysinfo;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_comms(), create_message(bytea, text, bytea, bytea, text, text, text);
+DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_comms(), create_message(bytea, text, bytea, bytea, text, text, text, int);
 UNLISTEN noti_1sys;
 UNLISTEN noti_1initial;
 UNLISTEN noti_1receiver;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
-                            data_offset INTEGER NOT NULL,
                             jstate CHAR(5) NOT NULL DEFAULT 'N-1',
                             jtype TEXT NOT NULL DEFAULT '1',
                             jsource TEXT NOT NULL,
@@ -74,7 +73,8 @@ CREATE OR REPLACE FUNCTION create_message(
     messaget bytea,
     message_source text,
     message_destination text,
-    message_priority text
+    message_priority text,
+    max_capacity int
 ) RETURNS bytea
 AS
 $$
@@ -84,6 +84,8 @@ DECLARE
     fixed_source text;
     fixed_destination text;
     fixed_priority text;
+    extra_pad text;
+    size_difference int;
 BEGIN
     fixed_type := lpad(message_type, 5, ' ');
     fixed_source := lpad(message_source, 5, ' ');
@@ -92,9 +94,18 @@ BEGIN
     
     hnmessage := uuid_data || fixed_type::bytea || 
                 fixed_source::bytea || fixed_destination::bytea || 
-                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || subheader;
+                fixed_priority::bytea ||  to_char(now(), 'YYYY-MM-DD HH24:MI:SS.US')::bytea || subheader || messaget;
+
+    extra_pad := '';
+    size_difference := (max_capacity - 32) - length(hnmessage);
+
+    IF size_difference > 0 THEN
+        extra_pad := lpad(extra_pad, size_difference, ' ');  
+        hnmessage := hnmessage || extra_pad::bytea;
+    END IF;
     
-    return md5(hnmessage || messaget)::bytea || hnmessage;
+    return md5(hnmessage)::bytea || hnmessage;
+
 END;
 $$
 LANGUAGE 'plpgsql';
@@ -107,16 +118,15 @@ VALUES(
         2130706433, 
         6001,
         6000, 
-        64 * 1024
+        32*1024
 );
 
 
 INSERT INTO 
-    job_scheduler(jobdata, data_offset, jstate, jtype, jsource, 
+    job_scheduler(jobdata, jstate, jtype, jsource, 
     jobid, jparent_jobid, jdestination, jpriority) 
 VALUES (
         '__ROOT__', 
-        0, 
         'N-0', 
         '0', 
         lpad('M3', 5, ' '), 
@@ -201,7 +211,7 @@ AFTER UPDATE ON
     job_scheduler
 FOR EACH ROW 
 WHEN 
-    (NEW.jstate = 'S-3')
+    (NEW.jstate = 'S-4')
 EXECUTE FUNCTION 
     send_noti1();
 

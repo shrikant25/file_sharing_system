@@ -113,7 +113,7 @@ AND
 
 )
 INSERT INTO 
-    job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+    job_scheduler (jobdata, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
 SELECT 
     create_message (
         uuid_data::text::bytea, 
@@ -124,7 +124,6 @@ SELECT
         destination::text, 
         '5'::text
     ),
-    0, 
     '4', 
     'S-5', 
     system_name, 
@@ -263,7 +262,7 @@ FROM
     selfinfo
 )
 INSERT INTO 
-    job_scheduler (jobdata, data_offset, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
+    job_scheduler (jobdata, jtype, jstate, jsource, jdestination, jpriority, jobid, jparent_jobid)
 SELECT 
     create_message (
         uuid_data::text::bytea, 
@@ -274,7 +273,6 @@ SELECT
         destination::text, 
         '5'::text
     ),
-    0, 
     '5', 
     'S-5', 
     system_name,
@@ -349,7 +347,7 @@ WHERE
         ON
             jdestination = si.system_name 
         AND
-            LENGTH(lo_get(f.file_data)) > si.system_capacity
+            LENGTH(lo_get(f.file_data)) > (si.system_capacity-168)
         AND 
             si.system_capacity != 0
     )
@@ -375,7 +373,7 @@ WHERE
         ON
             jdestination = si.system_name 
         AND
-            LENGTH(lo_get(file_data)) <= si.system_capacity
+            LENGTH(lo_get(file_data)) <= (si.system_capacity-168)
         AND 
             si.system_capacity != 0
     )
@@ -396,7 +394,8 @@ WITH single_job AS
             lo_get(fd.file_data), 
             btrim(js.jsource, ' '), 
             btrim(js.jdestination, ' '), 
-            js.jpriority
+            js.jpriority,
+            si.system_capacity
         ) 
         mdata, jsource, 
         js.jobid AS parent_jobid, 
@@ -415,9 +414,9 @@ WITH single_job AS
         jstate = 'S-3'    
 )
 INSERT INTO 
-    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+    job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
 SELECT 
-    mdata, 0, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
+    mdata, 'S-4', '1', jsource, encode(substr(mdata, 33, 36), 'escape')::uuid, parent_jobid, jdestination, jpriority 
 FROM 
     single_job; 
 
@@ -458,13 +457,13 @@ chunk_info AS (
         jsource, 
         jpriority, 
         system_capacity,  
-        lo_get(file_data, (idx*system_capacity)::BIGINT, system_capacity::INTEGER - 168) chunk_data 
+        lo_get(file_data, (idx*(system_capacity-168))::BIGINT, system_capacity::INTEGER - 168) chunk_data 
     FROM 
         par_job, 
         generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
 )
 INSERT INTO 
-    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+    job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
 SELECT
     create_message( 
         uuid_data, 
@@ -473,9 +472,9 @@ SELECT
         chunk_data, 
         btrim(jsource, ' '), 
         btrim(jdestination, ' '),
-        jpriority::text
+        jpriority::text,
+        system_capacity
     ),
-    idx, 
     'S-4', 
     '2', 
     jsource, 
@@ -502,7 +501,8 @@ WITH cte_msginfo as(
             ''::bytea, 
             btrim(jsource, ' '), 
             btrim(jdestination, ' '), 
-            jpriority::text
+            jpriority::text,
+            si.system_capacity
         )as mdata, 
         js.jobid, 
         js.jdestination, 
@@ -522,10 +522,9 @@ WITH cte_msginfo as(
     WHERE jstate = 'S-2'
 )
 INSERT INTO 
-    job_scheduler (jobdata, data_offset, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
+    job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
 SELECT 
     mdata,
-    0, 
     'S-4', 
     '3', 
     jsource, 

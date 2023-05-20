@@ -58,12 +58,7 @@ db_statements dbs[statement_count] = {
     },
     {
       .statement_name = "s_get_data",
-      .statement = " SELECT (js.jobdata|| lo_get(f.file_data, js.data_offset * (si.system_capacity-168), si.system_capacity-168) \
-                || (lpad('',si.system_capacity-length(js.jobdata||\
-        lo_get(f.file_data,js.data_offset*(si.system_capacity-168), si.system_capacity-168)), ' '))::bytea) FROM job_scheduler \
-        js JOIN job_scheduler js2 ON js.jparent_jobid = js2.jobid \
-       JOIN files f ON f.file_name = encode(js2.jobdata, 'escape') \
-       JOIN sysinfo si ON  js.jdestination = si.system_name JOIN sending_conns sc ON sc.sipaddr = si.ipaddress WHERE js.jobid = $1::uuid;",
+      .statement = "SELECT jobdata FROM job_scheduler WHERE jobid = $1::uuid;",
       .param_count = 1
     }
 };
