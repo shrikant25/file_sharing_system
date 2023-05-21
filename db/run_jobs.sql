@@ -284,9 +284,6 @@ FROM
     conn_info;
 
 
-
-
-
 UPDATE
     job_scheduler
 SET 
@@ -297,10 +294,8 @@ AND
     jtype = '    4';
 
 
-
-UPDATE 
-    sysinfo 
-SET (system_capacity, dataport) = (
+WITH cte_sysinfo AS (
+    
     SELECT encode(substr(js.jobdata, 115, 11), 'escape')::INTEGER as system_capacity, 
         encode(substr(js.jobdata, 126, 11), 'escape')::INTEGER as dataport
     FROM 
@@ -316,9 +311,41 @@ SET (system_capacity, dataport) = (
     AND 
         jtype = '    5'
 )
-WHERE system_capacity = 0 
+UPDATE 
+    sysinfo 
+SET 
+    (system_capacity, dataport) = (
+        SELECT 
+            system_capacity, dataport 
+        FROM 
+            cte_sysinfo
+    )
+WHERE 
+    system_capacity = 0 
 AND
-dataport = 0; 
+    dataport = 0; 
+
+-- UPDATE 
+--     sysinfo 
+-- SET (system_capacity, dataport) = (
+    -- SELECT encode(substr(js.jobdata, 115, 11), 'escape')::INTEGER as system_capacity, 
+    --     encode(substr(js.jobdata, 126, 11), 'escape')::INTEGER as dataport
+    -- FROM 
+    --     job_scheduler js 
+    -- JOIN
+    --     sysinfo si 
+    -- ON
+    --     (encode(substr(js.jobdata, 74, 5), 'escape')) = si.system_name
+    -- AND
+    --     (encode(substr(js.jobdata, 137, 11), 'escape'))::BIGINT = si.ipaddress
+    -- WHERE 
+    --     jstate = 'N-4' 
+    -- AND 
+    --     jtype = '    5'
+-- )
+-- WHERE system_capacity = 0 
+-- AND
+-- dataport = 0; 
 
 
 UPDATE
@@ -627,7 +654,43 @@ AND
 -- type 3 = metadata about chunks
 
 
+UPDATE 
+    job_scheduler 
+SET 
+    jstate = 'C' 
+WHERE 
+    jstate = 'S-2W' 
+AND 
+    jobid = (
+        take parent_jobid 
+        such that
+        encode(substr(js2.jobdata, 163, 10), 'escape')::INTEGER + 1 
+        =
+        count of all processes having parent_jobid = jobid; 
+    )
 
+
+
+    -- SELECT DISTINCT
+    --     jparent_jobid 
+    -- FROM 
+    --     job_scheduler js1 
+    -- WHERE
+    --     js1.jstate = 'C'
+    -- GROUP BY 
+    --     js1.jparent_jobid
+    -- HAVING
+    --     count(js1.jparent_jobid) =
+    -- (
+    -- SELECT
+    --     encode(substr(js2.jobdata, 163, 10), 'escape')::INTEGER 
+    -- FROM 
+    --     job_scheduler js2
+    -- WHERE 
+    --     js2.jstate = 'S-2W'
+    )
+
+);
 
 
 -- SELECT                       length(jobdata),    
