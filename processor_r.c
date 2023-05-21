@@ -113,7 +113,7 @@ int store_commr_into_database (receivers_message *rcvm)
 int get_data_from_receiver () 
 {
     int subblock_position = -1;
-    char *blkptr = NULL;
+    unsigned char *blkptr = NULL;
     newmsg_data nmsg;
 
     sem_wait(sem_lock_datar.var);         
@@ -204,7 +204,7 @@ int send_msg_to_receiver ()
     if (subblock_position >= 0) {
 
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        
+        memset(blkptr, 0, CPARTITION_SIZE);
         if (get_comms_from_database(blkptr) != -1) {
             toggle_bit(subblock_position, commr_block.var, 1);
         }

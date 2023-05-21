@@ -325,7 +325,7 @@ int run_receiver ()
 int send_to_processor (newmsg_data *nmsg)
 {
     int subblock_position = -1;
-    char *blkptr = NULL;
+    unsigned char *blkptr = NULL;
     
     sem_wait(sem_lock_datar.var);         
     subblock_position = get_subblock(datar_block.var, 0, 3);

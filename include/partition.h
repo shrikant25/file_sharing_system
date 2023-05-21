@@ -19,7 +19,7 @@
 // 1024 * 64 * 40 + 5 
 
 typedef struct capacity_info {
-    char ipaddress[17];
+    unsigned char ipaddress[17];
     unsigned int capacity;
 }capacity_info;
 
@@ -32,7 +32,7 @@ typedef struct receivers_message {
 typedef struct newmsg_data {
     unsigned int data1;
     unsigned int data2;
-    char data[MESSAGE_SIZE];
+    unsigned char data[MESSAGE_SIZE];
 }newmsg_data;
 
 typedef struct open_connection {
@@ -56,14 +56,14 @@ typedef struct connection_status {
 typedef struct send_message {
     unsigned int size;
     unsigned int fd;
-    char uuid[37];
-    char data[MESSAGE_SIZE];
+    unsigned char uuid[37];
+    unsigned char data[MESSAGE_SIZE];
 }send_message;
 
 typedef struct message_status {
     unsigned char type;
     unsigned char status;
-    char uuid[37];
+    unsigned char uuid[37];
 }message_status;
 
 

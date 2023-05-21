@@ -100,7 +100,7 @@ int get_message_from_processor(char *data)
 int get_data_from_processor(send_message *sndmsg)
 {
     int subblock_position = -1;
-    char *blkptr;
+    unsigned char *blkptr;
     
     sem_wait(sem_lock_datas.var);         
     subblock_position = get_subblock(datas_block.var, 1, 3);
@@ -186,7 +186,7 @@ int run_sender()
             }
         }
 
-        
+        memset(&sndmsg, 0, sizeof(send_message));
         if (get_data_from_processor(&sndmsg)!= -1) {
 
             memset(&msgsts, 0, sizeof(message_status));

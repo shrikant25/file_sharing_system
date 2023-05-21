@@ -40,7 +40,7 @@ int retrive_data_from_database (char *blkptr)
     else {
         
         sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
-        strncpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+        memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
         PQclear(res);
 
         const char *const param_values[] = {sndmsg->uuid};
@@ -59,7 +59,7 @@ int retrive_data_from_database (char *blkptr)
         else {
             
             sndmsg->size = PQgetlength(res, 0, 0);
-            strncpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+            memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
             
             memset(error, 0, sizeof(error));
             sprintf(error, "data got from db %d %s", PQgetlength(res, 0, 0),PQerrorMessage(connection));
@@ -218,7 +218,7 @@ int give_data_to_sender ()
     if (subblock_position >= 0) {
 
         blkptr = datas_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        
+        memset(blkptr, 0, DPARTITION_SIZE);
         if (retrive_data_from_database(blkptr) != -1) { 
             toggle_bit(subblock_position, datas_block.var, 3);
             sem_post(sem_lock_sigs.var);
@@ -241,7 +241,7 @@ int send_msg_to_sender ()
     if (subblock_position >= 0) {
 
         blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        
+        memset(blkptr, 0, CPARTITION_SIZE);
         if (retrive_comms_from_database(blkptr) != -1){
             toggle_bit(subblock_position, comms_block.var, 1);
             sem_post(sem_lock_sigs.var);
