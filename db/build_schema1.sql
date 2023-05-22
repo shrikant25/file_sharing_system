@@ -109,7 +109,7 @@ END;
 $$
 LANGUAGE 'plpgsql';
 
-INSERT INTO sysinfo VALUES('   M3', 2130706433, 0, 6000, 0);
+INSERT INTO sysinfo VALUES(lpad('M3', 5, ' '), 2130706433, 0, 6000, 0);
 
 
 INSERT INTO 
@@ -227,7 +227,7 @@ AFTER INSERT on
     senders_comms
 FOR EACH ROW 
 WHEN 
-    (NEW.mtype = 1)
+    (NEW.mtype in (1,2))
 EXECUTE FUNCTION 
     send_noti1();
 

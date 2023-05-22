@@ -114,7 +114,7 @@ LANGUAGE 'plpgsql';
 INSERT INTO 
     selfinfo 
 VALUES(
-        '   M3', 
+        lpad('M3', 5, ' '), 
         2130706433, 
         6001,
         6000, 

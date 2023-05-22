@@ -118,7 +118,7 @@ int store_comms_into_database (char *blkptr)
         message_status *msgsts = (message_status *)blkptr;
         
         sprintf(status, "%hhu", msgsts->status);
-        strncpy(uuid, msgsts->uuid, sizeof(msgsts->uuid));
+        memcpy(uuid, msgsts->uuid, sizeof(msgsts->uuid));
         
 
         const char *param_values[] = {uuid, status};
