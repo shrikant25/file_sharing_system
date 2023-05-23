@@ -163,10 +163,19 @@ int run_sender()
 
         sem_wait(sem_lock_sigs.var);
         if (get_message_from_processor(data) != -1) {
-            if (*(unsigned char *)data == 1) {
+            
+            memset(&cncsts, 0, sizeof(connection_status));
+            memset(error, 0, sizeof(error));
+            sprintf(error, "%d", *(int *)data);
+            store_log(error);
+
+            if (*(int *)data == 1) {
                 
                 opncn = (open_connection *)data;
-                memset(&cncsts, 0, sizeof(connection_status));
+                memset(error, 0, sizeof(error));
+                sprintf(error, "port %d ip %d", opncn->port, opncn->ipaddress);
+                store_log(error);
+            
                 cncsts.type = 3;
                 cncsts.fd = create_connection(opncn->port, opncn->ipaddress);
                 cncsts.ipaddress = opncn->ipaddress;
@@ -174,14 +183,16 @@ int run_sender()
                 send_message_to_processor(3, (void *)&cncsts);
 
             }
-            else if(*(unsigned char *)data == 2) {
+            else if(*(int *)data == 2) {
 
                 clscn = (close_connection *)data;
                 close(clscn->fd);
                 cncsts.type = 3;
                 cncsts.fd = -1;
                 cncsts.ipaddress = clscn->ipaddress;
-
+                memset(error, 0, sizeof(error));
+                sprintf(error, "%d %d %d", cncsts.type, cncsts.fd, cncsts.ipaddress);
+                store_log(error);
                 send_message_to_processor(3, (void *)&cncsts);
             }
         }

@@ -36,20 +36,20 @@ typedef struct newmsg_data {
 }newmsg_data;
 
 typedef struct open_connection {
-    unsigned char type;
+    int type;
     unsigned int port;
     unsigned int ipaddress;
 }open_connection;
 
 typedef struct close_connection {
-    unsigned char type;
+    int type;
     unsigned int fd;
     unsigned int ipaddress;
 }close_connection;
 
 typedef struct connection_status {
-    unsigned char type;
-    unsigned int fd;
+    int type;
+    int fd;
     unsigned int ipaddress; 
 }connection_status;
 
@@ -61,8 +61,8 @@ typedef struct send_message {
 }send_message;
 
 typedef struct message_status {
-    unsigned char type;
-    unsigned char status;
+    int type;
+    int status;
     unsigned char uuid[37];
 }message_status;
 

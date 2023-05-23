@@ -96,8 +96,8 @@ int store_comms_into_database (char *blkptr)
 
     PGresult* res = NULL;
     
-    if(*(unsigned char *)blkptr == 3){
-        
+    if(*(int *)blkptr == 3){
+
         connection_status *cncsts = (connection_status *)blkptr;
         sprintf(ipaddress, "%d", cncsts->ipaddress);        
         sprintf(fd, "%d", cncsts->fd);
@@ -105,6 +105,13 @@ int store_comms_into_database (char *blkptr)
         if (cncsts->fd >= 0) {
             sprintf(status, "%d", 2);
         }
+        else{
+            sprintf(status, "%d", 1);
+        }
+        
+        memset(error, 0, sizeof(error));
+        sprintf(error, "storing comms type %d ip %d fd %d status %s",*(int *)blkptr ,cncsts->ipaddress, cncsts->fd, status);
+        store_log(error);
 
         const char *param_values[] = {ipaddress, fd, status};
         const int paramLengths[] = {sizeof(ipaddress), sizeof(fd), sizeof(status)};
@@ -113,7 +120,7 @@ int store_comms_into_database (char *blkptr)
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
   
     }
-    else if(*(unsigned char *)blkptr == 4) {
+    else if(*(int *)blkptr == 4) {
         
         message_status *msgsts = (message_status *)blkptr;
         
@@ -167,13 +174,20 @@ int retrive_comms_from_database (char *blkptr)
             opncn->type = atoi(PQgetvalue(res, 0, 0));
             opncn->ipaddress = atoi(PQgetvalue(res, 0, 1)); 
             opncn->port = atoi(PQgetvalue(res, 0, 2));
+            memset(error, 0, sizeof(error));
+            sprintf(error, "port %d, ip %d, type %d", opncn->port, opncn->ipaddress, opncn->type);
+            store_log(error);
             
         }
         else if(type == 2) {
             
             close_connection *clscn = (close_connection *)blkptr;
             clscn->type = atoi(PQgetvalue(res, 0, 0));
-            clscn->fd = atoi(PQgetvalue(res, 0, 1));
+            clscn->ipaddress = atoi(PQgetvalue(res, 0, 1));
+            clscn->fd = atoi(PQgetvalue(res, 0, 2));
+            memset(error, 0, sizeof(error));
+            sprintf(error, "fd %d, ip %d", clscn->fd, clscn->ipaddress);
+            store_log(error);
         }
 
         status = 0;

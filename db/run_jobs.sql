@@ -48,6 +48,28 @@ UPDATE job_scheduler
 SET jstate = 'N-4', jtype = encode(substr(jobdata, 69, 5), 'escape')
 WHERE jstate = 'N-3';
 
+UPDATE job_scheduler 
+SET jstate = 'C' 
+WHERE jstate = 'S-2W' 
+AND jobid IN (
+        SELECT js1.jparent_jobid 
+        FROM job_scheduler js1
+        JOIN job_scheduler js2
+        ON js1.jparent_jobid = js2.jparent_jobid
+        WHERE encode(substr(js1.jobdata, 69, 5), 'escape') = lpad('3', 5, ' ')
+        AND js2.jstate = 'C'
+        GROUP BY js1.jparent_jobid, js1.jobdata        
+        HAVING encode(substr(js1.jobdata, 163, 10), 'escape')::INTEGER + 1 = count(js2.jobid)
+    );
+
+UPDATE job_scheduler
+SET jstate = 'C'
+WHERE jstate = 'S-3W'
+AND jobid IN (
+        SELECT jparent_jobid
+        FROM job_scheduler
+        WHERE jstate = 'C'
+    );
 
 
 WITH conn_info_sending AS (
@@ -162,11 +184,11 @@ SELECT
 FROM conn_info;
 
 
-
 UPDATE job_scheduler
 SET jstate = 'C'
 WHERE jstate = 'N-4'
 AND jtype = lpad('4', 5, ' ');
+
 
  
 
@@ -331,6 +353,13 @@ AND jdestination = (
         FROM sysinfo
     );
 
+UPDATE job_scheduler 
+SET jstate = 'S-3W' 
+WHERE jstate = 'S-3'
+AND jdestination = (
+        SELECT system_name
+        FROM sysinfo
+    );
 
 
 -- create a record for every ipaddress where messages are intended for
@@ -358,40 +387,24 @@ JOIN sending_conns sc
 ON si.ipaddress = sc.sipaddr
 WHERE sc.scstatus = 1;
 
-
-
-
 -- type 1 = single data job
 -- type 2 = chunk of larger message
 -- type 3 = metadata about chunks
-UPDATE job_scheduler 
-SET jstate = 'C' 
-WHERE jstate = 'S-2W' 
-AND jobid IN (
-        SELECT js1.jparent_jobid 
-        FROM job_scheduler js1
-        JOIN job_scheduler js2
-        ON js1.jparent_jobid = js2.jparent_jobid
-        WHERE encode(substr(js1.jobdata, 69, 5), 'escape') = lpad('3', 5, ' ')
-        AND js2.jstate = 'C'
-        GROUP BY js1.jparent_jobid, js1.jobdata        
-        HAVING encode(substr(js1.jobdata, 163, 10), 'escape')::INTEGER + 1 = count(js2.jobid)
-    );
 
 -- take all fd which belong to an open connection,
 -- but none of the job in scheduler have destination same as the ip that belong to those fd
 -- and create a message to close them
 
-    -- INSERT INTO senders_comms (mdata1, mdata2, mtype)
-    -- SELECT sc.sfd, sc.sipaddr, 2
-    -- FROM sending_conns sc
-    -- JOIN sysinfo si ON
-    -- sc.ipaddress = si.ipaddress
-    -- LEFT JOIN job_scheduler js
-    -- ON si.system_name = js.jdestination  
-    -- AND js.jstate != 'C'
-    -- WHERE js.jdestination IS NULL
-    -- AND sc.scstatus = 2;
+INSERT INTO senders_comms (mdata1, mdata2, mtype)
+SELECT sc.sipaddr, sc.sfd, 2
+FROM sending_conns sc
+JOIN sysinfo si ON
+sc.sipaddr = si.ipaddress
+LEFT JOIN job_scheduler js
+ON si.system_name = js.jdestination  
+AND js.jstate != 'C'
+WHERE js.jdestination IS NULL
+AND sc.scstatus = 2;
 
 
 

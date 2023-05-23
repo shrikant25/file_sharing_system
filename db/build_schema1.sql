@@ -29,18 +29,18 @@ CREATE TABLE receivers_comms (rcomid SERIAL PRIMARY KEY,
 
 CREATE TABLE receiving_conns (rfd INTEGER PRIMARY KEY, 
                               ripaddr BIGINT NOT NULL, 
-                              rcstatus SMALLINT NOT NULL,
+                              rcstatus INTEGER NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE sending_conns (sfd INTEGER PRIMARY KEY,
                             sipaddr BIGINT NOT NULL, 
-                            scstatus SMALLINT NOT NULL,
+                            scstatus INTEGER NOT NULL,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
 CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
                             mdata1 BIGINT NOT NULL,
                             mdata2 INTEGER NOT NULL, 
-                            mtype SMALLINT NOT NULL);
+                            mtype INTEGER NOT NULL);
 
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
@@ -203,6 +203,7 @@ CREATE OR REPLACE FUNCTION send_noti1()
 RETURNS TRIGGER AS 
 $$
 BEGIN
+    RAISE NOTICE 'hola';
     PERFORM pg_notify('noti_2sys', 'get_data');
     RETURN NEW;
 END;
