@@ -18,37 +18,84 @@ char error[100];
 int read_data_from_database (server_info *servinfo) {
 
     int status = -1;
-    PGresult *res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, NULL, NULL, NULL, 0);
+    PGresult *res;
 
-    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+    res = PQexec(connection, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "retriving data for intial sender failed %s", PQerrorMessage(connection));
+        sprintf(error, "BEGIN command in transaction failed in initial sender: %s", PQerrorMessage(connection));
         store_log(error);
-    }    
+    }
     else {
 
-        servinfo->port = atoi(PQgetvalue(res, 0, 0));
-        servinfo->ipaddress = atoi((PQgetvalue(res, 0, 1)));
-        strncpy(servinfo->uuid, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2)); 
-
-        const char *const param_values[] = {servinfo->uuid};
-        const int param_lengths[] = {strlen(servinfo->uuid)};
-        const int param_format[] = {0};
-        int result_format = 1;  
-
         PQclear(res);
+        res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, NULL, NULL, NULL, 0);
 
-        res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
             memset(error, 0, sizeof(error));
-            sprintf(error, "failed to get message data %s status %d error %s", servinfo->uuid, status, PQerrorMessage(connection));
+            sprintf(error, "retriving data for intial sender failed %s", PQerrorMessage(connection));
             store_log(error);
-        }
+
+            PQclear(res);
+            res = PQexec(connection, "ROLLBACK");
+            if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                memset(error, 0, sizeof(error));
+                sprintf(error, "ROLLBACK command in transaction failed in initial sender: %s", PQerrorMessage(connection));
+                store_log(error);
+            }
+        }    
         else {
-            strncpy(servinfo->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-            status = 0;
+
+            servinfo->port = atoi(PQgetvalue(res, 0, 0));
+            servinfo->ipaddress = atoi((PQgetvalue(res, 0, 1)));
+            memcpy(servinfo->uuid, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2)); 
+
+            const char *const param_values[] = {servinfo->uuid};
+            const int param_lengths[] = {strlen(servinfo->uuid)};
+            const int param_format[] = {0};
+            int result_format = 1;  
+
+            PQclear(res);
+
+            res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
+            if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+                memset(error, 0, sizeof(error));
+                sprintf(error, "failed to get message data %s status %d error %s", servinfo->uuid, status, PQerrorMessage(connection));
+                store_log(error);
+
+                PQclear(res);
+                res = PQexec(connection, "ROLLBACK");
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "ROLLBACK command in transaction failed in initial sender: %s", PQerrorMessage(connection));
+                    store_log(error);
+                }
+            }
+            else {
+
+                memcpy(servinfo->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+                PQclear(res);
+
+                res = PQexec(connection, "COMMIT");
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "COMMIT command in transaction failed in initial sender: %s", PQerrorMessage(connection));
+                    store_log(error);
+
+                    PQclear(res);
+                    res = PQexec(connection, "ROLLBACK");
+                    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "ROLLBACK command for transaction failed in initial sender: %s", PQerrorMessage(connection));
+                        store_log(error);
+                    }
+                } 
+                else {
+                    status = 0;
+                }
+            }
+                
         }
-             
     }
 
     PQclear(res);

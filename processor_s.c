@@ -114,8 +114,16 @@ int retrive_data_from_database (char *blkptr)
                     res = PQexec(connection, "COMMIT");
                     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                         memset(error, 0, sizeof(error));
-                        sprintf(error, "END for ending transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                        sprintf(error, "COMMIT for transaction command failed in processor_s: %s", PQerrorMessage(connection));
                         store_log(error);
+
+                        PQclear(res);
+                        res = PQexec(connection, "ROLLBACK");
+                        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                            memset(error, 0, sizeof(error));
+                            sprintf(error, "ROLLBACK command for transaction failed in processor_s: %s", PQerrorMessage(connection));
+                            store_log(error);
+                        }
                     } else {
                         status = 0;
                     }
