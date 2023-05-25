@@ -29,58 +29,103 @@ int retrive_data_from_database (char *blkptr)
     char error[100];
     PGresult *res = NULL;
     send_message *sndmsg = (send_message *)blkptr;
-
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, 
-                                    NULL, NULL, NULL, 0);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+    
+    res = PQexec(connection, "BEGIN");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "failed to retrive info from db %s", PQerrorMessage(connection));
+        sprintf(error, "BEGIN command to start transaction failed in processor_s: %s", PQerrorMessage(connection));
         store_log(error);
-    }    
+    }
     else {
-        
-        sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
-        memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+    
         PQclear(res);
+        res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, NULL, NULL, NULL, 0);
 
-        const char *const param_values[] = {sndmsg->uuid};
-        const int paramLengths[] = {sizeof(sndmsg->uuid)};
-        const int paramFormats[] = {0};
-        int resultFormat = 1;
-
-        res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values,   
-                                        paramLengths, paramFormats, resultFormat);
-        
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "failed to retrive data from db  . %s", PQerrorMessage(connection));
-            store_log(error);
-        }
-        else {
-            
-            sndmsg->size = PQgetlength(res, 0, 0);
-            memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
             
             memset(error, 0, sizeof(error));
-            sprintf(error, "data got from db %d %s", PQgetlength(res, 0, 0),PQerrorMessage(connection));
+            sprintf(error, "failed to retrive info from db %s", PQerrorMessage(connection));
             store_log(error);
+         
             PQclear(res);
-
-            res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
-                                    param_values, paramLengths, paramFormats, resultFormat);
-
+            res = PQexec(connection, "ROLLBACK");
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 memset(error, 0, sizeof(error));
-                sprintf(error, "failed update job status %s", PQerrorMessage(connection));
+                sprintf(error, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
                 store_log(error);
             }
+        }    
+        else {
+            
+            sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
+            memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
+ 
+            const char *const param_values[] = {sndmsg->uuid};
+            const int paramLengths[] = {sizeof(sndmsg->uuid)};
+            const int paramFormats[] = {0};
+            int resultFormat = 1;
+            
+            PQclear(res);
+            res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values,   
+                                            paramLengths, paramFormats, resultFormat);
+            
+            if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+                memset(error, 0, sizeof(error));
+                sprintf(error, "failed to retrive data from db  . %s", PQerrorMessage(connection));
+                store_log(error);
+
+                PQclear(res);
+                res = PQexec(connection, "ROLLBACK");
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                    store_log(error);
+                }
+            }
             else {
-                status = 0;
+                
+                sndmsg->size = PQgetlength(res, 0, 0);
+                memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+                
+                memset(error, 0, sizeof(error));
+                sprintf(error, "data got from db %d %s", PQgetlength(res, 0, 0),PQerrorMessage(connection));
+                store_log(error);
+                PQclear(res);
+
+                res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
+                                        param_values, paramLengths, paramFormats, resultFormat);
+
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "failed update job status %s", PQerrorMessage(connection));
+                    store_log(error);
+
+                    PQclear(res);
+                    res = PQexec(connection, "ROLLBACK");
+                    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                        store_log(error);
+                    }
+                }
+                else {
+
+                    PQclear(res);
+                    res = PQexec(connection, "COMMIT");
+                    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "END for ending transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                        store_log(error);
+                    } else {
+                        status = 0;
+                    }
+                }
             }
         }
+    
     }
-
-    PQclear(res);
+    
+    PQclear(res); 
     return status;   
 }
 
