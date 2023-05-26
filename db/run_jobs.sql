@@ -408,6 +408,151 @@ AND sc.scstatus = 2;
 
 
 
+-- create table temp_chunks (tmsgid uuid, tdata bytea, tchunk_number int);
+
+
+-- with cte_arrnewmsg as (
+--     select distinct encode(substr(js2.jobdata, 115, 36), 'escape') msgid from job_scheduler js1                 
+--     join job_scheduler js2                                                          
+--     ON encode(substr(js1.jobdata, 123, 36), 'escape') = encode(substr(js2.jobdata, 115, 36), 'escape')                                       
+--     GROUP by js2.jobdata, js1.jstate, js2.jstate, js1.jobdata
+--     having  js1.jstate = 'N-4' 
+--     and js2.jstate = 'N-4'                                       
+--     and encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 2
+--     and encode(substr(js2.jobdata, 69, 5), 'escape')::integer = 3
+--      and count(js1.jobdata) = encode(substr(js2.jobdata, 163, 10), 'escape')::int
+-- )
+-- with cte_msgdata as (
+--     select substr(js1.jobdata, 169,  encode(substr(js1.jobdata, 159, 10), 'escape')::integer) msgdata,
+--     cte_arrnewmsg.msgid,
+--     encode(substr(js.jobdata, 115, 8), 'escape')::integer chunk_num 
+--     from job_scheduler js
+--     join cte_arrnewmsg 
+--     on encode(substr(js.jobdata, 123, 36), 'escape') = cte_arrnewmsg.msgid
+--     where js.jstate = 'N-4' 
+--     and encode(substr(js.jobdata, 69, 5), 'escape')::integer = 2
+--     GROUP by js.jobdata
+--     order by encode(substr(js.jobdata, 115, 8), 'escape')::integer;
+-- )
+-- INSERT INTO temp_chunks 
+-- SELECT msgid::uuid, msgdata, chunk_num  
+-- FROM cte_msgdata;
+
+
+-- update job_scheduler js1 
+-- set jstate = 'C' from
+--  (                                                      
+--     select encode(substr(js2.jobdata, 115, 36), 'escape') msgid
+--     from job_scheduler js2
+--     where encode(substr(js2.jobdata, 163, 10), 'escape')::integer = (
+                                                                                                             
+--         select count(js3.jobdata) from job_scheduler js3
+--         where encode(substr(js3.jobdata, 123, 36), 'escape') = encode(substr(js2.jobdata, 115, 36), 'escape')
+--         and js3.jstate = 'N-4' 
+--         and encode(substr(js3.jobdata, 69, 5), 'escape')::integer = 2
+--     )                      
+--     and encode(substr(js2.jobdata, 69, 5), 'escape')::integer = 3
+--     and js2.jstate = 'N-4'
+    
+-- ) as tempid
+-- where jstate = 'N-4'  and (encode(substr(js1.jobdata, 115, 36), 'escape')::uuid = tempid.msgid::uuid   
+-- and  encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 3)
+-- and  (encode(substr(js1.jobdata, 123, 36), 'escape')::uuid = tempid.msgid::uuid   
+-- and  encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 2);
+
+
+
+
+
+
+-- with cte_arrnewmsg as (
+--     select encode(substr(js1.jobdata, 115, 36), 'escape') msgid
+--     from job_scheduler js1
+--     where encode(substr(js1.jobdata, 163, 10), 'escape')::integer = (
+
+--         select count(js2.jobdata) from job_scheduler js2
+--         where encode(substr(js2.jobdata, 123, 36), 'escape') = encode(substr(js1.jobdata, 115, 36), 'escape')
+--         and js2.jstate = 'N-4' 
+--         and encode(substr(js2.jobdata, 69, 5), 'escape')::integer = 2
+--     )
+--     and encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 3
+--     and js1.jstate = 'N-4';
+-- )
+-- with cte_msgdata as (
+--     select substr(js1.jobdata, 169,  encode(substr(js1.jobdata, 159, 10), 'escape')::integer) 
+--     from job_scheduler js
+--     join cte_arrnewmsg 
+--     on encode(substr(js.jobdata, 123, 36), 'escape') = cte_arrnewmsg.msgid
+--     where js.jstate = 'N-4' 
+--     and encode(substr(js.jobdata, 69, 5), 'escape')::integer = 2
+--     GROUP by js.jobdata
+--     order by encode(substr(js.jobdata, 115, 8), 'escape')::integer;
+-- )
+
+
+
+
+
+
+
+
+
+
+
+    -- select substr(js1.jobdata, 169,  encode(substr(js1.jobdata, 159, 10), 'escape')::integer) 
+    -- from job_scheduler js
+    -- where js.jstate = 'N-4' 
+    -- and encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 2
+    -- and encode(substr(js2.jobdata, 69, 5), 'escape')::integer = 3
+    -- GROUP by js1.jobdata
+    -- order by encode(substr(js1.jobdata, 115, 8), 'escape')::integer;
+
+
+
+
+
+
+
+
+
+
+--  select encode(substr(js1.jobdata, 115, 8), 'escape')::integer
+--     from job_scheduler js1
+--     join job_scheduler js2
+--     ON encode(substr(js1.jobdata, 123, 36), 'escape') = encode(substr(js2.jobdata, 115, 36), 'escape')
+--     where js1.jstate = 'N-4' 
+--     and js2.jstate = 'N-4'
+--     and encode(substr(js1.jobdata, 69, 5), 'escape')::integer = 2
+--     and encode(substr(js2.jobdata, 69, 5), 'escape')::integer = 3
+--     GROUP by js1.jobdata
+--     order by encode(substr(js1.jobdata, 115, 8), 'escape')::integer;
+
+
+-- if we have info msg (type = 3) say m1 in N-4 state
+-- see if count of messages having msgtypw = 2 and parjobid in msgheader same is above msg m1 and they all are in N-4 state
+-- it means we have received all such messages
+-- then read their data in order of chunk number and then merge them into a single file
+-- store it in files table as a file with name  __R + (random())::text
+-- then mark all these messages as 'c'
+
+-- if we have msg (type = 1) say m1 in N-4 state
+-- then store data of that message in files tablea
+-- as a file with name __R + (random())::text
+-- then mark all these messages as 'c'
+
+-- UPDATE job_scheduler 
+-- SET jstate = 'C' 
+-- WHERE jstate = 'S-2W' 
+-- AND jobid IN (
+--         SELECT js1.jparent_jobid 
+--         FROM job_scheduler js1
+--         JOIN job_scheduler js2
+--         ON js1.jparent_jobid = js2.jparent_jobid
+--         WHERE encode(substr(js1.jobdata, 69, 5), 'escape') = lpad('3', 5, ' ')
+--         AND js2.jstate = 'C'
+--         GROUP BY js1.jparent_jobid, js1.jobdata        
+--         HAVING encode(substr(js1.jobdata, 163, 10), 'escape')::INTEGER + 1 = count(js2.jobid)
+--     );
 
 
 
