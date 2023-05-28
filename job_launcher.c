@@ -7,6 +7,7 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <time.h>
+#include <aio.h>
 
 int dbsocket;
 int epoll_fd;
@@ -147,6 +148,10 @@ int main(int argc, char *argv[])
     PGresult *res;
     PGnotify *notify;
     int num_events;
+    const struct timespec tm = {
+        .0, 
+        .10000000L
+    };
 
     if (argc != 2) {
         syslog(LOG_NOTICE, "invlaid arguments");
@@ -183,7 +188,7 @@ int main(int argc, char *argv[])
                     }
                     PQclear(res);
                     PQfreemem(notify);
-                    nanosleep((const struct timespec []){{0, 10000000L}}, NULL);
+                    nanosleep(&tm, NULL);
                 }
             }
         }

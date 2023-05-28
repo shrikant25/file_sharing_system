@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/shm.h>
+#include <aio.h>
 #include "shared_memory.h"
 #include "partition.h"
 #include "processor_r.h"
@@ -219,10 +220,14 @@ int run_process ()
 {
     int status = 0;
     char data[CPARTITION_SIZE];
+    const struct timespec tm = {
+        .0,
+        .10000000L
+    };
 
     while (1) {
 
-        sem_wait(sem_lock_sigr.var); 
+        sem_timedwait(sem_lock_sigr.var, &tm);
         get_message_from_receiver();
         get_data_from_receiver();           
         send_msg_to_receiver(); 

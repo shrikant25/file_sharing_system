@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <aio.h>
 #include <sys/shm.h>
 #include "shared_memory.h"
 #include "partition.h"
@@ -340,10 +341,15 @@ int read_msg_from_sender ()
 
 
 int run_process () 
-{
+{   
+    const struct timespec tm = {
+        .0,
+        .10000000L
+    };
+
     while (1) {
 
-        sem_wait(sem_lock_sigps.var);
+        sem_timedwait(sem_lock_sigps.var, &tm);
         send_msg_to_sender();
         read_msg_from_sender();
         give_data_to_sender();
