@@ -46,7 +46,8 @@ int initnotif(char *confg_filename)
     char dbname[30];
     char noti_command[100];
     char db_conn_command[100];
-    char funcname[30];
+    char funcname[10];
+    char func_command[30];
 
     PGresult *res = NULL;
     if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
@@ -60,6 +61,8 @@ int initnotif(char *confg_filename)
     memset(db_conn_command, 0, sizeof(db_conn_command));
     memset(username, 0, sizeof(username));
     memset(dbname, 0, sizeof(dbname));
+    memset(funcname, 0, sizeof(funcname));
+    memset(func_command, 0, sizeof(func_command));
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf,"FUNCNAME=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  funcname, username, dbname, noti_channel);
@@ -70,6 +73,7 @@ int initnotif(char *confg_filename)
     }
 
     sprintf(noti_command, "LISTEN %s", noti_channel);
+    sprintf(func_command, "Select %s();", funcname);
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     connection = PQconnectdb(db_conn_command);
@@ -86,7 +90,7 @@ int initnotif(char *confg_filename)
         return -1;
     }
 
-    res = PQprepare(connection, "run_jobs", "Select run_jobs();", 0, NULL);
+    res = PQprepare(connection, "run_jobs", func_command, 0, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
         PQclear(res);
