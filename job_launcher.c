@@ -1,12 +1,12 @@
 #include <stdio.h> 
-#include <unistd.h>
 #include <semaphore.h>
 #include <string.h>
 #include <syslog.h>
 #include <fcntl.h>
 #include <libpq-fe.h>
 #include <sys/epoll.h>
-#include "shared_memory.h"
+#include <unistd.h>
+#include <time.h>
 
 int dbsocket;
 int epoll_fd;
@@ -14,7 +14,6 @@ char error[100];
 char noti_channel[30];
 struct epoll_event event;
 PGconn *connection;
-semlocks sem_lock_sig;
 
 
 void store_log(char *logtext) 
@@ -47,6 +46,7 @@ int initnotif(char *confg_filename)
     char dbname[30];
     char noti_command[100];
     char db_conn_command[100];
+    char funcname[30];
 
     PGresult *res = NULL;
     if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
@@ -62,7 +62,7 @@ int initnotif(char *confg_filename)
     memset(dbname, 0, sizeof(dbname));
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
-        sscanf(buf,"SEM_LOCK_SIG=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sig.key, username, dbname, noti_channel);
+        sscanf(buf,"FUNCNAME=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  funcname, username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -79,6 +79,14 @@ int initnotif(char *confg_filename)
     }
 
     res = PQprepare(connection, "store_log", "INSERT INTO logs (log) VALUES ($1);", 1, NULL);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        PQfinish(connection);
+        return -1;
+    }
+
+    res = PQprepare(connection, "run_jobs", "Select run_jobs();", 0, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
         PQclear(res);
@@ -125,14 +133,6 @@ int initnotif(char *confg_filename)
         return -1;
     }
     PQclear(res);
-    
-    if ((sem_lock_sig.var = sem_open(sem_lock_sig.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
-        sprintf(error, "noti channel %s error creating semphore %s: %s", noti_channel, sem_lock_sig.key, PQerrorMessage(connection));
-        store_log(error);
-        close(epoll_fd);
-        PQfinish(connection);
-        return -1;
-    }
 
     return 0;
 }
@@ -140,6 +140,7 @@ int initnotif(char *confg_filename)
 
 int main(int argc, char *argv[]) 
 {
+    PGresult *res;
     PGnotify *notify;
     int num_events;
 
@@ -169,8 +170,16 @@ int main(int argc, char *argv[])
             }
             else {
                 while ((notify = PQnotifies(connection)) != NULL) {
-                    sem_post(sem_lock_sig.var);
+
+                    res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
+                    if (PQresultStatus(res) != PGRES_COMMAND_OK){
+                        memset(error, 0, sizeof(error));
+                        sprintf(error, "failed to run jobs function for noti channel %s, errorr : %s", noti_channel, PQerrorMessage(connection));
+                        store_log(error);
+                    }
+                    PQclear(res);
                     PQfreemem(notify);
+                    nanosleep((const struct timespec []){{0, 10000000L}}, NULL);
                 }
             }
         }
@@ -183,7 +192,6 @@ int main(int argc, char *argv[])
     }
     
     store_log("closing notif");
-    sem_close(sem_lock_sig.var);
     PQfinish(connection);
     close(epoll_fd);
 

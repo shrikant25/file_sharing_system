@@ -32,6 +32,9 @@ launcher_files := launcher.c
 user_program_target = user_program
 user_program_files := user_program.c
 
+job_launcher_target = job_launcher
+job_launcher_files := job_launcher.c
+
 launcher:
 	$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)
 	$(CC) $(processor_s_files) -o $(processor_s_target) $(CFLAGS) 
@@ -42,6 +45,7 @@ launcher:
 	$(CC) $(initial_sender_files) -o $(initial_sender_target) $(CFLAGS)
 	$(CC) $(launcher_files) -o $(launcher_target) $(CFLAGS)
 	$(CC) $(user_program_files) -o $(user_program_target) $(CFLAGS)
+	$(CC) $(job_launcher_files) -o $(job_launcher_target) $(CFLAGS)
 
 clean:
-	rm processor_r processor_s receiver sender notif launcher user_program initial_receiver initial_sender
+	rm processor_r processor_s receiver sender notif launcher user_program initial_receiver initial_sender job_launcher
