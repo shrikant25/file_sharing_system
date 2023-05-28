@@ -49,29 +49,23 @@ int main(int argc, char *argv[]) {
             .args[2] = NULL,
         },
         {
-            .path = "./notif",
-            .args[0] = "notif",
-            .args[1] = argv[3],
-            .args[2] = NULL,
-        },
-        {
-            .path = "./notif",
-            .args[0] = "notif",
-            .args[1] = argv[4],
-            .args[2] = NULL,
-        },
-        {
             .path = "./initial_receiver",
             .args[0] = "initial_receiver",
-            .args[1] = argv[5],
+            .args[1] = argv[3],
             .args[2] = NULL,
         },
         {
             .path = "./initial_sender",
             .args[0] = "initial_sender",
-            .args[1] = argv[6],
+            .args[1] = argv[4],
             .args[2] = NULL,
         },
+        {
+            .path = "./job_launcher",
+            .args[0] = "job_launcher",
+            .args[1] = argv[5],
+            .args[2] = NULL,
+        }
     };
     
     pid_t pid = -1;
