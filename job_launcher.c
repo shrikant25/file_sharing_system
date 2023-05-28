@@ -1,19 +1,15 @@
 #include <stdio.h> 
-#include <semaphore.h>
 #include <string.h>
 #include <syslog.h>
 #include <fcntl.h>
 #include <libpq-fe.h>
-#include <sys/epoll.h>
 #include <unistd.h>
 #include <time.h>
 #include <aio.h>
 
-int dbsocket;
 int epoll_fd;
 char error[100];
 char noti_channel[30];
-struct epoll_event event;
 PGconn *connection;
 
 
@@ -93,41 +89,14 @@ int initnotif(char *confg_filename)
 
     res = PQprepare(connection, "run_jobs", func_command, 0, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        sprintf(error, "preparation of statement run jobs failed for notif channel %s error %s",  noti_channel, PQerrorMessage(connection));
+        store_log(error);
         PQclear(res);
         PQfinish(connection);
         return -1;
     }
 
-    dbsocket = PQsocket(connection);
-    if (dbsocket == -1) {
-        sprintf(error, "noti channel %s, error in PQsocket creating a connection to db %s", noti_channel, PQerrorMessage(connection));
-        store_log(error);
-        PQfinish(connection);
-        return -1;
-    }
-    PQsetnonblocking(connection, 1);
-
-    epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1) {
-        sprintf(error, "epoll_create1 failed in notifier listening on %s", noti_channel);
-        store_log(error);
-        PQfinish(connection);
-        return -1;
-    }
-
-    event.events = EPOLLIN;
-    event.data.fd = dbsocket;
-
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dbsocket, &event) == -1) {
-        sprintf(error, "epollctl failed in notifier listening on %s", noti_channel);
-        store_log(error);
-        PQfinish(connection);
-        close(epoll_fd);
-        return -1;
-    }
-
-    PQclear(res);
+   
     res = PQexec(connection, noti_command);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         sprintf(error, "noti channel %s, LISTEN command failed: %s", noti_channel, PQerrorMessage(connection));
@@ -137,20 +106,35 @@ int initnotif(char *confg_filename)
         PQfinish(connection);
         return -1;
     }
+    store_log(noti_command);
+
     PQclear(res);
 
     return 0;
 }
 
+void do_run_jobs() {
+
+    PGresult *res;
+    res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK){
+        memset(error, 0, sizeof(error));
+        sprintf(error, "failed to run jobs function for noti channel %s, errorr : %s", noti_channel, PQerrorMessage(connection));
+        store_log(error);
+    }
+    PQclear(res);
+}
+
 
 int main(int argc, char *argv[]) 
 {
-    PGresult *res;
+    int num_events = 0;
+    int turn = 0;
     PGnotify *notify;
-    int num_events;
+
     const struct timespec tm = {
-        .0, 
-        .10000000L
+        1, 
+        0L
     };
 
     if (argc != 2) {
@@ -159,50 +143,28 @@ int main(int argc, char *argv[])
     
     if(initnotif(argv[1]) == -1) {return -1;}
     
+    do_run_jobs();
+
     while (1) {
-
-        num_events = epoll_wait(epoll_fd, &event, 1, -1);
-        if (num_events == -1) {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "epoll wait failed for notifier listening on channel %s", noti_channel);
-            store_log(error);
-            break;
-        }
-
-        if (event.data.fd == dbsocket) {
-        
-            if (PQconsumeInput(connection) == 0) {
+            
+        nanosleep(&tm, NULL);
+                        
+        if (PQconsumeInput(connection) == 0) {
                 memset(error, 0, sizeof(error));
                 sprintf(error, "noti channel %s Failed to consume input: %s", noti_channel, PQerrorMessage(connection));
                 store_log(error);
                 break;
-            }
-            else {
-                while ((notify = PQnotifies(connection)) != NULL) {
-
-                    res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
-                    if (PQresultStatus(res) != PGRES_COMMAND_OK){
-                        memset(error, 0, sizeof(error));
-                        sprintf(error, "failed to run jobs function for noti channel %s, errorr : %s", noti_channel, PQerrorMessage(connection));
-                        store_log(error);
-                    }
-                    PQclear(res);
-                    PQfreemem(notify);
-                    nanosleep(&tm, NULL);
-                }
-            }
         }
         else {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "unkown event occured on epoll of notifier listening on channel %s", noti_channel);
-            store_log(error);
-            break;
-        }    
+            while ((notify = PQnotifies(connection)) != NULL) {                        
+                do_run_jobs();
+                PQfreemem(notify);
+            }
+        }
     }
     
-    store_log("closing notif");
+    store_log("closing job_launcher");
     PQfinish(connection);
-    close(epoll_fd);
 
     return 0;
 }

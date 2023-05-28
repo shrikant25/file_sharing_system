@@ -42,7 +42,7 @@ int retrive_data_from_database (char *blkptr)
         PQclear(res);
         res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, NULL, NULL, NULL, 0);
 
-        if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+        if (PQresultStatus(res) != PGRES_TUPLES_OK) {
             
             memset(error, 0, sizeof(error));
             sprintf(error, "failed to retrive info from db %s", PQerrorMessage(connection));
@@ -56,7 +56,7 @@ int retrive_data_from_database (char *blkptr)
                 store_log(error);
             }
         }    
-        else {
+        else if (PQntuples(res) > 0) {
             
             sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
             memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
@@ -70,7 +70,7 @@ int retrive_data_from_database (char *blkptr)
             res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values,   
                                             paramLengths, paramFormats, resultFormat);
             
-            if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+            if (PQresultStatus(res) != PGRES_TUPLES_OK) {
                 memset(error, 0, sizeof(error));
                 sprintf(error, "failed to retrive data from db  . %s", PQerrorMessage(connection));
                 store_log(error);
@@ -83,7 +83,7 @@ int retrive_data_from_database (char *blkptr)
                     store_log(error);
                 }
             }
-            else {
+            else if (PQntuples(res) > 0) {
                 
                 sndmsg->size = PQgetlength(res, 0, 0);
                 memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
@@ -129,6 +129,25 @@ int retrive_data_from_database (char *blkptr)
                         status = 0;
                     }
                 }
+            }
+            else {
+            
+                PQclear(res);
+                res = PQexec(connection, "ROLLBACK");
+                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                    store_log(error);
+                }
+            }
+        }
+        else {
+            PQclear(res);
+            res = PQexec(connection, "ROLLBACK");
+            if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+                memset(error, 0, sizeof(error));
+                sprintf(error, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
+                store_log(error);
             }
         }
     
@@ -217,9 +236,9 @@ int retrive_comms_from_database (char *blkptr)
         store_log(error);
         return status;
     }    
-
+   
     if (PQntuples(res) > 0) {
-        
+       
         type = atoi(PQgetvalue(res, 0, 0));
 
         if (type == 1){
@@ -343,8 +362,8 @@ int read_msg_from_sender ()
 int run_process () 
 {   
     const struct timespec tm = {
-        .0,
-        .10000000L
+        1,
+        0L
     };
 
     while (1) {

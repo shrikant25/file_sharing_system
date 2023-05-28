@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-#define TOTAL_PROCESSES 8
+#define TOTAL_PROCESSES 7
 
 struct launch_processes
 {
@@ -18,7 +18,7 @@ struct launch_processes
 
 int main(int argc, char *argv[]) {
 	
-    if (argc != 7) {
+    if (argc != 6) {
         syslog(LOG_NOTICE, "invalid arguments");
         return -1;
     }

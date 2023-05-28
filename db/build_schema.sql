@@ -4,10 +4,10 @@ DROP TRIGGER IF EXISTS msg_for_receiver ON receivers_comms;
 DROP TRIGGER IF EXISTS create_msg_receiver ON sysinfo;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
-UNLISTEN noti_1sys;
+DROP FUNCTION IF EXISTS send_noti2(), create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
+-- UNLISTEN noti_1sys;
 UNLISTEN noti_1initial;
-UNLISTEN noti_1receiver;
+-- UNLISTEN noti_1receiver;
 UNLISTEN noti_jobs;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -153,24 +153,24 @@ ALTER COLUMN
 SET NOT NULL;
 
 
-CREATE OR REPLACE FUNCTION send_noti3()
-RETURNS TRIGGER AS
-$$
-BEGIN
-    PERFORM pg_notify('noti_1receiver', 'get_data');
-    RETURN NEW;
-END;
-$$
-LANGUAGE plpgsql;
+-- CREATE OR REPLACE FUNCTION send_noti3()
+-- RETURNS TRIGGER AS
+-- $$
+-- BEGIN
+--     PERFORM pg_notify('noti_1receiver', 'get_data');
+--     RETURN NEW;
+-- END;
+-- $$
+-- LANGUAGE plpgsql;
 
 
-CREATE TRIGGER
-    msg_for_receiver
-AFTER INSERT ON
-    receivers_comms
-FOR EACH ROW 
-EXECUTE FUNCTION
-    send_noti3();
+-- CREATE TRIGGER
+--     msg_for_receiver
+-- AFTER INSERT ON
+--     receivers_comms
+-- FOR EACH ROW 
+-- EXECUTE FUNCTION
+--     send_noti3();
 
 
 CREATE OR REPLACE FUNCTION create_comms ()
@@ -195,37 +195,37 @@ EXECUTE FUNCTION
     create_comms();
 
 
-CREATE OR REPLACE FUNCTION send_noti1()
-RETURNS TRIGGER AS 
-$$
-BEGIN
-    PERFORM pg_notify('noti_1sys', 'get_data');
-    RETURN NEW;
-END;
-$$
-LANGUAGE plpgsql;
+-- CREATE OR REPLACE FUNCTION send_noti1()
+-- RETURNS TRIGGER AS 
+-- $$
+-- BEGIN
+--     PERFORM pg_notify('noti_1sys', 'get_data');
+--     RETURN NEW;
+-- END;
+-- $$
+-- LANGUAGE plpgsql;
 
 
-CREATE TRIGGER 
-    msg_for_sender1
-AFTER UPDATE ON 
-    job_scheduler
-FOR EACH ROW 
-WHEN 
-    (NEW.jstate = 'S-4')
-EXECUTE FUNCTION 
-    send_noti1();
+-- CREATE TRIGGER 
+--     msg_for_sender1
+-- AFTER UPDATE ON 
+--     job_scheduler
+-- FOR EACH ROW 
+-- WHEN 
+--     (NEW.jstate = 'S-4')
+-- EXECUTE FUNCTION 
+--     send_noti1();
 
 
-CREATE TRIGGER 
-    msg_for_sender2
-AFTER INSERT ON 
-    senders_comms
-FOR EACH ROW 
-WHEN 
-    (NEW.mtype = 1)
-EXECUTE FUNCTION 
-    send_noti1();
+-- CREATE TRIGGER 
+--     msg_for_sender2
+-- AFTER INSERT ON 
+--     senders_comms
+-- FOR EACH ROW 
+-- WHEN 
+--     (NEW.mtype = 1)
+-- EXECUTE FUNCTION 
+--     send_noti1();
 
 
 
@@ -233,7 +233,6 @@ CREATE OR REPLACE FUNCTION send_noti2()
 RETURNS TRIGGER AS 
 $$
 BEGIN
-    RAISE NOTICE 'hello';
     PERFORM pg_notify('noti_1initial', 'get_data');
     RETURN NEW;
 END;

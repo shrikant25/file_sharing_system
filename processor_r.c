@@ -173,7 +173,7 @@ int get_comms_from_database (char *blkptr)
     
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
    
-    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         memset(error, 0, sizeof(error));
         sprintf(error, "retriving comms for receiver failed %s", PQerrorMessage(connection));
         store_log(error);
@@ -181,13 +181,16 @@ int get_comms_from_database (char *blkptr)
         return -1;
     }    
     
-    memset(&cpif, 0, sizeof(capacity_info));
-    strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
-    cpif.capacity = atoi(PQgetvalue(res, 0, 1));
-    memset(error, 0, sizeof(error));
-    sprintf(error, "ip %s, cp %d", cpif.ipaddress, cpif.capacity);
-    store_log(error);
-    memcpy(blkptr, &cpif, sizeof(capacity_info));
+    if (PQntuples(res) > 0) {
+    
+        memset(&cpif, 0, sizeof(capacity_info));
+        strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+        cpif.capacity = atoi(PQgetvalue(res, 0, 1));
+        memset(error, 0, sizeof(error));
+        sprintf(error, "ip %s, cp %d", cpif.ipaddress, cpif.capacity);
+        store_log(error);
+        memcpy(blkptr, &cpif, sizeof(capacity_info));
+    }
 
     PQclear(res);
     return 0;
@@ -221,8 +224,8 @@ int run_process ()
     int status = 0;
     char data[CPARTITION_SIZE];
     const struct timespec tm = {
-        .0,
-        .10000000L
+        1,
+        0L
     };
 
     while (1) {
