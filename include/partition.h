@@ -39,18 +39,21 @@ typedef struct open_connection {
     int type;
     unsigned int port;
     unsigned int ipaddress;
+    int scommid;
 }open_connection;
 
 typedef struct close_connection {
     int type;
     unsigned int fd;
     unsigned int ipaddress;
+    int scommid;
 }close_connection;
 
 typedef struct connection_status {
     int type;
     int fd;
     unsigned int ipaddress; 
+    int scommid;
 }connection_status;
 
 typedef struct send_message {

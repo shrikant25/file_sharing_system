@@ -168,7 +168,7 @@ int get_comms_from_database (char *blkptr)
 {
     PGresult *res = NULL;
     capacity_info cpif;
-
+    int status = -1;
     char error[100];
     
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
@@ -177,23 +177,22 @@ int get_comms_from_database (char *blkptr)
         memset(error, 0, sizeof(error));
         sprintf(error, "retriving comms for receiver failed %s", PQerrorMessage(connection));
         store_log(error);
-        PQclear(res);
-        return -1;
     }    
-    
-    if (PQntuples(res) > 0) {
+    else if (PQntuples(res) > 0) {
     
         memset(&cpif, 0, sizeof(capacity_info));
         strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
         cpif.capacity = atoi(PQgetvalue(res, 0, 1));
+        memcpy(blkptr, &cpif, sizeof(capacity_info));
+        
         memset(error, 0, sizeof(error));
         sprintf(error, "ip %s, cp %d", cpif.ipaddress, cpif.capacity);
         store_log(error);
-        memcpy(blkptr, &cpif, sizeof(capacity_info));
+        status = 0;
     }
 
     PQclear(res);
-    return 0;
+    return status;
 }
 
 

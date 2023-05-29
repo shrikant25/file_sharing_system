@@ -20,7 +20,7 @@ typedef struct db_statements {
 }db_statements;
 
 
-#define statement_count 7
+#define statement_count 9
 
 db_statements dbs[statement_count] = {
     { 
@@ -42,8 +42,7 @@ db_statements dbs[statement_count] = {
     },
     { 
       .statement_name = "s_get_comms", 
-      .statement = "WITH sdata AS(SELECT scommid FROM senders_comms WHERE mtype IN(1, 2) LIMIT 1) \
-                    DELETE FROM senders_comms WHERE scommid = (SELECT scommid FROM sdata) RETURNING mtype, mdata1, mdata2;",
+      .statement = "SELECT mtype, mdata1, mdata2, scommid FROM senders_comms WHERE mtype IN('1', '2') LIMIT 1;",
       .param_count = 0,
     },
     {
@@ -59,6 +58,16 @@ db_statements dbs[statement_count] = {
     {
       .statement_name = "s_get_data",
       .statement = "SELECT jobdata FROM job_scheduler WHERE jobid = $1::uuid;",
+      .param_count = 1,
+    },
+    {
+      .statement_name = "s_update_comms",
+      .statement = "UPDATE senders_comms SET mtype = mtype || 'W' WHERE scommid = $1::INTEGER;",
+      .param_count = 1
+    },
+    {
+      .statement_name = "s_delete_comms",
+      .statement = "DELETE FROM senders_comms WHERE scommid = $1::INTEGER;",
       .param_count = 1
     }
 };

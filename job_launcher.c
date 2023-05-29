@@ -8,15 +8,15 @@
 #include <aio.h>
 
 int epoll_fd;
-char error[100];
+char error[1000];
 char noti_channel[30];
 PGconn *connection;
 
 
 void store_log(char *logtext) 
 {
-    PGresult *res = NULL;
-    char log[100];
+    PGresult *res;
+    char log[1000];
     memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
@@ -119,7 +119,7 @@ void do_run_jobs() {
     res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK){
         memset(error, 0, sizeof(error));
-        sprintf(error, "failed to run jobs function for noti channel %s, errorr : %s", noti_channel, PQerrorMessage(connection));
+        snprintf(error, 100,"failed to run jobs function for noti channel %s, errorr : %s", noti_channel, PQerrorMessage(connection));
         store_log(error);
     }
     PQclear(res);

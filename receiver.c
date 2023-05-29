@@ -226,7 +226,7 @@ int run_receiver ()
 
     while (1) {
         
-        act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, 3000);
+        act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, 1000);
 
         if (get_message_from_processor(&cpif) != -1) {
             
@@ -365,7 +365,7 @@ int get_message_from_processor (capacity_info *cpif)
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
         memset(error, 0, sizeof(error));
-        sprintf(error, "ip %s, cp %d", cpif->ipaddress, cpif->capacity);
+        sprintf(error, "but why ip %s, cp %d", cpif->ipaddress, cpif->capacity);
         store_log(error);
         memcpy(blkptr, &cpif, sizeof(capacity_info));
         toggle_bit(subblock_position, commr_block.var, 1);

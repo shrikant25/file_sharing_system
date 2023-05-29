@@ -179,6 +179,7 @@ int run_sender()
                 cncsts.type = 3;
                 cncsts.fd = create_connection(opncn->port, opncn->ipaddress);
                 cncsts.ipaddress = opncn->ipaddress;
+                cncsts.scommid = opncn->scommid;
                 
                 send_message_to_processor(3, (void *)&cncsts);
 
@@ -190,8 +191,9 @@ int run_sender()
                 cncsts.type = 3;
                 cncsts.fd = -1;
                 cncsts.ipaddress = clscn->ipaddress;
+                cncsts.scommid = clscn->scommid;
                 memset(error, 0, sizeof(error));
-                sprintf(error, "%d %d %d", cncsts.type, cncsts.fd, cncsts.ipaddress);
+                sprintf(error, "clsing %d %d %d", cncsts.type, cncsts.fd, cncsts.ipaddress);
                 store_log(error);
                 send_message_to_processor(3, (void *)&cncsts);
             }

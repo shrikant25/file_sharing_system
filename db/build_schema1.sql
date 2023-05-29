@@ -33,16 +33,17 @@ CREATE TABLE receiving_conns (rfd INTEGER PRIMARY KEY,
                               rcstatus INTEGER NOT NULL,
                               rctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE sending_conns (sfd INTEGER PRIMARY KEY,
+CREATE TABLE sending_conns (sfd INTEGER NOT NULL,
                             sipaddr BIGINT NOT NULL, 
                             scstatus INTEGER NOT NULL,
-                            sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                            sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            CONSTRAINT pk_sending_conns PRIMARY KEY (sipaddr));
 
 CREATE TABLE senders_comms (scommid SERIAL, 
                             mdata1 BIGINT NOT NULL,
                             mdata2 INTEGER NOT NULL, 
-                            mtype INTEGER NOT NULL,
-                            CONSTRAINT pk_senders_comms PRIMARY KEY (mdata1, mdata2, mtype));
+                            mtype TEXT NOT NULL,
+                            CONSTRAINT pk_senders_comms PRIMARY KEY (mdata1, mdata2));
 
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
@@ -353,7 +354,7 @@ BEGIN
     WHERE jdestination = (
             SELECT system_name
             FROM sysinfo     
-            WHERE dataport = 0
+            WHERE dataport != 0
         )
     AND jstate = 'S';
 
@@ -481,7 +482,7 @@ BEGIN
             ON jdestination = si.system_name 
             AND LENGTH(lo_get(f.file_data)) > (si.system_capacity-168)
             AND si.system_capacity != 0
-        
+           
         )
     AND jstate = 'S-1';
 
@@ -496,6 +497,7 @@ BEGIN
             ON jdestination = si.system_name 
             AND LENGTH(lo_get(file_data)) <= (si.system_capacity-168)
             AND si.system_capacity != 0
+
         )
     AND jstate = 'S-1';
 
@@ -607,23 +609,22 @@ BEGIN
     JOIN sysinfo si
     ON si.system_name = jdestination
     WHERE js.jstate = 'S-4' 
-    AND NOT EXISTS (
-            SELECT 1 
-            FROM sending_conns sc
-            WHERE sc.sipaddr = si.ipaddress
-        );   
+    ON CONFLICT ON CONSTRAINT pk_sending_conns
+    DO NOTHING;   
 
 
     INSERT INTO senders_comms (mdata1, mdata2, mtype)
-    SELECT si.ipaddress, si.dataport, 1 
+    SELECT si.ipaddress, si.dataport, '1' 
     FROM sysinfo si
     JOIN sending_conns sc 
     ON si.ipaddress = sc.sipaddr
-    WHERE sc.scstatus = 1;
+    WHERE sc.scstatus = 1
+    ON CONFLICT ON CONSTRAINT pk_senders_comms 
+    DO NOTHING;
 
 
     INSERT INTO senders_comms (mdata1, mdata2, mtype)
-    SELECT sc.sipaddr, sc.sfd, 2
+    SELECT sc.sipaddr, sc.sfd, '2'
     FROM sending_conns sc
     JOIN sysinfo si ON
     sc.sipaddr = si.ipaddress
@@ -631,7 +632,9 @@ BEGIN
     ON si.system_name = js.jdestination  
     AND js.jstate != 'C'
     WHERE js.jdestination IS NULL
-    AND sc.scstatus = 2;
+    AND sc.scstatus = 2
+    ON CONFLICT ON CONSTRAINT pk_senders_comms 
+    DO NOTHING;
 
     PERFORM pg_notify('noti_jobs1', 'get_data');
 
