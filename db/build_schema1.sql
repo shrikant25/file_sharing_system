@@ -38,10 +38,11 @@ CREATE TABLE sending_conns (sfd INTEGER PRIMARY KEY,
                             scstatus INTEGER NOT NULL,
                             sctime TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 
-CREATE TABLE senders_comms (scommid SERIAL PRIMARY KEY, 
+CREATE TABLE senders_comms (scommid SERIAL, 
                             mdata1 BIGINT NOT NULL,
                             mdata2 INTEGER NOT NULL, 
-                            mtype INTEGER NOT NULL);
+                            mtype INTEGER NOT NULL,
+                            CONSTRAINT pk_senders_comms PRIMARY KEY (mdata1, mdata2, mtype));
 
 CREATE TABLE logs (logid SERIAL PRIMARY KEY,
                    log TEXT NOT NULL,
