@@ -420,8 +420,8 @@ int read_msg_from_sender ()
 int run_process () 
 {   
     const struct timespec tm = {
-        1,
-        0L
+        0,
+        100000000L
     };
 
     while (1) {

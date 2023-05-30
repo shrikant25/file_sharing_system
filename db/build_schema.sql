@@ -350,7 +350,6 @@ BEGIN
     WHERE jdestination IN (
             SELECT system_name
             FROM sysinfo     
-            WHERE dataport != 0
         )
     AND jstate = 'S';
 

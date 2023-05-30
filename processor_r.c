@@ -181,13 +181,15 @@ int get_comms_from_database (char *blkptr)
     else if (PQntuples(res) > 0) {
     
         memset(&cpif, 0, sizeof(capacity_info));
-        strncpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+        memcpy(cpif.ipaddress, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
+        cpif.ipaddress[sizeof(cpif.ipaddress)] = 0;
         cpif.capacity = atoi(PQgetvalue(res, 0, 1));
         memcpy(blkptr, &cpif, sizeof(capacity_info));
         
         memset(error, 0, sizeof(error));
-        sprintf(error, "ip %s, cp %d", cpif.ipaddress, cpif.capacity);
+        sprintf(error, "got from db ip %s, cp %d", cpif.ipaddress, cpif.capacity);
         store_log(error);
+        
         status = 0;
     }
 
