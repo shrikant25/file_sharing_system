@@ -40,3 +40,5 @@ void store_log(char *);
 void store_data_in_database(int, char *);
 
 #endif
+
+ 

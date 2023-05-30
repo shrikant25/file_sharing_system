@@ -261,24 +261,23 @@ RETURNS VOID AS
 $$
 BEGIN
 
+    
     UPDATE job_scheduler 
-    SET jstate = ( 
-        SELECT
-            CASE 
-            WHEN jstate = 'N-1' 
-                AND encode(substr(jobdata, 1, 32), 'escape') = md5(substr(jobdata, 33)) 
-            THEN 'N-2'
-            WHEN jstate = 'N-1' 
-                AND encode(substr(jobdata, 1, 32), 'escape') != md5(substr(jobdata, 33)) 
-            THEN 'D'
-            ELSE jstate
-            END
-        );
+    SET jstate = 'N-2'
+    WHERE jstate = 'N-1'
+    AND encode(substr(jobdata, 1, 32), 'escape') = md5(substr(jobdata, 33));
+
+
+    UPDATE job_scheduler 
+    SET jstate = 'D'
+    WHERE jstate = 'N-1'
+    AND encode(substr(jobdata, 1, 32), 'escape') != md5(substr(jobdata, 33));
+    
 
     UPDATE job_scheduler 
     SET jstate = 'N-3' 
     WHERE jstate = 'N-2' 
-    AND encode(substr(jobdata, 79, 5), 'escape') = (
+    AND encode(substr(jobdata, 79, 5), 'escape') IN (
             SELECT jdestination 
             FROM job_scheduler 
             WHERE jobid = jparent_jobid
@@ -288,7 +287,7 @@ BEGIN
     UPDATE job_scheduler 
     SET jstate = 'S-1', jdestination = encode(substr(jobdata, 79, 5), 'escape') 
     WHERE jstate = 'N-2' 
-    AND encode(substr(jobdata, 79, 5), 'escape') != (
+    AND encode(substr(jobdata, 79, 5), 'escape') NOT IN (
             SELECT jdestination 
             FROM job_scheduler 
             WHERE jobid = jparent_jobid
@@ -348,10 +347,10 @@ BEGIN
 
     UPDATE job_scheduler 
     SET jstate = 'S-1'
-    WHERE jdestination = (
+    WHERE jdestination IN (
             SELECT system_name
             FROM sysinfo     
-            WHERE dataport = 0
+            WHERE dataport != 0
         )
     AND jstate = 'S';
 
@@ -463,6 +462,7 @@ BEGIN
             FROM cte_sysinfo 
         );
 
+
     UPDATE job_scheduler
     SET jstate = 'C'
     WHERE jstate = 'N-4'
@@ -471,7 +471,7 @@ BEGIN
 
     UPDATE job_scheduler 
     SET jstate = 'S-2' 
-    WHERE jobdata = (
+    WHERE jobdata IN (
 
             SELECT file_name::bytea 
             FROM files f 
@@ -486,7 +486,7 @@ BEGIN
 
     UPDATE job_scheduler 
     SET jstate = 'S-3' 
-    WHERE jobdata = ( 
+    WHERE jobdata IN ( 
         
             SELECT file_name::bytea 
             FROM files 
@@ -554,6 +554,7 @@ BEGIN
     FROM chunk_info;
 
 
+
     WITH cte_msginfo as(
 
         SELECT create_message(  
@@ -581,10 +582,11 @@ BEGIN
     FROM cte_msginfo; 
 
 
+
     UPDATE job_scheduler 
     SET jstate = 'S-2W' 
     WHERE jstate = 'S-2'
-    AND jdestination = (
+    AND jdestination IN (
             SELECT system_name
             FROM sysinfo
         );
@@ -593,7 +595,7 @@ BEGIN
     UPDATE job_scheduler 
     SET jstate = 'S-3W' 
     WHERE jstate = 'S-3'
-    AND jdestination = (
+    AND jdestination IN (
             SELECT system_name
             FROM sysinfo
         );
