@@ -618,7 +618,10 @@ BEGIN
     FROM sysinfo si
     JOIN sending_conns sc 
     ON si.ipaddress = sc.sipaddr
+    JOIN job_scheduler js
+    ON si.system_name = jdestination
     WHERE sc.scstatus = 1
+    AND js.jstate = 'S-4'
     ON CONFLICT ON CONSTRAINT pk_senders_comms 
     DO NOTHING;
 
