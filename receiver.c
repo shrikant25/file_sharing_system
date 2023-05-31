@@ -469,6 +469,7 @@ int main (int argc, char *argv[])
     char db_conn_command[100];
     char username[30];
     char dbname[30];
+    char ignore[20];
     
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -482,7 +483,7 @@ int main (int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nPORT=%d\nIPADDRESS=%lu", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, &s_info.port, &s_info.ipaddress);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%sNOTI_CHANNEL=%s\nPORT=%d\nIPADDRESS=%lu", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, ignore, &s_info.port, &s_info.ipaddress);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");

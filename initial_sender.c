@@ -10,10 +10,11 @@
 #include <netinet/in.h> // contains structures to store address information
 #include <sys/types.h>
 #include <libpq-fe.h>
+#include <sys/epoll.h>
 #include "initial_sender.h"
 
 PGconn *connection;
-char error[100];
+char error[1000];
 
 int read_data_from_database (server_info *servinfo) {
 
@@ -129,10 +130,46 @@ void run_server ()
     int hSocket, data_sent, total_data_sent, idx, fd;
     unsigned int ipaddress;
     struct sockaddr_in server;
+    int sockfd, epoll_fd, event_cnt;
+    struct epoll_event event;
     server_info servinfo;
     PGnotify *notify;
     
+    sockfd = PQsocket(connection);
+    if (sockfd < 0) {
+        memset(error, 0, sizeof(error));
+        snprintf(error, sizeof(error), "Failed to create a socket to listen to database %s", PQerrorMessage(connection));
+        store_log(error);
+    }
+
+    if((epoll_fd = epoll_create1(0)) == -1) {
+        memset(error, 0, sizeof(error));
+        snprintf(error, sizeof(error), "epoll_create1 failed %s", strerror(errno));
+        store_log(error);
+        return;
+    }
+
+    memset(&event, 0, sizeof(event));
+    event.data.fd = sockfd;
+    event.events = EPOLLIN;
+
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sockfd, &event) == -1) {
+        memset(error, 0, sizeof(error));
+        snprintf(error, sizeof(error), "epoll_ctl failed %s", strerror(errno));
+        store_log(error);
+        return;
+    }
+
+    memset(&event, 0, sizeof(event));
+
     while (1) {
+        
+        if ((event_cnt = epoll_wait(epoll_fd, &event, 1, -1)) == -1) {
+            memset(error, 0, sizeof(error));
+            snprintf(error, sizeof(error), "epoll wait failed %s", strerror(errno));
+            store_log(error);
+            return;
+        }
         
         if (PQconsumeInput(connection) == 0) {
             memset(error, 0, sizeof(error));
@@ -147,11 +184,14 @@ void run_server ()
                 if (read_data_from_database(&servinfo) != -1) {
                     store_log("read something");
                     servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
+                 
                     if (servinfo.servsoc_fd == -1) {
+                  
                         memset(error, 0, sizeof(error));
                         sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
                         store_log(error);
                         update_status(servinfo.uuid, -1);
+                 
                     }
                     else {
                     
@@ -163,10 +203,12 @@ void run_server ()
                             store_log(error);
                         store_log("trying to make connection");
                         if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
+                   
                             memset(error, 0, sizeof(error));
                             sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
                             store_log(error);
                             update_status(servinfo.uuid, -1);
+                  
                         }
                         else {
                             store_log("sending");
@@ -203,7 +245,7 @@ void run_server ()
 void store_log (char *logtext) 
 {
     PGresult *res = NULL;
-    char log[100];
+    char log[1000];
     memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 

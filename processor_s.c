@@ -22,12 +22,13 @@ datablocks datas_block;
 datablocks comms_block;
 PGconn *connection;
 
+char error[1000];
+
 
 int retrive_data_from_database (char *blkptr) 
 {
     int row_count;
     int status = -1;
-    char error[100];
     PGresult *res = NULL;
     send_message *sndmsg = (send_message *)blkptr;
     
@@ -167,7 +168,6 @@ int store_comms_into_database (char *blkptr)
     char fd[11];
     char mstatus[11];
     char id[37];
-    char error[1000];
     int status = -1;
 
     PGresult* res = NULL;
@@ -249,7 +249,6 @@ int retrive_comms_from_database (char *blkptr)
 {
     PGresult *res = NULL;
     int status = -1;
-    char error[1000];
     int type;
     char scommid[30];
 
@@ -419,6 +418,8 @@ int read_msg_from_sender ()
 
 int run_process () 
 {   
+    PGnotify *notify;
+
     const struct timespec tm = {
         0,
         100000000L
@@ -427,10 +428,21 @@ int run_process ()
     while (1) {
 
         sem_timedwait(sem_lock_sigps.var, &tm);
-        send_msg_to_sender();
         read_msg_from_sender();
-        give_data_to_sender();
-    }  
+
+        if (PQconsumeInput(connection) == 0) {
+            memset(error, 0, sizeof(error));
+            sprintf(error, "Failed to consume input: %s", PQerrorMessage(connection));
+            store_log(error);
+        }
+        else{
+
+            while ((notify = PQnotifies(connection)) != NULL) {
+                send_msg_to_sender();
+                give_data_to_sender();
+            }
+        }  
+    }
 }
 
 
@@ -474,8 +486,19 @@ int main (int argc, char *argv[])
     int conffd = -1;
     char buf[500];
     char db_conn_command[100];
+    char noti_channel[20];
+    char noti_command[50];
     char username[30];
     char dbname[30];
+    PGresult *res;
+
+
+    memset(buf, 0, sizeof(buf));
+    memset(db_conn_command, 0, sizeof(db_conn_command));
+    memset(noti_channel, 0, sizeof(noti_channel));
+    memset(noti_command, 0, sizeof(noti_command));
+    memset(username, 0, sizeof(username));
+    memset(dbname, 0, sizeof(dbname));
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -489,7 +512,7 @@ int main (int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
     
-        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname);
+        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -498,9 +521,22 @@ int main (int argc, char *argv[])
 
     close(conffd);
 
-    sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
+    snprintf(db_conn_command, sizeof(db_conn_command), "user=%s dbname=%s", username, dbname);
+    snprintf(noti_command, sizeof(noti_command), "LISTEN %s", noti_channel);
+
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
+
+    res = PQexec(connection, noti_command);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        memset(error, 0, sizeof(error));
+        snprintf(error, sizeof(error), "LISTEN command failed: %s", PQerrorMessage(connection));
+        store_log(error);
+        PQclear(res);
+        PQfinish(connection);
+        return -1;
+    }
+    PQclear(res); 
     
     sem_lock_datas.var = sem_open(sem_lock_datas.key, O_CREAT, 0777, 1);
     sem_lock_comms.var = sem_open(sem_lock_comms.key, O_CREAT, 0777, 1);

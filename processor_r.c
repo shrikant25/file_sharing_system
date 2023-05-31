@@ -23,13 +23,14 @@ semlocks sem_lock_commr;
 semlocks sem_lock_sigr;
 datablocks datar_block;
 datablocks commr_block;
+char error[1000];
 
 
 void store_log (char *logtext) 
 {
 
     PGresult *res = NULL;
-    char log[100];
+    char log[1000];
     memset(log, 0, sizeof(log));
     strncpy(log, logtext, strlen(logtext));
 
@@ -52,7 +53,6 @@ int store_data_in_database (newmsg_data *nmsg)
     PGresult *res = NULL;
     
     char fd[11];
-    char error[100];
 
     sprintf(fd, "%d", nmsg->data1);
 
@@ -84,8 +84,7 @@ int store_commr_into_database (receivers_message *rcvm)
     char fd[11];
     char ipaddr[11];
     char status [11];
-    char error[100];
-
+   
     sprintf(fd, "%d", rcvm->fd);
     sprintf(ipaddr, "%d", rcvm->ipaddr);
     sprintf(status, "%d", rcvm->status);
@@ -169,7 +168,6 @@ int get_comms_from_database (char *blkptr)
     PGresult *res = NULL;
     capacity_info cpif;
     int status = -1;
-    char error[100];
     
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
    
@@ -224,6 +222,8 @@ int run_process ()
 {
     int status = 0;
     char data[CPARTITION_SIZE];
+    PGnotify *notify;
+
     const struct timespec tm = {
         1,
         0L
@@ -232,9 +232,21 @@ int run_process ()
     while (1) {
 
         sem_timedwait(sem_lock_sigr.var, &tm);
+        
         get_message_from_receiver();
-        get_data_from_receiver();           
-        send_msg_to_receiver(); 
+        get_data_from_receiver();     
+        
+        if (PQconsumeInput(connection) == 0) {
+            memset(error, 0, sizeof(error));
+            sprintf(error, "Failed to consume input: %s", PQerrorMessage(connection));
+            store_log(error);
+        }
+        else{
+
+            while ((notify = PQnotifies(connection)) != NULL) {      
+                send_msg_to_receiver(); 
+            }
+        }
     }  
 }
 
@@ -281,6 +293,16 @@ int main (int argc, char *argv[])
     char db_conn_command[100];
     char username[30];
     char dbname[30];
+    char noti_channel[20];
+    char noti_command[50];
+    PGresult *res;
+
+    memset(buf, 0, sizeof(buf));
+    memset(db_conn_command, 0, sizeof(db_conn_command));
+    memset(noti_channel, 0, sizeof(noti_channel));
+    memset(noti_command, 0, sizeof(noti_command));
+    memset(username, 0, sizeof(username));
+    memset(dbname, 0, sizeof(dbname));
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -294,7 +316,7 @@ int main (int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname, noti_channel);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -303,7 +325,8 @@ int main (int argc, char *argv[])
     
     close(conffd);
 
-    sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
+    snprintf(db_conn_command, sizeof(db_conn_command), "user=%s dbname=%s", username, dbname);
+    snprintf(noti_command, sizeof(noti_command), "LISTEN %s", noti_channel);
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
     
@@ -322,6 +345,17 @@ int main (int argc, char *argv[])
         store_log("failed to get shared memory");
         return -1; 
     }
+
+    res = PQexec(connection, noti_command);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        memset(error, 0, sizeof(error));
+        snprintf(error, sizeof(error), "LISTEN command failed: %s", PQerrorMessage(connection));
+        store_log(error);
+        PQclear(res);
+        PQfinish(connection);
+        return -1;
+    }
+    PQclear(res); 
 
     unset_all_bits(commr_block.var, 2);
     unset_all_bits(commr_block.var, 3);
