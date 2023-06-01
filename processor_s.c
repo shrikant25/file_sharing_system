@@ -354,6 +354,7 @@ void store_log (char *logtext)
 int give_data_to_sender () 
 {
     int subblock_position = -1;
+    int status = 0;
     char *blkptr = NULL;
 
     sem_wait(sem_lock_datas.var);         
@@ -366,17 +367,20 @@ int give_data_to_sender ()
         if (retrive_data_from_database(blkptr) != -1) { 
             toggle_bit(subblock_position, datas_block.var, 3);
             sem_post(sem_lock_sigs.var);
+            status = 1;
         }
     
     }
 
     sem_post(sem_lock_datas.var);
+    return status;
 }
 
 
 int send_msg_to_sender () 
 {
     int subblock_position = -1;
+    int status = 0;
     char *blkptr = NULL;
 
     sem_wait(sem_lock_comms.var);         
@@ -389,10 +393,11 @@ int send_msg_to_sender ()
         if (retrive_comms_from_database(blkptr) != -1){
             toggle_bit(subblock_position, comms_block.var, 1);
             sem_post(sem_lock_sigs.var);
+            status = 1;
         }
     }
     sem_post(sem_lock_comms.var);
-
+    return status;
 }
 
 
@@ -418,6 +423,7 @@ int read_msg_from_sender ()
 
 int run_process () 
 {   
+    int iswork;
     PGnotify *notify;
 
     const struct timespec tm = {
@@ -436,10 +442,14 @@ int run_process ()
             store_log(error);
         }
         else{
-
+            
             while ((notify = PQnotifies(connection)) != NULL) {
-                send_msg_to_sender();
-                give_data_to_sender();
+                do { // if work was done, there might be more work, so try again
+                    iswork = 0;
+                    iswork |= send_msg_to_sender();
+                    iswork |= give_data_to_sender();
+                    read_msg_from_sender();
+                } while (iswork);
             }
         }  
     }

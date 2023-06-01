@@ -220,13 +220,13 @@ int send_msg_to_receiver ()
 
 int run_process () 
 {
-    int status = 0;
+    int iswork = 0;
     char data[CPARTITION_SIZE];
     PGnotify *notify;
 
     const struct timespec tm = {
-        1,
-        0L
+        0,
+        100000000L
     };
 
     while (1) {
@@ -241,10 +241,15 @@ int run_process ()
             sprintf(error, "Failed to consume input: %s", PQerrorMessage(connection));
             store_log(error);
         }
-        else{
+        else {
 
             while ((notify = PQnotifies(connection)) != NULL) {      
-                send_msg_to_receiver(); 
+                do {
+                    iswork = 0;                    
+                    iswork = send_msg_to_receiver();
+                    get_message_from_receiver();
+                    get_data_from_receiver();
+                } while(iswork);
             }
         }
     }  
