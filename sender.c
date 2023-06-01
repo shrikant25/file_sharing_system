@@ -223,7 +223,7 @@ int run_sender()
             store_log(error);
 
             msgsts.type = 4;
-            strncpy(msgsts.uuid, sndmsg.uuid, strlen(sndmsg.uuid));
+            strncpy(msgsts.uuid, sndmsg.uuid, sizeof(sndmsg.uuid));
             send_message_to_processor(4, (void *)&msgsts);
         }
     }

@@ -3,7 +3,7 @@
 DROP TRIGGER IF EXISTS create_msg_receiver ON sysinfo;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
+DROP FUNCTION IF EXISTS send_noti2(), create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
 
 UNLISTEN noti_1initial;
 UNLISTEN noti_jobs;
@@ -175,6 +175,31 @@ WHEN
     (NEW.system_capacity != 0)
 EXECUTE FUNCTION
     create_comms();
+
+
+
+CREATE OR REPLACE FUNCTION send_noti2()
+RETURNS TRIGGER AS 
+$$
+BEGIN
+    PERFORM pg_notify('noti_1initial', gen_random_uuid()::TEXT);
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+
+CREATE TRIGGER 
+    msg_for_initial_sender
+AFTER INSERT ON 
+    job_scheduler
+FOR EACH ROW 
+WHEN 
+    (NEW.jstate = 'S-5')
+EXECUTE FUNCTION 
+    send_noti2();
+
 
 
 

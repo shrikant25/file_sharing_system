@@ -100,7 +100,7 @@ int store_commr_into_database (receivers_message *rcvm)
    
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "%s %s", "comms storing failed failed", PQerrorMessage(connection));
+        sprintf(error, "%s %s", "comms storing failed ", PQerrorMessage(connection));
         store_log(error);
         return -1;
     }
@@ -168,7 +168,7 @@ int get_comms_from_database (char *blkptr)
 {
     PGresult *res = NULL;
     capacity_info cpif;
-    int status = 0;
+    int status = -1;
     
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
    
@@ -189,7 +189,7 @@ int get_comms_from_database (char *blkptr)
         sprintf(error, "got from db ip %s, cp %d", cpif.ipaddress, cpif.capacity);
         store_log(error);
         
-        status = 1;
+        status = 0;
     }
 
     PQclear(res);
@@ -302,7 +302,7 @@ int main (int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
-        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s\n", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
+        sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");

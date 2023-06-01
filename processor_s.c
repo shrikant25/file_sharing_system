@@ -30,7 +30,7 @@ int retrive_data_from_database (char *blkptr)
 {
     int row_count;
     int status = -1;
-    PGresult *res = NULL;
+    PGresult *res;
     send_message *sndmsg = (send_message *)blkptr;
     
     res = PQexec(connection, "BEGIN");
@@ -171,7 +171,7 @@ int store_comms_into_database (char *blkptr)
     char id[37];
     int status = -1;
 
-    PGresult* res = NULL;
+    PGresult* res;
     memset(id, 0, sizeof(id));
 
     if(*(int *)blkptr == 3){
@@ -215,6 +215,7 @@ int store_comms_into_database (char *blkptr)
                 memset(error, 0, sizeof(error));
                 snprintf(error, 1000, "failed to delete comms id %d errro : %s", cncsts->scommid, PQerrorMessage(connection));
                 store_log(error);
+                status = -1;
             }
             status = 0;
         }
@@ -233,7 +234,8 @@ int store_comms_into_database (char *blkptr)
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             memset(error, 0, sizeof(error));
             snprintf(error, 1000, "failed to insert senders comms %s", PQerrorMessage(connection));
-            store_log(error);        
+            store_log(error);     
+            status = -1;   
         }
         else {
             status = 0;
@@ -248,7 +250,7 @@ int store_comms_into_database (char *blkptr)
 
 int retrive_comms_from_database (char *blkptr) 
 {
-    PGresult *res = NULL;
+    PGresult *res;
     int status = -1;
     int type;
     char scommid[30];
@@ -266,7 +268,7 @@ int retrive_comms_from_database (char *blkptr)
        
         type = atoi(PQgetvalue(res, 0, 0));
 
-        if (type == 1){
+        if (type == 1) {
             
             open_connection *opncn = (open_connection *)blkptr;
             opncn->type = atoi(PQgetvalue(res, 0, 0));
@@ -289,6 +291,7 @@ int retrive_comms_from_database (char *blkptr)
                 memset(error, 0, sizeof(error));
                 snprintf(error, 1000, "failed to update comms status %s", PQerrorMessage(connection));
                 store_log(error);
+                status = -1;
             }
             else {
                 status = 0;
@@ -318,6 +321,7 @@ int retrive_comms_from_database (char *blkptr)
                 memset(error, 0, sizeof(error));
                 snprintf(error, 1000,"failed to update comms status %s", PQerrorMessage(connection));
                 store_log(error);
+                status = -1;
             }
             else {
                 status = 0;
@@ -426,7 +430,7 @@ int run_process ()
 
     const struct timespec tm = {
         0,
-        100000000L
+        500000000L
     };
 
     while (1) {
@@ -502,7 +506,7 @@ int main (int argc, char *argv[])
 
     if (read(conffd, buf, sizeof(buf)) > 0) {
     
-        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s\n", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname);
+        sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
