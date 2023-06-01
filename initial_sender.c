@@ -10,7 +10,8 @@
 #include <netinet/in.h> // contains structures to store address information
 #include <sys/types.h>
 #include <libpq-fe.h>
-#include <sys/epoll.h>
+#include <time.h>
+#include <aio.h>
 #include "initial_sender.h"
 
 PGconn *connection;
@@ -130,112 +131,66 @@ void run_server ()
     int hSocket, data_sent, total_data_sent, idx, fd;
     unsigned int ipaddress;
     struct sockaddr_in server;
-    int sockfd, epoll_fd, event_cnt;
-    struct epoll_event event;
     server_info servinfo;
-    PGnotify *notify;
     
-    sockfd = PQsocket(connection);
-    if (sockfd < 0) {
-        memset(error, 0, sizeof(error));
-        snprintf(error, sizeof(error), "Failed to create a socket to listen to database %s", PQerrorMessage(connection));
-        store_log(error);
-    }
-
-    if((epoll_fd = epoll_create1(0)) == -1) {
-        memset(error, 0, sizeof(error));
-        snprintf(error, sizeof(error), "epoll_create1 failed %s", strerror(errno));
-        store_log(error);
-        return;
-    }
-
-    memset(&event, 0, sizeof(event));
-    event.data.fd = sockfd;
-    event.events = EPOLLIN;
-
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sockfd, &event) == -1) {
-        memset(error, 0, sizeof(error));
-        snprintf(error, sizeof(error), "epoll_ctl failed %s", strerror(errno));
-        store_log(error);
-        return;
-    }
-
-    memset(&event, 0, sizeof(event));
+    const struct timespec tm = {
+        0,
+        100000000L
+    };
 
     while (1) {
         
-        if ((event_cnt = epoll_wait(epoll_fd, &event, 1, -1)) == -1) {
-            memset(error, 0, sizeof(error));
-            snprintf(error, sizeof(error), "epoll wait failed %s", strerror(errno));
-            store_log(error);
-            return;
-        }
-        
-        if (PQconsumeInput(connection) == 0) {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "Failed to consume input: %s", PQerrorMessage(connection));
-            store_log(error);
-        }
-        else{
+        nanosleep(&tm, NULL);
+            
+        memset(&servinfo, 0, sizeof(servinfo)); 
+        if (read_data_from_database(&servinfo) != -1) {
+            
+            servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
+            
+            if (servinfo.servsoc_fd == -1) {
+            
+                memset(error, 0, sizeof(error));
+                sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
+                store_log(error);
+                update_status(servinfo.uuid, -1);
+            
+            }
+            else {
+            
+                server.sin_family = AF_INET;
+                server.sin_port = htons(servinfo.port);
+                server.sin_addr.s_addr = htonl(servinfo.ipaddress);
+                
+                if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
+            
+                    memset(error, 0, sizeof(error));
+                    sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
+                    store_log(error);
+                    update_status(servinfo.uuid, -1);
+            
+                }
+                else {
+                    
+                    total_data_sent = 0;
+                    data_sent = 0;
 
-            while ((notify = PQnotifies(connection)) != NULL) {
-                    store_log("got one");
-                memset(&servinfo, 0, sizeof(servinfo)); 
-                if (read_data_from_database(&servinfo) != -1) {
-                    store_log("read something");
-                    servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
-                 
-                    if (servinfo.servsoc_fd == -1) {
-                  
-                        memset(error, 0, sizeof(error));
-                        sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
-                        store_log(error);
+                    do {
+                        
+                        data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, MESSAGE_SIZE, 0);
+                        total_data_sent += data_sent;
+                        
+                    } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
+                            
+                    if (total_data_sent != MESSAGE_SIZE) {
+                        
                         update_status(servinfo.uuid, -1);
-                 
                     }
                     else {
-                    
-                        server.sin_family = AF_INET;
-                        server.sin_port = htons(servinfo.port);
-                        server.sin_addr.s_addr = htonl(servinfo.ipaddress);
-                        memset(error, 0, sizeof(error));
-                            sprintf(error, "info ip %ld %d %s", servinfo.ipaddress, servinfo.port, servinfo.uuid);
-                            store_log(error);
-                        store_log("trying to make connection");
-                        if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
-                   
-                            memset(error, 0, sizeof(error));
-                            sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
-                            store_log(error);
-                            update_status(servinfo.uuid, -1);
-                  
-                        }
-                        else {
-                            store_log("sending");
-                            total_data_sent = 0;
-                            data_sent = 0;
-
-                            do {
-                                store_log("start");
-                                data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, MESSAGE_SIZE, 0);
-                                total_data_sent += data_sent;
-                                store_log("ohhhh");
-                            } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
-                                    store_log("done");
-                            if (total_data_sent != MESSAGE_SIZE) {
-                                store_log("failed");
-                                update_status(servinfo.uuid, -1);
-                            }
-                            else {
-                                store_log("sucess");
-                                update_status(servinfo.uuid, total_data_sent);
-                            }
-                        }
-
-                        close(servinfo.servsoc_fd);
+                        update_status(servinfo.uuid, total_data_sent);
                     }
                 }
-                PQfreemem(notify);
+
+                close(servinfo.servsoc_fd);
             }
         }
     }
