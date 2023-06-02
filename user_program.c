@@ -108,6 +108,8 @@ int show_stats()
 {
     int i, cnt;
     PGresult *res;
+    char *line = "----------------------------------------------------------------------";
+
 
     res = PQexecPrepared(connection, dbs[3].statement_name ,dbs[3].param_count, NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -122,17 +124,18 @@ int show_stats()
     }
 
     i = 0;
-    while (i < cnt) {
-        
-        printf("\n------------------------------\n");
 
-        printf("\ntotal_jobs : %s\njstate : %s\njpriority : %s\njdestination : %s\njtype : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
-       
-        printf("\n------------------------------\n");
+    printf("%s\n", line);
+    printf(" %-10s | %-10s | %-10s | %-15s | %-10s |\n", "total_jobs", "jstate", "jpriority", "jdestination", "jtype");
+    printf("%s\n", line);
+
+    while (i < cnt) {
+        printf(" %-10s | %-10s | %-10s | %-15s | %-10s |\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
         i+=1;
-   
     }
 
+    printf("%s\n", line);
+    
     PQclear(res);
     return 0;
 }
@@ -142,6 +145,7 @@ int show_jobs_info()
 {
     int i, cnt;
     PGresult *res;
+    char *line = "-------------------------------------------------------------------------------------------------------------------------------------------------------------";
 
     res = PQexecPrepared(connection, dbs[4].statement_name ,dbs[4].param_count, NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -157,16 +161,17 @@ int show_jobs_info()
     }
 
     i = 0;
+
+    printf("%s\n", line);
+    printf(" %-37s | %-70s | %-10s | %-10s | %-15s |\n", "jobid", "file_name", "jstate", "jpriority", "jdestination");
+    printf("%s\n", line);
+    
     while (i < cnt) {
-        
-        printf("\n------------------------------\n");
-       
-        printf("\njobid : %s\nfile_name : %s\njstate : %s\njpriority : %s\njdestination : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
-       
-        printf("\n------------------------------\n");
+        printf(" %37s | %-70s | %-10s | %-10s | %-15s |\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
         i+=1;
-   
     }
+    
+    printf("%s\n", line);
 
     PQclear(res);
     return 0;
@@ -219,6 +224,7 @@ int show_files_info()
 {
     int i, cnt;
     PGresult *res;
+    char *line = "---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------";
 
     res = PQexecPrepared(connection, dbs[6].statement_name ,dbs[6].param_count, NULL, NULL, NULL, 0);
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -234,16 +240,17 @@ int show_files_info()
     }
 
     i = 0;
-    while (i < cnt) {
-        
-        printf("\n------------------------------\n");
 
-        printf("\nfiles_id : %s\nfile_name : %s\nfile_data : %s\ncreation_time : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3));
-       
-        printf("\n------------------------------\n");
+    printf("%s\n", line);
+    printf(" %-37s | %-70s | %-20s | %-50s |\n", "files_id", "file_name", "file_data_oid", "time_of_insertion");
+    printf("%s\n", line);
+    
+    while (i < cnt) {
+        printf(" %-37s | %-70s | %-20s | %-50s |\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3));
         i+=1;
-   
     }
+
+    printf("%s\n", line);
 
     PQclear(res);
     return 0;
