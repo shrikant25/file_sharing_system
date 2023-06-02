@@ -100,7 +100,7 @@ int store_commr_into_database (receivers_message *rcvm)
    
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         memset(error, 0, sizeof(error));
-        sprintf(error, "%s %s", "comms storing failed ", PQerrorMessage(connection));
+        sprintf(error, "comms storing failed %s", PQerrorMessage(connection));
         store_log(error);
         return -1;
     }

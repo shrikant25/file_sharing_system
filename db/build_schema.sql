@@ -1,5 +1,6 @@
-
-
+DROP VIEW IF EXISTS show_jobs_info;
+DROP VIEW IF EXISTS show_stats;
+DROP VIEW IF EXISTS show_files_info;
 DROP TRIGGER IF EXISTS create_msg_receiver ON sysinfo;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
@@ -66,6 +67,22 @@ CREATE TABLE files (file_id UUID PRIMARY KEY,
                         file_data oid NOT NULL, 
                         creation_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP); 
 
+
+CREATE OR REPLACE VIEW show_stats 
+AS 
+SELECT count(jstate) AS total_jobs, jstate, jpriority, jdestination, jtype 
+FROM job_scheduler 
+GROUP BY jstate, jpriority, jdestination, jtype;
+
+
+CREATE OR REPLACE VIEW show_jobs_info AS
+SELECT  js1.jobid, encode(js1.jobdata, 'escape') AS file_name, js1.jstate, js1.jpriority, js1.jdestination 
+FROM job_scheduler js1 
+WHERE js1.jtype = lpad('6', 5, ' ') 
+GROUP BY js1.jobid;
+
+CREATE OR REPLACE VIEW show_files_info AS
+SELECT * FROM FILES;
 
 CREATE OR REPLACE FUNCTION create_message(
     uuid_data bytea,

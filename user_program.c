@@ -22,10 +22,11 @@ int import_file (char *file_path)
         file_path[i] = '\0';
     }
 
-    while (i > 0 && file_path[i--] != '/');
+   // while (i > 0 && file_path[i--] != '/');
 
     memset(file_name, 0, sizeof(bufsize));
-    strncpy(file_name, file_path+i+2, pathlen-i-1);
+    //strncpy(file_name, file_path+i+2, pathlen-i-1);
+    strncpy(file_name, file_path, pathlen-1);
 
     const char *const param_values[] = {file_name, file_path};
     const int paramLengths[] = {sizeof(file_name), pathlen};
@@ -101,6 +102,152 @@ int export_file (char *path)
 {
     printf("not implemented\n");
 } 
+
+
+int show_stats() 
+{
+    int i, cnt;
+    PGresult *res;
+
+    res = PQexecPrepared(connection, dbs[3].statement_name ,dbs[3].param_count, NULL, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("failed to show stats error : %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+    if ((cnt = PQntuples(res)) < 1) {
+        printf("got no jobs\n");
+        PQclear(res);
+        return -1;
+    }
+
+    i = 0;
+    while (i < cnt) {
+        
+        printf("\n------------------------------\n");
+
+        printf("\ntotal_jobs : %s\njstate : %s\njpriority : %s\njdestination : %s\njtype : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
+       
+        printf("\n------------------------------\n");
+        i+=1;
+   
+    }
+
+    PQclear(res);
+    return 0;
+}
+
+
+int show_jobs_info()
+{
+    int i, cnt;
+    PGresult *res;
+
+    res = PQexecPrepared(connection, dbs[4].statement_name ,dbs[4].param_count, NULL, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("failed to show job info : %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+    
+    if ((cnt = PQntuples(res)) < 1) {
+        printf("got no jobs\n");
+        PQclear(res);
+        return -1;
+    }
+
+    i = 0;
+    while (i < cnt) {
+        
+        printf("\n------------------------------\n");
+       
+        printf("\njobid : %s\nfile_name : %s\njstate : %s\njpriority : %s\njdestination : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3), PQgetvalue(res, i, 4));
+       
+        printf("\n------------------------------\n");
+        i+=1;
+   
+    }
+
+    PQclear(res);
+    return 0;
+}
+                    
+
+int update_job_priority(char *jobid, char *jobpriority)
+{
+    int len;
+    PGresult *res;
+    char pjobid[37];
+    char pjobpriority[bufsize];
+
+    memset(pjobid, 0, sizeof(pjobid));
+    memset(pjobpriority, 0, sizeof(pjobpriority));
+
+    len = strlen(jobid);
+    if (jobid[len-1] == '\n') {
+        jobid[len-1] = '\0';
+    }
+
+    len = strlen(jobpriority);
+    if (jobpriority[len-1] == '\n') {
+        jobpriority[len-1] = '\0';
+    }
+
+    strncpy(pjobid, jobid, sizeof(pjobid));
+    strncpy(pjobpriority, jobpriority, strlen(jobpriority));
+
+    const char *const param_values[] = {pjobid, pjobpriority};
+    const int paramLengths[] = {strlen(pjobid), strlen(pjobpriority)};
+    const int paramFormats[] = {0, 0};
+    int resultFormat = 0;
+
+    res = PQexecPrepared(connection, dbs[5].statement_name ,dbs[5].param_count, param_values, paramLengths, paramFormats, resultFormat);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        printf("failed to update job priority error : %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+
+    printf("successfully update job priority\n");
+
+    PQclear(res);
+    return 0;
+}
+
+
+int show_files_info() 
+{
+    int i, cnt;
+    PGresult *res;
+
+    res = PQexecPrepared(connection, dbs[6].statement_name ,dbs[6].param_count, NULL, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        printf("failed to show files info : %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
+    }
+
+    if ((cnt = PQntuples(res)) < 1) {
+        printf("got no jobs\n");
+        PQclear(res);
+        return -1;
+    }
+
+    i = 0;
+    while (i < cnt) {
+        
+        printf("\n------------------------------\n");
+
+        printf("\nfiles_id : %s\nfile_name : %s\nfile_data : %s\ncreation_time : %s\n", PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2), PQgetvalue(res, i, 3));
+       
+        printf("\n------------------------------\n");
+        i+=1;
+   
+    }
+
+    PQclear(res);
+    return 0;
+}
 
 
 int connect_to_database (char *conninfo) 
@@ -191,14 +338,18 @@ int main (int argc, char *argv[])
         printf("\nEnter 1 to import a file into database\n");
         printf("Enter 2 to send a file\n");
         printf("Enter 3 to export a file from database\n");
-        printf("Enter 4 to close the program\n");
+        printf("Enter 4 to show stats\n");
+        printf("Enter 5 to show job info\n");
+        printf("Enter 6 to Update job priority\n");
+        printf("Enter 7 to show files present\n");
+        printf("Enter 8 to close the program\n");
         fflush(stdin);
         memset(choice1, 0, sizeof(choice1));
         fgets(choice1, sizeof(choice1), stdin);    
     
         switch (choice1[0]) {
     
-            case '4':   PQfinish(connection);
+            case '8':   PQfinish(connection);
                         return 0;
                         break;
     
@@ -223,6 +374,24 @@ int main (int argc, char *argv[])
                         export_file(buf1);
                         break;
             
+            case '4':   show_stats();
+                        break;
+            
+            case '5':   show_jobs_info();
+                        break; 
+            
+            case '6':   if (get_input("Enter jobid id\n", buf1, bufsize) == -1) {
+                            break;
+                        }
+                        if (get_input("Enter job priority\n", buf2, bufsize) == -1) {
+                            break;
+                        }
+                        update_job_priority(buf1, buf2);
+                        break;
+
+            case '7':   show_files_info();
+                        break;
+
             default:    printf("Invalid Input\n");        
                         break;
         };

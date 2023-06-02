@@ -12,7 +12,7 @@ typedef struct db_statements {
 }db_statements;
 
 
-#define statement_count 3
+#define statement_count 7
 
 db_statements dbs[statement_count] = {
     {
@@ -27,13 +27,29 @@ db_statements dbs[statement_count] = {
     },
     {
       .statement_name = "create_job_for_sending",
-      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, \
-                    jsource, jobid, jparent_jobid, jdestination, jpriority) \
-                    VALUES($1, 'S', '0', \
-                    (select jsource from job_scheduler where jparent_jobid = jobid), GEN_RANDOM_UUID(), \
-                    (select jobid from job_scheduler where jparent_jobid = jobid), lpad($2, 5, ' '), 5);",
+      .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority) VALUES($1, 'S', lpad('6', 5, ' '), (select jsource from job_scheduler where jparent_jobid = jobid), GEN_RANDOM_UUID(), (select jobid from job_scheduler where jparent_jobid = jobid), lpad($2, 5, ' '), 5);",
       .param_count = 2,
     },
+    {
+      .statement_name = "show_stats",
+      .statement = "SELECT * FROM show_stats;",
+      .param_count = 0,
+    },
+    {
+      .statement_name = "show_jobs_info",
+      .statement = "SELECT * FROM show_jobs_info;",
+      .param_count = 0,
+    },
+    {
+      .statement_name = "update_job_priority",
+      .statement = "UPDATE job_scheduler SET jpriority = $2 WHERE jparent_jobid = $1::uuid OR jobid = $1::uuid;",
+      .param_count = 2,
+    }, 
+    {
+      .statement_name = "get_file_info",
+      .statement = "SELECT * FROM show_file_info;",
+      .param_count = 0,
+    }
 };
 
 
@@ -45,4 +61,3 @@ int send_file (char *, char *);
 int get_input (char *, char *, int);
 
 #endif //_USR_PRGM_H
-
