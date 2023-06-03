@@ -3,7 +3,7 @@
 
 #include "partition.h"
 
-void store_log (char *);
+void storelog(char * fmt, ...);
 int run_process ();
 int store_data_in_database (newmsg_data *);
 int store_commr_into_database (receivers_message *);
@@ -39,7 +39,7 @@ db_statements dbs[statement_count] = {
       .param_count = 3,
     },
     {
-      .statement_name = "pr_storelogs", 
+      .statement_name = "storelog", 
       .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1,
     },

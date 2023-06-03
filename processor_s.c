@@ -23,9 +23,6 @@ datablocks datas_block;
 datablocks comms_block;
 PGconn *connection;
 
-char error[1000];
-
-
 int retrive_data_from_database (char *blkptr) 
 {
     int row_count;
@@ -35,9 +32,7 @@ int retrive_data_from_database (char *blkptr)
     
     res = PQexec(connection, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        snprintf(error, 1000, "BEGIN command to start transaction failed in processor_s: %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s","BEGIN command to start transaction failed in processor_s : ", PQerrorMessage(connection));
     }
     else {
     
@@ -45,17 +40,12 @@ int retrive_data_from_database (char *blkptr)
         res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, NULL, NULL, NULL, 0);
 
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-            
-            memset(error, 0, sizeof(error));
-            snprintf(error, 1000, "failed to retrive info from db %s", PQerrorMessage(connection));
-            store_log(error);
+            storelog("%s%s", "failed to retrive info from db : ", PQerrorMessage(connection));
          
             PQclear(res);
             res = PQexec(connection, "ROLLBACK");
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000,"rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "rollback in transaction command failed in processor_s : ", PQerrorMessage(connection));
             }
         }    
         else if (PQntuples(res) > 0) {
@@ -73,16 +63,12 @@ int retrive_data_from_database (char *blkptr)
                                             paramLengths, paramFormats, resultFormat);
             
             if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000, "failed to retrive data from db  . %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "failed to retrive data from db  : ", PQerrorMessage(connection));
 
                 PQclear(res);
                 res = PQexec(connection, "ROLLBACK");
                 if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    memset(error, 0, sizeof(error));
-                    snprintf(error, 1000, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                    store_log(error);
+                    storelog("%s%s", "rollback in transaction command failed in processor_s : ", PQerrorMessage(connection));
                 }
             }
             else if (PQntuples(res) > 0) {
@@ -90,25 +76,19 @@ int retrive_data_from_database (char *blkptr)
                 sndmsg->size = PQgetlength(res, 0, 0);
                 memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
                 
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000, "data got from db %d %s", PQgetlength(res, 0, 0),PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "data got from db : ", PQgetlength(res, 0, 0), PQerrorMessage(connection));
                 PQclear(res);
 
                 res = PQexecPrepared(connection, dbs[4].statement_name, dbs[4].param_count, 
                                         param_values, paramLengths, paramFormats, resultFormat);
 
                 if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    memset(error, 0, sizeof(error));
-                    snprintf(error, 1000, "failed update job status %s", PQerrorMessage(connection));
-                    store_log(error);
+                    storelog("%s%s", "failed update job status : ", PQerrorMessage(connection));
 
                     PQclear(res);
                     res = PQexec(connection, "ROLLBACK");
                     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                        memset(error, 0, sizeof(error));
-                        snprintf(error, 1000, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                        store_log(error);
+                        storelog("%s%s", "rollback in transaction command failed in processor_s : ", PQerrorMessage(connection));
                     }
                 }
                 else {
@@ -116,16 +96,12 @@ int retrive_data_from_database (char *blkptr)
                     PQclear(res);
                     res = PQexec(connection, "COMMIT");
                     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                        memset(error, 0, sizeof(error));
-                        snprintf(error, 1000, "COMMIT for transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                        store_log(error);
+                        storelog("%s%s", "COMMIT for transaction command failed in processor_s : ", PQerrorMessage(connection));
 
                         PQclear(res);
                         res = PQexec(connection, "ROLLBACK");
                         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                            memset(error, 0, sizeof(error));
-                            snprintf(error, 1000, "ROLLBACK command for transaction failed in processor_s: %s", PQerrorMessage(connection));
-                            store_log(error);
+                            storelog("%s%s", "ROLLBACK command for transaction failed in processor_s : ", PQerrorMessage(connection));
                         }
                     } else {
                         status = 0;
@@ -135,23 +111,19 @@ int retrive_data_from_database (char *blkptr)
             else {
             
                 PQclear(res);
-                store_log("got no data rollback");
+                storelog("%s"," processor s got no data rollback");
                 res = PQexec(connection, "ROLLBACK");
                 if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    memset(error, 0, sizeof(error));
-                    snprintf(error, 1000, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                    store_log(error);
+                    storelog("%s%s", "rollback in transaction command failed in processor_s : ", PQerrorMessage(connection));
                 }
             }
         }
         else {
             PQclear(res);
-            store_log("got no tuples info rollback");
+            storelog("%s", " processor s got no tuples info rollback");
             res = PQexec(connection, "ROLLBACK");
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000, "rollback in transaction command failed in processor_s: %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "rollback in transaction command failed in processor_s : ", PQerrorMessage(connection));
             }
         }
     
@@ -187,19 +159,15 @@ int store_comms_into_database (char *blkptr)
             sprintf(mstatus, "%d", 1);
         }
         
-        memset(error, 0, sizeof(error));
-        snprintf(error, 1000, "storing comms type %d ip %d fd %d status %s",*(int *)blkptr ,cncsts->ipaddress, cncsts->fd, mstatus);
-        store_log(error);
-
+        storelog("%s%d%s%d%s%d%s%s", "storing comms type : ", *(int *)blkptr, " ip : ", cncsts->ipaddress, " fd : ", cncsts->fd, " status : ", mstatus);
+        
         const char *param_values[] = {ipaddress, fd, mstatus};
         const int paramLengths[] = {sizeof(ipaddress), sizeof(fd), sizeof(mstatus)};
         const int paramFormats[] = {0, 0, 0};
         
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            memset(error, 0, sizeof(error));
-            snprintf(error, 1000,"failed to insert senders comms %s", PQerrorMessage(connection));
-            store_log(error);
+            storelog("%s%s", "failed to insert senders comms : ", PQerrorMessage(connection));
         }
         else {
 
@@ -212,9 +180,7 @@ int store_comms_into_database (char *blkptr)
             
             res = PQexecPrepared(connection, dbs[8].statement_name, dbs[8].param_count, param_values, paramLengths, paramFormats, resultFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000, "failed to delete comms id %d errro : %s", cncsts->scommid, PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%d%s%s", "failed to delete comms id : ",  cncsts->scommid,  " errro : ", PQerrorMessage(connection));
                 status = -1;
             }
             status = 0;
@@ -230,11 +196,10 @@ int store_comms_into_database (char *blkptr)
         const char *param_values[] = {id, mstatus};
         const int paramLengths[] = {sizeof(id), sizeof(mstatus)};
         const int paramFormats[] = {0, 0};
+        
         res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            memset(error, 0, sizeof(error));
-            snprintf(error, 1000, "failed to insert senders comms %s", PQerrorMessage(connection));
-            store_log(error);     
+            storelog("%s%s", "failed to insert senders comms : ", PQerrorMessage(connection));
             status = -1;   
         }
         else {
@@ -258,9 +223,7 @@ int retrive_comms_from_database (char *blkptr)
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        memset(error, 0, sizeof(error));
-        snprintf(error, 1000, "retriving comms for sender failed %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s", "retriving comms for sender failed : ", PQerrorMessage(connection));
         return status;
     }    
    
@@ -275,9 +238,8 @@ int retrive_comms_from_database (char *blkptr)
             opncn->ipaddress = atoi(PQgetvalue(res, 0, 1)); 
             opncn->port = atoi(PQgetvalue(res, 0, 2));
             opncn->scommid = atoi(PQgetvalue(res, 0, 3));
-            memset(error, 0, sizeof(error));
-            snprintf(error, 1000, "got from db opn data port %d, ip %d, type %d, id %d", opncn->port, opncn->ipaddress, opncn->type, opncn->scommid);
-            store_log(error);
+            
+            storelog("%s%d%s%d%s%d%s%d", "got from db opn data port : ", opncn->port, " ip : ", opncn->ipaddress, "type : ", opncn->type, " id :", opncn->scommid);
 
             memcpy(scommid, PQgetvalue(res, 0, 3), PQgetlength(res, 0, 3));
             const char *param_values[] = {scommid};
@@ -288,9 +250,7 @@ int retrive_comms_from_database (char *blkptr)
             PQclear(res);
             res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, paramLengths, paramFormats, resutlFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000, "failed to update comms status %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "failed to update comms status : ", PQerrorMessage(connection));
                 status = -1;
             }
             else {
@@ -304,10 +264,8 @@ int retrive_comms_from_database (char *blkptr)
             clscn->ipaddress = atoi(PQgetvalue(res, 0, 1));
             clscn->fd = atoi(PQgetvalue(res, 0, 2));
             clscn->scommid = atoi(PQgetvalue(res, 0, 3));
-            memset(error, 0, sizeof(error));
-            snprintf(error, 1000,"fd %d, ip %d, id %d", clscn->fd, clscn->ipaddress, clscn->scommid);
-            store_log(error);
-
+            
+            storelog("%s%d%s%d%s%d", "fd : ", clscn->fd, " ip : ", clscn->ipaddress, " id : ", clscn->scommid);
 
             memcpy(scommid, PQgetvalue(res, 0, 3), PQgetlength(res, 0, 3));
             const char *param_values[] = {scommid};
@@ -318,9 +276,7 @@ int retrive_comms_from_database (char *blkptr)
             PQclear(res);
             res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, paramLengths, paramFormats, resutlFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                snprintf(error, 1000,"failed to update comms status %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "failed to update comms status : ", PQerrorMessage(connection));
                 status = -1;
             }
             else {
@@ -331,28 +287,6 @@ int retrive_comms_from_database (char *blkptr)
 
     PQclear(res);
     return status;
-}
-
-
-void store_log (char *logtext) 
-{
-
-    PGresult *res = NULL;
-    char log[1000];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, dbs[5].statement_name, dbs[5].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
 }
 
 
@@ -526,7 +460,7 @@ int main (int argc, char *argv[])
     sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 0);
 
     if (sem_lock_sigps.var == SEM_FAILED || sem_lock_sigs.var == SEM_FAILED || sem_lock_datas.var == SEM_FAILED || sem_lock_comms.var == SEM_FAILED) {
-        store_log("failed to initialize locks");
+        storelog("%s", " processor s failed to initialize locks");
         return -1;
     }
         
@@ -534,7 +468,7 @@ int main (int argc, char *argv[])
     comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)comms_block.key);
 
     if (!( datas_block.var && comms_block.var)) {
-        store_log("failed to get shared memory");
+        storelog("%s", "processor s failed to get shared memory");
         return -1; 
     }
 

@@ -8,7 +8,7 @@ int get_message_from_processor(char *);
 int get_data_from_processor(send_message *);
 int send_message_to_processor(int, void *); 
 int run_sender(); 
-void store_log(char *);
+void storelog(char * fmt, ...);
 
 typedef struct db_statements {
     char *statement_name;
@@ -23,7 +23,7 @@ int prepare_statements();
 
 db_statements dbs[statement_count] = {
     { 
-      .statement_name = "s_storelog",  
+      .statement_name = "storelog",  
       .statement = "INSERT INTO logs (log) VALUES ($1)",
       .param_count = 1
     }

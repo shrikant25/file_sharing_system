@@ -18,8 +18,6 @@
 #include "partition.h"
 #include "hashtable.h"
 
-
-char error[100];
 server_info s_info;
 PGconn *connection;
 semlocks sem_lock_datar;
@@ -35,17 +33,13 @@ int make_nonblocking (int active_fd)
     // get current flags for file descriptor
     int flags = fcntl(active_fd, F_GETFL, 0);
     if (flags == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "failed to get current flags %s, fd %d .", strerror(errno), active_fd);
-        store_log(error);
+        storelog("%s%s%s%d", "failed to get current flags : ",  strerror(errno), " fd : ", active_fd);
         return -1;
     }
 
     // set the non blocking flag
     if( fcntl(active_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "failed to set non blocking %s, fd %d .", strerror(errno), active_fd);
-        store_log(error);
+        storelog("%s%s%s%d", "failed to set non blocking : ", strerror(errno),  " fd : ", active_fd);
         return -1;
     }
     return 0;
@@ -59,7 +53,7 @@ int create_socket ()
     
     s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0); // create socket for servet
     if (s_info.servsoc_fd == -1) {
-        store_log("creating socket failed");
+        storelog("%s", "receiver creating socket failed");
         return -1;
     }
 
@@ -67,9 +61,7 @@ int create_socket ()
     // then bind to that socket
     optval = 1;
     if (setsockopt(s_info.servsoc_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "setting socket option reuseaddr failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
-        store_log(error);
+        storelog("%s%s%s%d%s%d", "setting socket option reuseaddr failed :", strerror(errno), "s_info.servsoc_fd : ", s_info.servsoc_fd,  "optval : ", optval);
         return -1;
     }
 
@@ -80,9 +72,7 @@ int create_socket ()
 
     // bind address to socketfd
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "binding address to socketfd failed %s, s_info.servsoc_fd : %d, servaddr : %d .", strerror(errno), s_info.servsoc_fd, servaddr.sin_addr);
-        store_log(error);
+        storelog("%s%s%s%d%s%d", "binding address to socketfd failed : ", strerror(errno), "s_info.servsoc_fd : ", s_info.servsoc_fd, "servaddr : ", servaddr.sin_addr);
         return -1;
     }
 
@@ -100,9 +90,7 @@ int add_to_list (int active_fd)
  
     // try to add epoll variable to epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_ADD, active_fd, &event) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "adding to epoll list failed %s, epollfd : %d, fd to be added : %d .", strerror(errno), s_info.epoll_fd, active_fd);
-        store_log(error);
+        storelog("%s%s%s%d%s%d", "adding to epoll list failed : ", strerror(errno), " epollfd : ", s_info.epoll_fd, " fd to be added : ", active_fd);
         return -1;
     }
 
@@ -120,9 +108,7 @@ int remove_from_list (int active_fd)
     
     // try to delete the file descriptor from epoll listening list
     if (epoll_ctl(s_info.epoll_fd, EPOLL_CTL_DEL, active_fd, &event) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "removing from epoll list failed %s, epollfd : %d, fd to be removed : %d .", strerror(errno), s_info.epoll_fd, active_fd);
-        store_log(error);
+        storelog("%s%s%s%d%s%d", "removing from epoll list failed : ", strerror(errno), " epollfd : ", s_info.epoll_fd, " fd to be removed : ", active_fd);
         return -1;
     }
     return 0;
@@ -148,21 +134,11 @@ int accept_connection ()
                 return 0;
             }
             else {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "error accepting connection %s, servsocfd : %d .", strerror(errno), s_info.servsoc_fd);
-                store_log(error);
+                storelog("%s%s%s%d", "error accepting connection : ",  strerror(errno), " servsocfd : ", s_info.servsoc_fd);
                 return -1;
             }
         }
         else {
-            // get this data from database and store for buffer size
-            // optval = 128 *1024;
-            // if (setsockopt(client_fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval)) < 0) {
-            //     memset(error, 0, sizeof(error));
-            //     sprintf(error, "setting socket optinon  receive buffer size failed %s, s_info.servsoc_fd : %d, optval : %d .", strerror(errno), s_info.servsoc_fd, optval);
-            //     store_log(error);
-            //     return -1;
-            // }
 
             if (make_nonblocking(client_fd) == -1) return -1;
             if (add_to_list(client_fd) == -1) {
@@ -197,9 +173,7 @@ int end_connection (int fd, struct sockaddr_in addr)
     sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
     
     if (hdel(&htable, key) < 0) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "failed to delete key from table %s", key);
-        store_log(error);
+        storelog("%s%s", "failed to delete key from table : ", key);
     }
     close(fd);
 
@@ -231,22 +205,15 @@ int run_receiver ()
         if (get_message_from_processor(&cpif) != -1) {
             
             if ((status = hput(&htable, cpif.ipaddress, cpif.capacity)) != 0) {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "failed to insert key, value in table status = %d ip = %s capacity = %d", status, cpif.ipaddress, cpif.capacity);
-                store_log(error);
+                storelog("%s%d%s%s%s%d", "failed to insert key, value in table status : ",  status ," ip : ", cpif.ipaddress,  "capacity : ", cpif.capacity);
             }
             else {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "succes inserting key %s, value %d in table", cpif.ipaddress, cpif.capacity);
-                store_log(error);   
+                storelog("%s%s%s%d%s", "succes inserting key : ",  cpif.ipaddress, " value : ",  cpif.capacity,  " in table");   
             }
         }
 
-
         if (act_events_cnt == -1) {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "epoll wait failed %s, epollfd : %d .", strerror(errno), s_info.epoll_fd);
-            store_log(error);
+            storelog("%s%s%s%d", "epoll wait failed : ", strerror(errno), " epollfd : ", s_info.epoll_fd);
             return -1;
         }
 
@@ -281,18 +248,14 @@ int run_receiver ()
                         bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, message_size-total_bytes_read);
                         if (bytes_read <= 0) {
                             
-                            memset(error, 0, sizeof(error));
-                            sprintf(error, "read failed %s %d", strerror(errno), bytes_read);
-                            store_log(error);
+                            storelog("%s%s%d", "read failed ", strerror(errno), bytes_read);
                             break;    
                         
                         }
                         else {
 
                             total_bytes_read += bytes_read;
-                            memset(error, 0, sizeof(error));
-                            sprintf(error, "total bytes read %d, byte read %d bytes", total_bytes_read, bytes_read);
-                            store_log(error);
+                            storelog("%s%d%s%d%s", "total bytes read : ", total_bytes_read, "byte read : ", bytes_read , "bytes");
                         
                             if (total_bytes_read == message_size) {
                                 
@@ -308,9 +271,7 @@ int run_receiver ()
                     }
                 }
                 else {
-                    memset(error, 0, sizeof(error));
-                    sprintf(error, "invalid size %d for fd %d ip %s", message_size, events[i].data.fd, key);
-                    store_log(error);
+                    storelog("%s%d%s%d%s%s", "invalid size : ", message_size,  " for fd : ", events[i].data.fd,  " ip : ", key);
                     if (end_connection(events[i].data.fd, addr) == -1) { return -1; }
                 }
             }
@@ -342,7 +303,7 @@ int send_to_processor (newmsg_data *nmsg)
         sem_post(sem_lock_sigr.var);
     } 
     else {
-        store_log("failed to get empty block");
+        storelog("%s", "receiver failed to get empty block");
     }
 
     sem_post(sem_lock_datar.var);
@@ -364,9 +325,9 @@ int get_message_from_processor (capacity_info *cpif)
         memset(cpif, 0, sizeof(capacity_info));
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
-        memset(error, 0, sizeof(error));
-        sprintf(error, "but why ip %s, cp %d", cpif->ipaddress, cpif->capacity);
-        store_log(error);
+        
+        storelog("%s%s%s%d", "but why ip : ", cpif->ipaddress, " cp : ", cpif->capacity);
+        
         memcpy(blkptr, &cpif, sizeof(capacity_info));
         toggle_bit(subblock_position, commr_block.var, 1);
     } 
@@ -396,33 +357,11 @@ int send_message_to_processor (receivers_message *rcvm)
         sem_post(sem_lock_sigr.var);
     }
     else {
-        store_log("failed to get empty block");
+        storelog("%s", "receiver failed to get empty block");
     }
     
     sem_post(sem_lock_commr.var);
     return subblock_position;
-}
-
-
-void store_log (char *logtext) 
-{
-
-    PGresult *res = NULL;
-    char log[100];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
 }
 
 
@@ -506,7 +445,7 @@ int main (int argc, char *argv[])
     sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
     
     if (sem_lock_sigr.var == SEM_FAILED || sem_lock_datar.var == SEM_FAILED || sem_lock_commr.var == SEM_FAILED) {
-        store_log("failed to intialize locks");
+        storelog("%s", "receiver failed to intialize locks");
         status = -1;
     }
 
@@ -517,7 +456,7 @@ int main (int argc, char *argv[])
     commr_block.var = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, commr_block.key);
     
     if (!(datar_block.var && commr_block.var)) {
-        store_log("failed to get shared memory");
+        storelog("%s", "receiver failed to get shared memory");
         return -1; 
     }    
     
@@ -528,20 +467,20 @@ int main (int argc, char *argv[])
  
     // somaxconn is defined in socket.h
     if (listen(s_info.servsoc_fd, SOMAXCONN) < 0) { // listen for incoming connections
-        store_log("failed to listen on port");
+        storelog("%s", "receiver failed to listen on port");
         return -1;
     }
  
     s_info.epoll_fd = epoll_create1(0); // create epoll instance
     if (s_info.epoll_fd == -2) {
-        store_log("failed to create epoll instance");
+        storelog("%s", "receiver failed to create epoll instance");
         return -1;
     }
 
     if (add_to_list(s_info.servsoc_fd) == -1) { return -1; } // add socket file descriptor to epoll list
     
     if (hcreate_table(&htable, 1000) != 0) {
-        store_log("failed to create fd-capacity table");
+        storelog("%s", "receiver failed to create fd-capacity table");
         return -1;
     }
 

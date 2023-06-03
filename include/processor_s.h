@@ -6,7 +6,7 @@
 int run_process();
 int communicate_with_sender();
 int give_data_to_sender();
-void store_log(char *);
+void storelog(char * fmt, ...);
 int retrive_comms_from_database(char *);
 int store_comms_into_database(char *);
 int retrive_data_from_database(char *); 
@@ -51,7 +51,7 @@ db_statements dbs[statement_count] = {
       .param_count = 1, 
     },
     {
-      .statement_name = "ps_storelogs", 
+      .statement_name = "storelog", 
       .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1,
     },

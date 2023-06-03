@@ -15,11 +15,11 @@
 
 server_info s_info;
 PGconn *connection;
-char error[100];
+
 
 void store_data_in_database(int client_socket, char *data) {
 
-    PGresult *res = NULL;
+    PGresult *res;
 
     char fd[11];
     sprintf(fd, "%d", client_socket);
@@ -31,10 +31,7 @@ void store_data_in_database(int client_socket, char *data) {
     
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "Message storing failed in initial receiver : %s", PQerrorMessage(connection));
-        syslog(LOG_NOTICE,"%s", error);
-        store_log(error);
+        storelog("%s%s", "Message storing failed in initial receiver : ", PQerrorMessage(connection));
     }
 
     PQclear(res);
@@ -50,10 +47,7 @@ void run_server() {
     socklen_t addr_len = sizeof(client_address);
 
     if ((s_info.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "intial receiver failed to create a socket for listening %s", strerror(errno));
-        syslog(LOG_NOTICE,"%s", error);
-        store_log(error);
+        storelog("%s%s", "intial receiver failed to create a socket for listening : ", strerror(errno));
         return;
     }
     
@@ -62,18 +56,12 @@ void run_server() {
     server_address.sin_addr.s_addr = htonl(s_info.ipaddress); 
 
     if (bind(s_info.servsoc_fd, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "initial receiver failed to bind %s", strerror(errno));
-        syslog(LOG_NOTICE,"%s", error);
-        store_log(error);
+        storelog("%s%s", "initial receiver failed to bind : ", strerror(errno));
         return;
     }
 
     if (listen(s_info.servsoc_fd, 100) == -1) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "initial receiver failed to listen %s", strerror(errno));
-        syslog(LOG_NOTICE,"%s", error);
-        store_log(error);
+        storelog("%s%s", "initial receiver failed to listen : ", strerror(errno));
         return;
     }  
 
@@ -95,10 +83,7 @@ void run_server() {
             } while(total_data_read < MESSAGE_SIZE && data_read > 0);
 
             if (total_data_read != MESSAGE_SIZE) {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "data receiving failure size %d fd %d", total_data_read, client_socket);
-                syslog(LOG_NOTICE,"%s", error);
-                store_log(error);
+                storelog("%s%d%s%d", "data receiving failure size : ", total_data_read, ", fd : ",client_socket);
             }
             else {
                 store_data_in_database(client_socket, data);
@@ -106,39 +91,12 @@ void run_server() {
             close(client_socket);
         }
         else {
-
-            memset(error, 0, sizeof(error));
-            sprintf(error, "inital receiver failed to accept client connection %s", strerror(errno));
-            syslog(LOG_NOTICE,"%s", error);
-            store_log(error);
-            
+            sprintf("%s%s", "inital receiver failed to accept client connection : ", strerror(errno));
         }
     }
     
     close(s_info.servsoc_fd);
     
-}
-
-
-void store_log(char *logtext) 
-{
-
-    PGresult *res = NULL;
-    char log[100];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
 }
 
 

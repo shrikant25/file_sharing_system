@@ -6,34 +6,34 @@ PSQL_INCLUDE_DIR = /usr/include/postgresql
 CFLAGS = -I$(LOCAL_INCLUDE_DIR) -I$(PSQL_INCLUDE_DIR) -lpq -g -lpthread -mcmodel=large
 
 processor_r_target = processor_r
-processor_r_files := processor_r.c shared_memory.c partition.c 
+processor_r_files := processor_r.c shared_memory.c partition.c storelog.c
 
 processor_s_target = processor_s
-processor_s_files := processor_s.c shared_memory.c partition.c 
+processor_s_files := processor_s.c shared_memory.c partition.c storelog.c
 
 notif_target = notif
-notif_files := notif.c 
+notif_files := notif.c storelog.c
 
 sender_target = sender
-sender_files := sender.c shared_memory.c partition.c 
+sender_files := sender.c shared_memory.c partition.c storelog.c 
 
 initial_receiver_target = initial_receiver
-initial_receiver_files := initial_receiver.c 
+initial_receiver_files := initial_receiver.c storelog.c
 
 initial_sender_target = initial_sender
-initial_sender_files := initial_sender.c
+initial_sender_files := initial_sender.c storelog.c
 
 receiver_target = receiver
-receiver_files := receiver.c shared_memory.c partition.c hashtable.c
+receiver_files := receiver.c shared_memory.c partition.c hashtable.c storelog.c
 
 launcher_target = launcher
-launcher_files := launcher.c
+launcher_files := launcher.c 
 
 user_program_target = user_program
 user_program_files := user_program.c
 
 job_launcher_target = job_launcher
-job_launcher_files := job_launcher.c
+job_launcher_files := job_launcher.c storelog.c
 
 launcher:
 	$(CC) $(processor_r_files) -o $(processor_r_target) $(CFLAGS)

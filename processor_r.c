@@ -24,29 +24,6 @@ semlocks sem_lock_commr;
 semlocks sem_lock_sigr;
 datablocks datar_block;
 datablocks commr_block;
-char error[1000];
-
-
-void store_log (char *logtext) 
-{
-
-    PGresult *res = NULL;
-    char log[1000];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection,  dbs[2].statement_name,  dbs[2].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
-}
 
 
 int store_data_in_database (newmsg_data *nmsg) 
@@ -66,9 +43,7 @@ int store_data_in_database (newmsg_data *nmsg)
     res = PQexecPrepared(connection, dbs[0].statement_name, 
                                     dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "%s %s", "data storing failed", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s %s", "data storing failed", PQerrorMessage(connection));
         return -1;
     }
 
@@ -99,9 +74,7 @@ int store_commr_into_database (receivers_message *rcvm)
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
    
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "comms storing failed %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s", "comms storing failed : ", PQerrorMessage(connection));
         return -1;
     }
 
@@ -173,9 +146,7 @@ int get_comms_from_database (char *blkptr)
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
    
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "retriving comms for receiver failed %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s", "retriving comms for receiver failed : ", PQerrorMessage(connection));
     }    
     else if (PQntuples(res) > 0) {
     
@@ -185,9 +156,7 @@ int get_comms_from_database (char *blkptr)
         cpif.capacity = atoi(PQgetvalue(res, 0, 1));
         memcpy(blkptr, &cpif, sizeof(capacity_info));
         
-        memset(error, 0, sizeof(error));
-        sprintf(error, "got from db ip %s, cp %d", cpif.ipaddress, cpif.capacity);
-        store_log(error);
+        storelog("%s%s%s%d", "got from db ip : ", cpif.ipaddress, " cp : ", cpif.capacity);
         
         status = 0;
     }
@@ -321,14 +290,14 @@ int main (int argc, char *argv[])
     sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
     
     if (sem_lock_sigr.var == SEM_FAILED || sem_lock_datar.var == SEM_FAILED || sem_lock_commr.var == SEM_FAILED) {
-        store_log("failed to intialize locks");
+        storelog("%s"," processor r failed to intialize locks");
         return -1;
     }
 
     datar_block.var = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, datar_block.key);
     commr_block.var = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, commr_block.key);
     if (!(datar_block.var && commr_block.var)) {
-        store_log("failed to get shared memory");
+        storelog("%s", " procsssor s failed to get shared memory");
         return -1; 
     }
 

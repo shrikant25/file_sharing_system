@@ -25,7 +25,6 @@ PGconn *connection;
 
 int create_connection(unsigned short int port_number, unsigned int ip_address) 
 {    
-    char error[100];
     int network_socket; // to hold socket file descriptor
     int connection_status; // to show wether a connection was established or not
     struct sockaddr_in server_address; // create a address structure to store the address of remote connection
@@ -151,7 +150,6 @@ int run_sender()
 {
     int data_sent;
     int total_data_sent;
-    char error[100];
     char data[CPARTITION_SIZE];
     open_connection *opncn; 
     close_connection *clscn;
@@ -165,16 +163,11 @@ int run_sender()
         if (get_message_from_processor(data) != -1) {
             
             memset(&cncsts, 0, sizeof(connection_status));
-            memset(error, 0, sizeof(error));
-            sprintf(error, "%d", *(int *)data);
-            store_log(error);
 
             if (*(int *)data == 1) {
                 
                 opncn = (open_connection *)data;
-                memset(error, 0, sizeof(error));
-                sprintf(error, "port %d ip %d", opncn->port, opncn->ipaddress);
-                store_log(error);
+                storelog("%s%d%s%d", "port : ", opncn->port, " ip : ", opncn->ipaddress);
             
                 cncsts.type = 3;
                 cncsts.fd = create_connection(opncn->port, opncn->ipaddress);
@@ -192,9 +185,8 @@ int run_sender()
                 cncsts.fd = -1;
                 cncsts.ipaddress = clscn->ipaddress;
                 cncsts.scommid = clscn->scommid;
-                memset(error, 0, sizeof(error));
-                sprintf(error, "clsing %d %d %d", cncsts.type, cncsts.fd, cncsts.ipaddress);
-                store_log(error);
+                
+                storelog("%s%d%d%d", "clsing : ", cncsts.type, cncsts.fd, cncsts.ipaddress);
                 send_message_to_processor(3, (void *)&cncsts);
             }
         }
@@ -206,9 +198,7 @@ int run_sender()
             data_sent = 0;
             total_data_sent = 0;
             
-            memset(error, 0, sizeof(error));
-            sprintf(error, " msg in sender before sending size %d \n", sndmsg.size);
-            store_log(error);
+            storelog("%s%d", " msg in sender before sending size : ", sndmsg.size);
 
             do {
 
@@ -218,39 +208,14 @@ int run_sender()
             } while (total_data_sent < sndmsg.size && data_sent != 0);
             
             msgsts.status = total_data_sent < sndmsg.size ? 0 : 1;
-            memset(error, 0, sizeof(error));
-            sprintf(error, " msg size %d total bytes sent %d\n", sndmsg.size, total_data_sent);
-            store_log(error);
-
+            storelog("%s%d%s%d", " msg size : ", sndmsg.size, " total bytes sent : ",  total_data_sent);
+    
             msgsts.type = 4;
             strncpy(msgsts.uuid, sndmsg.uuid, sizeof(sndmsg.uuid));
             send_message_to_processor(4, (void *)&msgsts);
         }
     }
 }
-
-
-void store_log(char *logtext) 
-{
-
-    PGresult *res = NULL;
-    char log[100];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count , param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
-}
-
 
 int connect_to_database(char *conninfo) 
 {   
@@ -326,7 +291,7 @@ int main(int argc, char *argv[])
     sem_lock_sigps.var = sem_open(sem_lock_sigps.key, O_CREAT, 0777, 1);
 
     if (sem_lock_sigs.var == SEM_FAILED || sem_lock_sigps.var == SEM_FAILED || sem_lock_datas.var == SEM_FAILED || sem_lock_comms.var == SEM_FAILED) {
-        store_log("not able to initialize locks");
+        storelog("%s", "sender not able to initialize locks");
         return -1;
     }
  
@@ -334,7 +299,7 @@ int main(int argc, char *argv[])
     comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, comms_block.key);
 
     if (!(datas_block.var && comms_block.var)) { 
-        store_log("not able to attach shared memory");
+        storelog("%s", "sender not able to attach shared memory");
         return -1; 
     }
 

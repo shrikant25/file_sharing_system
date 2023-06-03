@@ -22,7 +22,7 @@ typedef struct db_statements {
 
 db_statements dbs[statement_count] = {
     { 
-      .statement_name = "r_storelog",  
+      .statement_name = "storelog",  
       .statement = "INSERT INTO logs (log) VALUES ($1);",
       .param_count = 1
     }
@@ -30,7 +30,7 @@ db_statements dbs[statement_count] = {
 
 int connect_to_database();
 int prepare_statements();
-void store_log(char *logtext);
+void storelog(char * fmt, ...);
 int run_receiver();
 int accept_connection();
 int remove_from_list(int);

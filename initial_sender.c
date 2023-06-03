@@ -15,7 +15,6 @@
 #include "initial_sender.h"
 
 PGconn *connection;
-char error[1000];
 
 int read_data_from_database (server_info *servinfo) {
 
@@ -24,9 +23,7 @@ int read_data_from_database (server_info *servinfo) {
 
     res = PQexec(connection, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "BEGIN command in transaction failed in initial sender: %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s", "BEGIN command in transaction failed in initial sender : ", PQerrorMessage(connection));
     }
     else {
 
@@ -34,16 +31,12 @@ int read_data_from_database (server_info *servinfo) {
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, NULL, NULL, NULL, 0);
 
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
-            memset(error, 0, sizeof(error));
-            sprintf(error, "retriving data for intial sender failed %s", PQerrorMessage(connection));
-            store_log(error);
+            storelog("%s%s", "retriving data for intial sender failed : ", PQerrorMessage(connection));
 
             PQclear(res);
             res = PQexec(connection, "ROLLBACK");
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "ROLLBACK command in transaction failed in initial sender: %s", PQerrorMessage(connection));
-                store_log(error);
+                storelog("%s%s", "ROLLBACK command in transaction failed in initial sender : ", PQerrorMessage(connection));
             }
         }    
         else {
@@ -61,16 +54,12 @@ int read_data_from_database (server_info *servinfo) {
 
             res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
             if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
-                memset(error, 0, sizeof(error));
-                sprintf(error, "failed to get message data %s status %d error %s", servinfo->uuid, status, PQerrorMessage(connection));
-                store_log(error);
-
+                storelog("%s%s%s%d%s%s", "failed to get message data : ",  servinfo->uuid, " status : ",  status,  " error : ", PQerrorMessage(connection));
+                
                 PQclear(res);
                 res = PQexec(connection, "ROLLBACK");
                 if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    memset(error, 0, sizeof(error));
-                    sprintf(error, "ROLLBACK command in transaction failed in initial sender: %s", PQerrorMessage(connection));
-                    store_log(error);
+                    storelog("%s%s", "ROLLBACK command in transaction failed in initial sender : ", PQerrorMessage(connection));
                 }
             }
             else {
@@ -80,16 +69,12 @@ int read_data_from_database (server_info *servinfo) {
 
                 res = PQexec(connection, "COMMIT");
                 if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    memset(error, 0, sizeof(error));
-                    sprintf(error, "COMMIT command in transaction failed in initial sender: %s", PQerrorMessage(connection));
-                    store_log(error);
+                    storelog("%s%s", "COMMIT command in transaction failed in initial sender : ", PQerrorMessage(connection));
 
                     PQclear(res);
                     res = PQexec(connection, "ROLLBACK");
                     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                        memset(error, 0, sizeof(error));
-                        sprintf(error, "ROLLBACK command for transaction failed in initial sender: %s", PQerrorMessage(connection));
-                        store_log(error);
+                        storelog("%s%s", "ROLLBACK command for transaction failed in initial sender : ", PQerrorMessage(connection));
                     }
                 } 
                 else {
@@ -114,12 +99,10 @@ void update_status (char *uuid, int status) {
     const int param_lengths[] = {sizeof(status_param), strlen(uuid)};
     const int param_format[] = {0, 0};
     int result_format = 0;  
-    store_log("trying to updaet status");
+    
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, param_values, param_lengths, param_format, result_format);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "failed to update status of message %s status %d error %s", uuid, status, PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s%s%d%s%s", "failed to update status of message", uuid , " status : ",  status,  " error : ", PQerrorMessage(connection));
     }
     
     PQclear(res);
@@ -148,12 +131,8 @@ void run_server ()
             servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
             
             if (servinfo.servsoc_fd == -1) {
-            
-                memset(error, 0, sizeof(error));
-                sprintf(error, "initial sender failed to create client socket %s", strerror(errno));
-                store_log(error);
+                storelog("%s%s", "initial sender failed to create client socket : ", strerror(errno));
                 update_status(servinfo.uuid, -1);
-            
             }
             else {
             
@@ -162,12 +141,8 @@ void run_server ()
                 server.sin_addr.s_addr = htonl(servinfo.ipaddress);
                 
                 if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
-            
-                    memset(error, 0, sizeof(error));
-                    sprintf(error, "failed to connect form connection with remote host %s", strerror(errno));
-                    store_log(error);
+                    storelog("%s%s", "failed to connect form connection with remote host : ", strerror(errno));
                     update_status(servinfo.uuid, -1);
-            
                 }
                 else {
                     
@@ -194,27 +169,6 @@ void run_server ()
             }
         }
     }
-}
-
-
-void store_log (char *logtext) 
-{
-    PGresult *res = NULL;
-    char log[1000];
-    memset(log, 0, sizeof(log));
-    strncpy(log, logtext, strlen(logtext));
-
-    const char *const param_values[] = {log};
-    const int paramLengths[] = {sizeof(log)};
-    const int paramFormats[] = {0};
-    int resultFormat = 0;
-    
-    res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
-    }
-
-    PQclear(res);
 }
 
 
@@ -292,9 +246,7 @@ int main (int argc, char *argv[])
 
     res = PQexec(connection, noti_command);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        memset(error, 0, sizeof(error));
-        sprintf(error, "LISTEN command failed: %s", PQerrorMessage(connection));
-        store_log(error);
+        storelog("%s%s", "LISTEN command failed : ", PQerrorMessage(connection));
         PQclear(res);
         PQfinish(connection);
         return -1;
