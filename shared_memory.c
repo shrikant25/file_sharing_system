@@ -1,11 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/shm.h>
-#include <unistd.h>
 #include "shared_memory.h"
-#include <errno.h>
+#include "partition.h"
 
 
 int get_key(char *filename, int project_id) 

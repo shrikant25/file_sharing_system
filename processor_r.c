@@ -1,13 +1,5 @@
 #include <semaphore.h>
 #include <signal.h>
-#include <syslog.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <libpq-fe.h>
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -155,9 +147,6 @@ int get_comms_from_database (char *blkptr)
         cpif.ipaddress[sizeof(cpif.ipaddress)] = 0;
         cpif.capacity = atoi(PQgetvalue(res, 0, 1));
         memcpy(blkptr, &cpif, sizeof(capacity_info));
-        
-        storelog("%s%s%s%d", "got from db ip : ", cpif.ipaddress, " cp : ", cpif.capacity);
-        
         status = 0;
     }
 

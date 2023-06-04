@@ -1,16 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <fcntl.h>
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets
 #include <sys/types.h>  // contains various types required to create a socket   
 #include <netinet/in.h> // contains structures to store address information
 #include <arpa/inet.h>
 #include <sys/types.h>
-#include <libpq-fe.h>
+#include "partition.h"
 #include "initial_receiver.h"
 
 server_info s_info;
@@ -41,7 +34,7 @@ void store_data_in_database(int client_socket, char *data) {
 void run_server() {
     
     int client_socket, data_read, total_data_read, network_status;
-    char data[MESSAGE_SIZE+1];
+    char data[IRMESSAGE_SIZE+1];
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
     socklen_t addr_len = sizeof(client_address);
@@ -77,12 +70,12 @@ void run_server() {
 
             do {    
 
-                data_read = read(client_socket, data+total_data_read, MESSAGE_SIZE);     
+                data_read = read(client_socket, data+total_data_read, IRMESSAGE_SIZE);     
                 total_data_read += data_read;
 
-            } while(total_data_read < MESSAGE_SIZE && data_read > 0);
+            } while(total_data_read < IRMESSAGE_SIZE && data_read > 0);
 
-            if (total_data_read != MESSAGE_SIZE) {
+            if (total_data_read != IRMESSAGE_SIZE) {
                 storelog("%s%d%s%d", "data receiving failure size : ", total_data_read, ", fd : ",client_socket);
             }
             else {

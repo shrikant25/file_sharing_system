@@ -1,19 +1,14 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <libpq-fe.h>
 #include "user_program.h"
+#include "partition.h"
 
 PGconn *connection;
 
 int import_file (char *file_path) 
 {
     int fd = 0;
-    char file_name[bufsize];
+    char file_name[upbufsize];
     PGresult *res = NULL;
     
     int pathlen = strlen(file_path);
@@ -24,7 +19,7 @@ int import_file (char *file_path)
 
    // while (i > 0 && file_path[i--] != '/');
 
-    memset(file_name, 0, sizeof(bufsize));
+    memset(file_name, 0, sizeof(upbufsize));
     //strncpy(file_name, file_path+i+2, pathlen-i-1);
     strncpy(file_name, file_path, pathlen-1);
 
@@ -183,7 +178,7 @@ int update_job_priority(char *jobid, char *jobpriority)
     int len;
     PGresult *res;
     char pjobid[37];
-    char pjobpriority[bufsize];
+    char pjobpriority[upbufsize];
 
     memset(pjobid, 0, sizeof(pjobid));
     memset(pjobpriority, 0, sizeof(pjobpriority));
@@ -308,8 +303,8 @@ int get_input (char *prompt, char *buf, int bsize)
 int main (int argc, char *argv[]) 
 {
     char choice1[3];
-    char buf1[bufsize];
-    char buf2[bufsize];    
+    char buf1[upbufsize];
+    char buf2[upbufsize];    
     char db_conn_command[db_conn_command_size];
     char username[conn_param_size];
     char dbname[conn_param_size];
@@ -325,8 +320,8 @@ int main (int argc, char *argv[])
         return -1;
     }
 
-    memset(buf1, 0, bufsize);
-    if(read(conffd, buf1, bufsize) > 0){
+    memset(buf1, 0, upbufsize);
+    if(read(conffd, buf1, upbufsize) > 0){
         sscanf(buf1, "USERNAME=%s\nDBNAME=%s", username, dbname);
     }
     else {
@@ -360,22 +355,22 @@ int main (int argc, char *argv[])
                         return 0;
                         break;
     
-            case '1':   if (get_input("Enter absolute file path\n", buf1, bufsize) == -1) {
+            case '1':   if (get_input("Enter absolute file path\n", buf1, upbufsize) == -1) {
                             break;
                         }
                         import_file(buf1);
                         break;
         
-            case '2':   if (get_input("Enter file name\n", buf1, bufsize) == -1) {
+            case '2':   if (get_input("Enter file name\n", buf1, upbufsize) == -1) {
                             break;
                         }   
-                        if (get_input("Enter destination\n", buf2   , bufsize) == -1) {
+                        if (get_input("Enter destination\n", buf2   , upbufsize) == -1) {
                             break;
                         }
                         send_file (buf1, buf2);
                         break;
             
-            case '3':   if (get_input("Enter absolute file path\n", buf1, bufsize) == -1) {
+            case '3':   if (get_input("Enter absolute file path\n", buf1, upbufsize) == -1) {
                             break;
                         }
                         export_file(buf1);
@@ -387,10 +382,10 @@ int main (int argc, char *argv[])
             case '5':   show_jobs_info();
                         break; 
             
-            case '6':   if (get_input("Enter jobid id\n", buf1, bufsize) == -1) {
+            case '6':   if (get_input("Enter jobid id\n", buf1, upbufsize) == -1) {
                             break;
                         }
-                        if (get_input("Enter job priority\n", buf2, bufsize) == -1) {
+                        if (get_input("Enter job priority\n", buf2, upbufsize) == -1) {
                             break;
                         }
                         update_job_priority(buf1, buf2);

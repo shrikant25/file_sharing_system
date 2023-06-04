@@ -1,6 +1,5 @@
-#include <string.h>
 #include "partition.h"
-#include <stdio.h>
+
 
 // 1 = bitmap present at start representing TOTAL_PARTITIONS blocks 
 // 2 = bitmap present at start representing TOTAL_PARTITIONS/2 blocks

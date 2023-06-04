@@ -1,7 +1,7 @@
 #ifndef _USR_PRGM_H
 #define _USR_PRGM_H
 
-#define bufsize 260
+#define upbufsize 260
 #define db_conn_command_size 100
 #define conn_param_size 30
 
@@ -46,8 +46,8 @@ db_statements dbs[statement_count] = {
       .param_count = 2,
     }, 
     {
-      .statement_name = "get_file_info",
-      .statement = "SELECT * FROM show_file_info;",
+      .statement_name = "get_files_info",
+      .statement = "SELECT * FROM show_files_info;",
       .param_count = 0,
     }
 };

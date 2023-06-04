@@ -1,24 +1,42 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <fcntl.h>
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets
 #include <sys/types.h>  // contains various types required to create a socket   
 #include <netinet/in.h> // contains structures to store address information
 #include <sys/types.h>
-#include <libpq-fe.h>
 #include <time.h>
 #include <aio.h>
 #include "initial_sender.h"
+#include "partition.h"
 
 PGconn *connection;
 
-int read_data_from_database (server_info *servinfo) {
+void rollback() 
+{
+    PGresult *res = PQexec(connection, "ROLLBACK");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        storelog("%s%s", "ROLLBACK command for transaction failed in initial sender : ", PQerrorMessage(connection));
+    }
+    PQclear(res);
+}
 
-    int status = -1;
+
+int commit() 
+{
+    int status = 0;
+
+    PGresult *res = PQexec(connection, "COMMIT");
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        storelog("%s%s", "COMMIT for transaction command failed in initial sender : ", PQerrorMessage(connection));  
+        rollback();
+        status = -1;
+    }    
+
+    PQclear(res);
+    return status;
+}
+
+
+int read_data_from_database (server_info *servinfo) 
+{
     PGresult *res;
 
     res = PQexec(connection, "BEGIN");
@@ -29,15 +47,11 @@ int read_data_from_database (server_info *servinfo) {
 
         PQclear(res);
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, NULL, NULL, NULL, 0);
-
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
             storelog("%s%s", "retriving data for intial sender failed : ", PQerrorMessage(connection));
-
             PQclear(res);
-            res = PQexec(connection, "ROLLBACK");
-            if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                storelog("%s%s", "ROLLBACK command in transaction failed in initial sender : ", PQerrorMessage(connection));
-            }
+            rollback();
+            return -1;
         }    
         else {
 
@@ -51,42 +65,23 @@ int read_data_from_database (server_info *servinfo) {
             int result_format = 1;  
 
             PQclear(res);
-
             res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
             if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
-                storelog("%s%s%s%d%s%s", "failed to get message data : ",  servinfo->uuid, " status : ",  status,  " error : ", PQerrorMessage(connection));
-                
+                storelog("%s%s%s%s", "failed to get message data : ",  servinfo->uuid,  " error : ", PQerrorMessage(connection));
                 PQclear(res);
-                res = PQexec(connection, "ROLLBACK");
-                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    storelog("%s%s", "ROLLBACK command in transaction failed in initial sender : ", PQerrorMessage(connection));
-                }
+                rollback();
+                return -1;
             }
             else {
 
                 memcpy(servinfo->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
                 PQclear(res);
-
-                res = PQexec(connection, "COMMIT");
-                if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                    storelog("%s%s", "COMMIT command in transaction failed in initial sender : ", PQerrorMessage(connection));
-
-                    PQclear(res);
-                    res = PQexec(connection, "ROLLBACK");
-                    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-                        storelog("%s%s", "ROLLBACK command for transaction failed in initial sender : ", PQerrorMessage(connection));
-                    }
-                } 
-                else {
-                    status = 0;
-                }
+                return commit();
             }
                 
         }
     }
-
-    PQclear(res);
-    return status;
+    return -1;
 }
 
 void update_status (char *uuid, int status) {
@@ -151,12 +146,12 @@ void run_server ()
 
                     do {
                         
-                        data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, MESSAGE_SIZE, 0);
+                        data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, ISMESSAGE_SIZE, 0);
                         total_data_sent += data_sent;
                         
-                    } while (total_data_sent < MESSAGE_SIZE && data_sent > 0);
+                    } while (total_data_sent < ISMESSAGE_SIZE && data_sent > 0);
                             
-                    if (total_data_sent != MESSAGE_SIZE) {
+                    if (total_data_sent != ISMESSAGE_SIZE) {
                         
                         update_status(servinfo.uuid, -1);
                     }

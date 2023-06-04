@@ -1,11 +1,6 @@
-#include <stdio.h> 
-#include <string.h>
-#include <syslog.h>
-#include <fcntl.h>
-#include <libpq-fe.h>
-#include <unistd.h>
 #include <time.h>
 #include <aio.h>
+#include "partition.h"
 
 int epoll_fd;
 PGconn *connection;

@@ -1,12 +1,7 @@
-#include <stdio.h> 
-#include <unistd.h>
 #include <semaphore.h>
-#include <string.h>
-#include <syslog.h>
-#include <fcntl.h>
-#include <libpq-fe.h>
 #include <sys/epoll.h>
 #include "shared_memory.h"
+#include "partition.h"
 
 int dbsocket;
 int epoll_fd;

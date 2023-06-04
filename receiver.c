@@ -1,18 +1,9 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <stdint.h>
 #include <netinet/in.h>
-#include <syslog.h>
-#include <libpq-fe.h>
-#include <libpq/libpq-fs.h>
 #include "receiver.h"
 #include "shared_memory.h"
 #include "partition.h"
@@ -207,9 +198,7 @@ int run_receiver ()
             if ((status = hput(&htable, cpif.ipaddress, cpif.capacity)) != 0) {
                 storelog("%s%d%s%s%s%d", "failed to insert key, value in table status : ",  status ," ip : ", cpif.ipaddress,  "capacity : ", cpif.capacity);
             }
-            else {
-                storelog("%s%s%s%d%s", "succes inserting key : ",  cpif.ipaddress, " value : ",  cpif.capacity,  " in table");   
-            }
+          
         }
 
         if (act_events_cnt == -1) {
@@ -247,15 +236,11 @@ int run_receiver ()
 
                         bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, message_size-total_bytes_read);
                         if (bytes_read <= 0) {
-                            
-                            storelog("%s%s%d", "read failed ", strerror(errno), bytes_read);
                             break;    
-                        
                         }
                         else {
 
                             total_bytes_read += bytes_read;
-                            storelog("%s%d%s%d%s", "total bytes read : ", total_bytes_read, "byte read : ", bytes_read , "bytes");
                         
                             if (total_bytes_read == message_size) {
                                 
@@ -325,9 +310,6 @@ int get_message_from_processor (capacity_info *cpif)
         memset(cpif, 0, sizeof(capacity_info));
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
-        
-        storelog("%s%s%s%d", "but why ip : ", cpif->ipaddress, " cp : ", cpif->capacity);
-        
         memcpy(blkptr, &cpif, sizeof(capacity_info));
         toggle_bit(subblock_position, commr_block.var, 1);
     } 

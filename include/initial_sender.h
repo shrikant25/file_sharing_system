@@ -1,14 +1,14 @@
 #ifndef I_SENDER_H
 #define I_SENDER_H
 
-#define MESSAGE_SIZE 147
+#define ISMESSAGE_SIZE 147
 
 typedef struct server_info {
   unsigned int port;
   unsigned int servsoc_fd;
   unsigned long ipaddress;
   char uuid[37];
-  char data[MESSAGE_SIZE];
+  char data[ISMESSAGE_SIZE];
 } server_info;
 
 typedef struct db_statements {
@@ -50,5 +50,7 @@ void storelog(char * fmt, ...);
 int read_data_from_database (server_info * _servinfo);
 void run_server();
 void update_status(char * _uuid, int __status);
+void rollback(); 
+int commit();
 
 #endif  

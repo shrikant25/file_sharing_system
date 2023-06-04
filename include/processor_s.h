@@ -11,6 +11,8 @@ int retrive_comms_from_database(char *);
 int store_comms_into_database(char *);
 int retrive_data_from_database(char *); 
 int prepare_statements();
+void rollback(); 
+int commit();
 int connect_to_database();
 
 typedef struct db_statements {

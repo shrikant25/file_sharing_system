@@ -1,9 +1,6 @@
 #include <stdarg.h>
-#include <syslog.h>
-#include <libpq-fe.h>
-#include <string.h>
+#include <partition.h>
 
-extern PGconn *connection;
 
 void storelog (char *fmt, ...) 
 {

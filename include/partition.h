@@ -1,6 +1,15 @@
 #ifndef PARTN_H
 #define PARTN_H
 
+#include <libpq-fe.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 #define MESSAGE_SIZE (1024 * 128)
 
 // todo - increase size of partitions to accomodate some meta info
@@ -17,6 +26,8 @@
 //                            |  |                        
 // 1024 * 64 * 40 + 5
 // 1024 * 64 * 40 + 5 
+
+extern PGconn *connection; 
 
 typedef struct capacity_info {
     unsigned int capacity;

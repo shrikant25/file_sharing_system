@@ -1,16 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets
 #include <sys/types.h>  // contains various types required to create a socket   
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <netinet/in.h> // contains structures to store address information
-#include <string.h>
-#include <unistd.h>
 #include <sys/time.h>
-#include <syslog.h>
-#include <libpq-fe.h>
-#include <errno.h>
 #include "sender.h"
 #include "partition.h"
 #include "shared_memory.h"
@@ -167,7 +159,6 @@ int run_sender()
             if (*(int *)data == 1) {
                 
                 opncn = (open_connection *)data;
-                storelog("%s%d%s%d", "port : ", opncn->port, " ip : ", opncn->ipaddress);
             
                 cncsts.type = 3;
                 cncsts.fd = create_connection(opncn->port, opncn->ipaddress);
@@ -185,8 +176,7 @@ int run_sender()
                 cncsts.fd = -1;
                 cncsts.ipaddress = clscn->ipaddress;
                 cncsts.scommid = clscn->scommid;
-                
-                storelog("%s%d%d%d", "clsing : ", cncsts.type, cncsts.fd, cncsts.ipaddress);
+            
                 send_message_to_processor(3, (void *)&cncsts);
             }
         }
@@ -198,8 +188,6 @@ int run_sender()
             data_sent = 0;
             total_data_sent = 0;
             
-            storelog("%s%d", " msg in sender before sending size : ", sndmsg.size);
-
             do {
 
                 data_sent = send(sndmsg.fd, sndmsg.data+total_data_sent, sndmsg.size, 0);
@@ -208,10 +196,9 @@ int run_sender()
             } while (total_data_sent < sndmsg.size && data_sent != 0);
             
             msgsts.status = total_data_sent < sndmsg.size ? 0 : 1;
-            storelog("%s%d%s%d", " msg size : ", sndmsg.size, " total bytes sent : ",  total_data_sent);
     
             msgsts.type = 4;
-            strncpy(msgsts.uuid, sndmsg.uuid, sizeof(sndmsg.uuid));
+            memcpy(msgsts.uuid, sndmsg.uuid, sizeof(sndmsg.uuid));
             send_message_to_processor(4, (void *)&msgsts);
         }
     }
