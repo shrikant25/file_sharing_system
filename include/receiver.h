@@ -37,8 +37,8 @@ int remove_from_list(int);
 int add_to_list(int);
 int create_socket();
 int make_nonblocking(int);
-int send_to_processor(newmsg_data *);
-int send_message_to_processor(receivers_message *);
+void send_to_processor(newmsg_data *);
+void send_message_to_processor(receivers_message *);
 int get_message_from_processor (capacity_info *cpif);
 int end_connection (int fd, struct sockaddr_in addr);
 

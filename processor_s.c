@@ -68,7 +68,8 @@ int retrive_data_from_database (char *blkptr)
             
             sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
             memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
- 
+            sndmsg->uuid[36] = '\0';
+
             const char *const param_values[] = {sndmsg->uuid};
             const int paramLengths[] = {sizeof(sndmsg->uuid)};
             const int paramFormats[] = {0};
@@ -155,6 +156,8 @@ int store_comms_into_database (char *blkptr)
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             storelog("%s%s", "failed to insert senders comms : ", PQerrorMessage(connection));
+            PQclear(res);
+            return -1;
         }
         else {
 
@@ -168,9 +171,10 @@ int store_comms_into_database (char *blkptr)
             res = PQexecPrepared(connection, dbs[8].statement_name, dbs[8].param_count, param_values, paramLengths, paramFormats, resultFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 storelog("%s%d%s%s", "failed to delete comms id : ",  cncsts->scommid,  " errro : ", PQerrorMessage(connection));
-                status = -1;
+                PQclear(res);
+                return -1;
             }
-            status = 0;
+
         }
     }
     else if(*(int *)blkptr == 4) {
@@ -179,6 +183,7 @@ int store_comms_into_database (char *blkptr)
         
         sprintf(mstatus, "%hhu", msgsts->status);
         memcpy(id, msgsts->uuid, sizeof(msgsts->uuid));
+        id[36] = '\0';
         
         const char *param_values[] = {id, mstatus};
         const int paramLengths[] = {sizeof(id), sizeof(mstatus)};
@@ -187,16 +192,18 @@ int store_comms_into_database (char *blkptr)
         res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             storelog("%s%s%s%s", "failed to update message status uuid : " , id ," mstatus : ", mstatus ,PQerrorMessage(connection));
-            status = -1;   
+            PQclear(res);
+            return -1;   
         }
-        else {
-            status = 0;
-        }
+    }
+    else {
+        storelog("%s", "invalid type of message received in processors store comms into database");
+        PQclear(res);
+        return -1;
     }
 
     PQclear(res);
-
-    return status;
+    return 0;
 }
 
 
@@ -211,7 +218,8 @@ int retrive_comms_from_database (char *blkptr)
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         storelog("%s%s", "retriving comms for sender failed : ", PQerrorMessage(connection));
-        return status;
+        PQclear(res);
+        return -1;
     }    
    
     if (PQntuples(res) > 0) {
@@ -236,10 +244,8 @@ int retrive_comms_from_database (char *blkptr)
             res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, paramLengths, paramFormats, resutlFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 storelog("%s%s", "failed to update comms status : ", PQerrorMessage(connection));
-                status = -1;
-            }
-            else {
-                status = 0;
+                PQclear(res);
+                return -1;
             }
         }
         else if(type == 2) {
@@ -261,23 +267,30 @@ int retrive_comms_from_database (char *blkptr)
             res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, paramLengths, paramFormats, resutlFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
                 storelog("%s%s", "failed to update comms status : ", PQerrorMessage(connection));
-                status = -1;
+                PQclear(res);
+                return -1;
             }
-            else {
-                status = 0;
-            }
+            
         }
+        else {
+            storelog("%s", "invalid type of message received in processors retrive comms from db");
+            PQclear(res);
+            return -1;
+        }
+    } 
+    else {
+        PQclear(res);
+        return -1;
     }
-
+    
     PQclear(res);
-    return status;
+    return  0;
 }
 
 
-int give_data_to_sender () 
+void give_data_to_sender () 
 {
     int subblock_position = -1;
-    int status = 0;
     char *blkptr = NULL;
 
     sem_wait(sem_lock_datas.var);         
@@ -287,57 +300,61 @@ int give_data_to_sender ()
 
         blkptr = datas_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         memset(blkptr, 0, DPARTITION_SIZE);
-        if (retrive_data_from_database(blkptr) != -1) { 
+        
+        if (retrive_data_from_database(blkptr) == 0) { 
             toggle_bit(subblock_position, datas_block.var, 3);
             sem_post(sem_lock_sigs.var);
-            status = 1;
         }
-    
     }
 
     sem_post(sem_lock_datas.var);
-    return status;
+    
 }
 
 
-int send_msg_to_sender () 
+void send_msg_to_sender () 
 {
     int subblock_position = -1;
-    int status = 0;
     char *blkptr = NULL;
 
     sem_wait(sem_lock_comms.var);         
     subblock_position = get_subblock(comms_block.var, 0, 1);
     
     if (subblock_position >= 0) {
-
+       
         blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         memset(blkptr, 0, CPARTITION_SIZE);
-        if (retrive_comms_from_database(blkptr) != -1){
+        
+        if (retrive_comms_from_database(blkptr) == 0) {
             toggle_bit(subblock_position, comms_block.var, 1);
             sem_post(sem_lock_sigs.var);
-            status = 1;
         }
+        
     }
+    
     sem_post(sem_lock_comms.var);
-    return status;
 }
 
 
-int read_msg_from_sender () 
+void read_msg_from_sender () 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
+    int attempts = 3;
+    int status = 0;
 
     sem_wait(sem_lock_comms.var);         
     subblock_position = get_subblock(comms_block.var, 1, 2);
     
     if (subblock_position >= 0) {
 
-        blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        store_comms_into_database(blkptr);
+        do {
+            blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
+            status = store_comms_into_database(blkptr);
+            attempts -= 1;
+        } while (attempts > 0 && status == -1);
+        
         toggle_bit(subblock_position, comms_block.var, 2);
-    
     }
     sem_post(sem_lock_comms.var);   
 }

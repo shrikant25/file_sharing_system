@@ -6,7 +6,7 @@
 int create_connection(unsigned short int, unsigned int); 
 int get_message_from_processor(char *); 
 int get_data_from_processor(send_message *);
-int send_message_to_processor(int, void *); 
+void send_message_to_processor(int, void *); 
 int run_sender(); 
 void storelog(char * fmt, ...);
 

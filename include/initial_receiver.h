@@ -37,7 +37,7 @@ db_statements dbs[statement_count] = {
 int connect_to_database();
 int prepare_statements();
 void storelog(char * fmt, ...);
-void store_data_in_database(int, char *);
+int store_data_in_database(int, char *);
 
 #endif
 

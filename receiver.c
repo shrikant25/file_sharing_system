@@ -267,32 +267,32 @@ int run_receiver ()
     return 0;
 }
  
-    
-int send_to_processor (newmsg_data *nmsg)
+ 
+void send_to_processor (newmsg_data *nmsg)
 {
     int subblock_position = -1;
+    int attempts = 3;
     unsigned char *blkptr = NULL;
     
-    sem_wait(sem_lock_datar.var);         
-    subblock_position = get_subblock(datar_block.var, 0, 3);
+    sem_wait(sem_lock_datar.var);
+    do {         
+        subblock_position = get_subblock(datar_block.var, 0, 3);
 
-    if (subblock_position >= 0) {
-        
-        blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
-        
-        memset(blkptr, 0, DPARTITION_SIZE);
-        memcpy(blkptr, nmsg, sizeof(newmsg_data));
-        
-        blkptr = NULL;
-        toggle_bit(subblock_position, datar_block.var, 3);
-        sem_post(sem_lock_sigr.var);
-    } 
-    else {
-        storelog("%s", "receiver failed to get empty block");
-    }
+        if (subblock_position >= 0) {
+            
+            blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+            
+            memset(blkptr, 0, DPARTITION_SIZE);
+            memcpy(blkptr, nmsg, sizeof(newmsg_data));
+            
+            blkptr = NULL;
+            toggle_bit(subblock_position, datar_block.var, 3);
+            sem_post(sem_lock_sigr.var);
+        } 
+        attempts -= 1;
+    } while (attempts > 0 && subblock_position == -1);    
 
     sem_post(sem_lock_datar.var);
-    return subblock_position;
 }
 
 
@@ -319,32 +319,32 @@ int get_message_from_processor (capacity_info *cpif)
 }
 
 
-int send_message_to_processor (receivers_message *rcvm)
+void send_message_to_processor (receivers_message *rcvm)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
     char msg_type;
+    int attempts = 3;
     
     sem_wait(sem_lock_commr.var);         
-    subblock_position = get_subblock(commr_block.var, 0, 2);
-    
-    if (subblock_position >= 0) {
-
-        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+    do {
+        subblock_position = get_subblock(commr_block.var, 0, 2);
         
-        memset(blkptr, 0, CPARTITION_SIZE);
-        memcpy(blkptr, rcvm, sizeof(receivers_message));
+        if (subblock_position >= 0) {
 
-        toggle_bit(subblock_position, commr_block.var, 2);
-        sem_post(sem_lock_sigr.var);
-    }
-    else {
-        storelog("%s", "receiver failed to get empty block");
-    }
-    
+            blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+            
+            memset(blkptr, 0, CPARTITION_SIZE);
+            memcpy(blkptr, rcvm, sizeof(receivers_message));
+
+            toggle_bit(subblock_position, commr_block.var, 2);
+            sem_post(sem_lock_sigr.var);
+        }
+
+        attempts -= 1;  
+    } while (attempts > 0 && subblock_position == -1);  
     sem_post(sem_lock_commr.var);
-    return subblock_position;
-}
+  }
 
 
 int connect_to_database (char *conninfo) 

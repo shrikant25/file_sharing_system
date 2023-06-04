@@ -9,8 +9,7 @@
 server_info s_info;
 PGconn *connection;
 
-
-void store_data_in_database(int client_socket, char *data) {
+int store_data_in_database(int client_socket, char *data) {
 
     PGresult *res;
 
@@ -25,9 +24,12 @@ void store_data_in_database(int client_socket, char *data) {
     res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s", "Message storing failed in initial receiver : ", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
     }
 
     PQclear(res);
+    return 0;
 }
 
 
@@ -35,6 +37,8 @@ void run_server() {
     
     int client_socket, data_read, total_data_read, network_status;
     char data[IRMESSAGE_SIZE+1];
+    int attempts = 3;
+    int status = 0;
     struct sockaddr_in server_address; 
     struct sockaddr_in client_address;
     socklen_t addr_len = sizeof(client_address);
@@ -79,7 +83,11 @@ void run_server() {
                 storelog("%s%d%s%d", "data receiving failure size : ", total_data_read, ", fd : ",client_socket);
             }
             else {
-                store_data_in_database(client_socket, data);
+                attempts = 3;
+                do {
+                    status = store_data_in_database(client_socket, data);
+                    attempts -= 1;
+                } while (attempts > 0 && status == -1);
             }
             close(client_socket);
         }

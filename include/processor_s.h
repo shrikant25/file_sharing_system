@@ -4,8 +4,9 @@
 #include "partition.h"
 
 int run_process();
-int communicate_with_sender();
-int give_data_to_sender();
+void give_data_to_sender();
+void send_msg_to_sender ();
+void read_msg_from_sender();
 void storelog(char * fmt, ...);
 int retrive_comms_from_database(char *);
 int store_comms_into_database(char *);

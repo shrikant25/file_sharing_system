@@ -109,32 +109,35 @@ int get_data_from_processor(send_message *sndmsg)
     return subblock_position;
 }
 
-
-int send_message_to_processor(int type, void *msg) 
+void send_message_to_processor(int type, void *msg) 
 {
     int subblock_position = -1;
+    int attempts = 0;
     char *blkptr = NULL;
 
-    sem_wait(sem_lock_comms.var);         
-    subblock_position = get_subblock(comms_block.var, 0, 2);
-    
-    if(subblock_position >= 0) {
+    sem_wait(sem_lock_comms.var);
+    do {         
+        subblock_position = get_subblock(comms_block.var, 0, 2);
+        
+        if (subblock_position >= 0) {
 
-        blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
-        memset(blkptr, 0, CPARTITION_SIZE);
+            blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
+            memset(blkptr, 0, CPARTITION_SIZE);
 
-        if (type == 3) {
-            memcpy(blkptr, (connection_status *)msg, sizeof(open_connection));
+            if (type == 3) {
+                memcpy(blkptr, (connection_status *)msg, sizeof(open_connection));
+            }
+            else if(type == 4) {
+                memcpy(blkptr, (message_status *)msg, sizeof(message_status));
+            }
+            toggle_bit(subblock_position, comms_block.var, 2);
+            sem_post(sem_lock_sigps.var);
         }
-        else if(type == 4) {
-            memcpy(blkptr, (message_status *)msg, sizeof(message_status));
-        }
-        toggle_bit(subblock_position, comms_block.var, 2);
-        sem_post(sem_lock_sigps.var);
-    }
+        attempts -= 1;
+    } while(attempts > 0 && subblock_position == -1);
 
     sem_post(sem_lock_comms.var);
-    return subblock_position;
+    
 }
 
 
@@ -199,6 +202,8 @@ int run_sender()
     
             msgsts.type = 4;
             memcpy(msgsts.uuid, sndmsg.uuid, sizeof(sndmsg.uuid));
+            msgsts.uuid[36] = '\0';
+           
             send_message_to_processor(4, (void *)&msgsts);
         }
     }

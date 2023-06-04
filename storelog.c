@@ -23,26 +23,26 @@ void storelog (char *fmt, ...)
                     memset(temp, 0, sizeof(temp));
                     c = (char )va_arg(args, int);
                     snprintf(temp, sizeof(c),"%c", c);
-                    strncat(log, temp, strlen(temp));
+                    strncat(log, temp, sizeof(temp));
                     break;
             
             case 's':
                     s = va_arg(args, char *);
-                    strncat(log, s, strlen(s));
+                    strncat(log, s, sizeof(temp));
                     break;
             
             case 'd':
                     memset(temp, 0, sizeof(temp));
                     d = va_arg(args, int);
                     snprintf(temp, sizeof(temp),"%d", d);
-                    strncat(log, temp, strlen(temp));
+                    strncat(log, temp, sizeof(temp));
                     break;
 
             case 'f':
                     memset(temp, 0, sizeof(temp));
                     f = va_arg(args, double);
                     snprintf(temp, sizeof(temp),"%lf", f);
-                    strncat(log, temp, strlen(temp));
+                    strncat(log, temp, sizeof(temp));
                     break;
             default:
                 break;

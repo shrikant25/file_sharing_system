@@ -20,7 +20,7 @@ datablocks commr_block;
 
 int store_data_in_database (newmsg_data *nmsg) 
 {
-    PGresult *res = NULL;
+    PGresult *res;
     
     char fd[11];
 
@@ -36,6 +36,7 @@ int store_data_in_database (newmsg_data *nmsg)
                                     dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s %s", "data storing failed", PQerrorMessage(connection));
+        PQclear(res);
         return -1;
     }
 
@@ -47,7 +48,7 @@ int store_data_in_database (newmsg_data *nmsg)
 
 int store_commr_into_database (receivers_message *rcvm) 
 {
-    PGresult *res = NULL;
+    PGresult *res;
 
     char fd[11];
     char ipaddr[11];
@@ -67,6 +68,7 @@ int store_commr_into_database (receivers_message *rcvm)
    
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s", "comms storing failed : ", PQerrorMessage(connection));
+        PQclear(res);
         return -1;
     }
 
@@ -76,38 +78,39 @@ int store_commr_into_database (receivers_message *rcvm)
 }
 
 
-int get_data_from_receiver () 
+void get_data_from_receiver () 
 {
     int subblock_position = -1;
     unsigned char *blkptr = NULL;
     newmsg_data nmsg;
+    int status = 0;
+    int attempts = 3;
 
     sem_wait(sem_lock_datar.var);         
     subblock_position = get_subblock(datar_block.var, 1, 3);
     
     if (subblock_position >= 0) {
 
-        blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+        do {
+            blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
+            memset(&nmsg, 0, sizeof(nmsg));
+            memcpy(&nmsg, blkptr, sizeof(nmsg));
+            status = store_data_in_database(&nmsg);
+            attempts -= 1;
+        } while (attempts > 0 && status == -1);
         
-        memset(&nmsg, 0, sizeof(nmsg));
-        memcpy(&nmsg, blkptr, sizeof(nmsg));
-
-        store_data_in_database(&nmsg);
-
-        blkptr = NULL;
         toggle_bit(subblock_position, datar_block.var, 3);
-    
     }
-
     sem_post(sem_lock_datar.var);
-    return subblock_position;
 }
 
 
-int get_message_from_receiver () 
+void get_message_from_receiver () 
 {
     int subblock_position = -1;
     char *blkptr = NULL;
+    int status = 0;
+    int attempts = 3;
     receivers_message rcvm;
 
     sem_wait(sem_lock_commr.var);         
@@ -115,30 +118,32 @@ int get_message_from_receiver ()
     
     if (subblock_position >= 0) {
 
-        blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
-        
-        memset(&rcvm, 0, sizeof(rcvm));
-        memcpy(&rcvm, blkptr, sizeof(rcvm));
-        store_commr_into_database(&rcvm);
+        do {
+            blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
+            memset(&rcvm, 0, sizeof(rcvm));
+            memcpy(&rcvm, blkptr, sizeof(rcvm));
+            status = store_commr_into_database(&rcvm);
+            attempts -= 1;
+        } while (attempts > 0 && status == -1);
+            
         toggle_bit(subblock_position, commr_block.var, 2);
-    
     }
-
     sem_post(sem_lock_commr.var);
-    return subblock_position;
+
 }
 
 
 int get_comms_from_database (char *blkptr) 
 {
-    PGresult *res = NULL;
+    PGresult *res;
     capacity_info cpif;
-    int status = -1;
     
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
    
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
         storelog("%s%s", "retriving comms for receiver failed : ", PQerrorMessage(connection));
+        PQclear(res);
+        return -1;
     }    
     else if (PQntuples(res) > 0) {
     
@@ -147,15 +152,16 @@ int get_comms_from_database (char *blkptr)
         cpif.ipaddress[sizeof(cpif.ipaddress)] = 0;
         cpif.capacity = atoi(PQgetvalue(res, 0, 1));
         memcpy(blkptr, &cpif, sizeof(capacity_info));
-        status = 0;
+        PQclear(res);
+        return 0;
     }
 
     PQclear(res);
-    return status;
+    return -1;
 }
 
 
-int send_msg_to_receiver () 
+void send_msg_to_receiver () 
 {
     int subblock_position;
     char *blkptr = NULL;
@@ -167,21 +173,18 @@ int send_msg_to_receiver ()
 
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
         memset(blkptr, 0, CPARTITION_SIZE);
-        if (get_comms_from_database(blkptr) != -1) {
+   
+        if (get_comms_from_database(blkptr) == 0) {
             toggle_bit(subblock_position, commr_block.var, 1);
         }
-    }
+    }   
 
     sem_post(sem_lock_commr.var);
-    return subblock_position;
 } 
 
 
 int run_process () 
 {   
-    int iswork;
-    char data[CPARTITION_SIZE];
-
     const struct timespec tm = {
         0,
         100000000L
