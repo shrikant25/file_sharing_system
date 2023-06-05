@@ -22,7 +22,7 @@
 #define TOTAL_PARTITIONS 80 // alway keep it in multiples of 
 #define DPARTITION_SIZE (MESSAGE_SIZE + 46)
 #define DATA_BLOCK_SIZE (DPARTITION_SIZE * TOTAL_PARTITIONS + 10)
-#define CPARTITION_SIZE 20
+#define CPARTITION_SIZE 50
 #define COMM_BLOCK_SIZE (CPARTITION_SIZE * TOTAL_PARTITIONS + 10)
 
 // (1024 * 128 + 4) * 80 + 10
@@ -83,7 +83,7 @@ typedef struct send_message {
 typedef struct message_status {
     int type;
     int status;
-    unsigned char uuid[37];
+    char uuid[37];
 }message_status;
 
 typedef struct semlocks {
