@@ -9,7 +9,7 @@ DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_comms()
 UNLISTEN noti_1sender;
 UNLISTEN noti_1receiver;
 UNLISTEN noti_1initialsender;
-UNLISTEN noti_jobs;
+
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
                             jobdata bytea NOT NULL,
@@ -652,9 +652,7 @@ BEGIN
     AND sc.scstatus = 2
     ON CONFLICT ON CONSTRAINT pk_senders_comms 
     DO NOTHING;
-
-    PERFORM pg_notify('noti_jobs', gen_random_uuid()::TEXT);
-
+   
     RETURN;
 
 END;
