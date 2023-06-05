@@ -3,8 +3,10 @@
 
 #include <sys/socket.h> // contains important fucntionality and api used to create sockets   
 #include <netinet/in.h> // contains structures to store address information
+#include <sys/time.h>
 #include "partition.h"
 #include "shared_memory.h"
+
 
 int create_connection(unsigned short int, unsigned int); 
 int get_message_from_processor(char *); 

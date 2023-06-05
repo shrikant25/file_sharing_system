@@ -8,6 +8,12 @@ datablocks datas_block;
 datablocks comms_block;
 PGconn *connection;
 
+const struct timespec tm = {
+    .tv_sec = 1,
+    .tv_nsec = 0L,
+};
+
+
 int create_connection(unsigned short int port_number, unsigned int ip_address) 
 {    
     int network_socket; // to hold socket file descriptor
@@ -127,6 +133,11 @@ void send_message_to_processor(int type, void *msg)
             sem_post(sem_lock_sigps.var);
         }
         attempts -= 1;
+        
+        if (attempts > 0 && subblock_position == -1) {
+            nanosleep(&tm, NULL);
+        }
+
     } while(attempts > 0 && subblock_position == -1);
 
     sem_post(sem_lock_comms.var);

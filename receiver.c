@@ -9,6 +9,10 @@ datablocks datar_block;
 datablocks commr_block;
 hashtable htable;
 
+const struct timespec tm = {
+    .tv_sec = 1,
+    .tv_nsec = 0L,
+};
 
 int make_nonblocking (int active_fd) 
 {
@@ -280,7 +284,12 @@ void send_to_processor (newmsg_data *nmsg)
             toggle_bit(subblock_position, datar_block.var, 3);
             sem_post(sem_lock_sigr.var);
         } 
+        
         attempts -= 1;
+        if (attempts > 0 && subblock_position == -1) {
+            nanosleep(&tm, NULL);
+        }
+
     } while (attempts > 0 && subblock_position == -1);    
 
     sem_post(sem_lock_datar.var);
@@ -332,7 +341,11 @@ void send_message_to_processor (receivers_message *rcvm)
             sem_post(sem_lock_sigr.var);
         }
 
-        attempts -= 1;  
+        attempts -= 1;
+        if (attempts > 0 && subblock_position == -1) {
+            nanosleep(&tm, NULL);
+        }  
+        
     } while (attempts > 0 && subblock_position == -1);  
     sem_post(sem_lock_commr.var);
   }

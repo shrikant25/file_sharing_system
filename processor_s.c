@@ -8,6 +8,12 @@ datablocks datas_block;
 datablocks comms_block;
 PGconn *connection;
 
+const struct timespec tm = {
+    .tv_sec = 1,
+    .tv_nsec = 0L,
+};
+
+
 void rollback() 
 {
     PGresult *res = PQexec(connection, "ROLLBACK");
@@ -184,7 +190,7 @@ int store_comms_into_database (char *blkptr)
         
         res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            storelog("%s%s%s%s", "failed to update message status uuid : " , id ," mstatus : ", mstatus ,PQerrorMessage(connection));
+            storelog("%s%s%s%s%s", "failed to update message status uuid : " , id ," mstatus : ", mstatus ,PQerrorMessage(connection));
             PQclear(res);
             return -1;   
         }
@@ -345,6 +351,11 @@ void read_msg_from_sender ()
             blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position*CPARTITION_SIZE;
             status = store_comms_into_database(blkptr);
             attempts -= 1;
+             
+            if (attempts > 0 && status == -1) {
+                nanosleep(&tm, NULL);
+            }
+
         } while (attempts > 0 && status == -1);
         
         toggle_bit(subblock_position, comms_block.var, 2);

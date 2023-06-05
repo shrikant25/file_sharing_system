@@ -13,6 +13,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <time.h>
+#include <aio.h>
 
 #define MESSAGE_SIZE (1024 * 128)
 

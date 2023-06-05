@@ -7,6 +7,10 @@ semlocks sem_lock_sigr;
 datablocks datar_block;
 datablocks commr_block;
 
+const struct timespec tm = {
+    .tv_sec = 1,
+    .tv_nsec = 0L,
+};
 
 int store_data_in_database (newmsg_data *nmsg) 
 {
@@ -87,6 +91,10 @@ void get_data_from_receiver ()
             memcpy(&nmsg, blkptr, sizeof(nmsg));
             status = store_data_in_database(&nmsg);
             attempts -= 1;
+
+            if (attempts > 0 && status == -1) {
+                nanosleep(&tm, NULL);
+            }
         } while (attempts > 0 && status == -1);
         
         toggle_bit(subblock_position, datar_block.var, 3);
@@ -114,6 +122,11 @@ void get_message_from_receiver ()
             memcpy(&rcvm, blkptr, sizeof(rcvm));
             status = store_commr_into_database(&rcvm);
             attempts -= 1;
+            
+            if (attempts > 0 && status == -1) {
+                nanosleep(&tm, NULL);
+            }
+            
         } while (attempts > 0 && status == -1);
             
         toggle_bit(subblock_position, commr_block.var, 2);
