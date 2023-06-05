@@ -2,6 +2,7 @@
 #define PROCESSOR_S_H
 
 #include "partition.h"
+#include "shared_memory.h"
 
 int run_process();
 void give_data_to_sender();

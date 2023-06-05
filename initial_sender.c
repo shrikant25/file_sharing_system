@@ -2,12 +2,12 @@
 #include <sys/types.h>  // contains various types required to create a socket   
 #include <netinet/in.h> // contains structures to store address information
 #include <sys/types.h>
-#include <time.h>
-#include <aio.h>
+#include <semaphore.h>
 #include "initial_sender.h"
 #include "partition.h"
 
 PGconn *connection;
+semlocks sem_lock_isender;
 
 void rollback() 
 {
@@ -84,6 +84,7 @@ int read_data_from_database (server_info *servinfo)
     return -1;
 }
 
+
 void update_status (char *uuid, int status) {
 
     PGresult *res;
@@ -103,6 +104,7 @@ void update_status (char *uuid, int status) {
     PQclear(res);
 }
 
+
 void run_server () 
 {
     
@@ -111,14 +113,9 @@ void run_server ()
     struct sockaddr_in server;
     server_info servinfo;
     
-    const struct timespec tm = {
-        0,
-        100000000L
-    };
-
     while (1) {
         
-        nanosleep(&tm, NULL);
+        sem_wait(sem_lock_isender.var);
             
         memset(&servinfo, 0, sizeof(servinfo)); 
         if (read_data_from_database(&servinfo) != -1) {
@@ -183,7 +180,7 @@ int prepare_statements ()
 {    
     int i, status = 0;
 
-    for (i = 0; i<statement_count; i++){
+    for (i = 0; i<statement_count; i++) {
 
         PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -223,8 +220,12 @@ int main (int argc, char *argv[])
     }
 
     memset(buf, 0, sizeof(buf));
+    memset(username, 0, sizeof(username));
+    memset(dbname, 0, sizeof(dbname));
+    memset(&sem_lock_isender, 0, sizeof(semlocks));
+
     if (read(conffd, buf, sizeof(buf)) > 0) {
-        sscanf(buf, "USERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s", username, dbname, noti_channel);
+        sscanf(buf, "USERNAME=%s\nDBNAME=%s\nSEM_LOCK_ISENDER=%s", username, dbname, sem_lock_isender.key);
     }
     else {
         syslog(LOG_NOTICE, "failed to read configuration file");
@@ -233,22 +234,21 @@ int main (int argc, char *argv[])
 
     close(conffd);
 
-    sprintf(noti_command, "LISTEN %s", noti_channel);
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }     
 
-    res = PQexec(connection, noti_command);
-    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-        storelog("%s%s", "LISTEN command failed : ", PQerrorMessage(connection));
-        PQclear(res);
-        PQfinish(connection);
-        return -1;
+    sem_lock_isender.var = sem_open(sem_lock_isender.key, O_CREAT, 0777, 0);
+    
+    if (sem_lock_isender.var == SEM_FAILED) {
+        storelog("%s", "initial sender failed to intialize locks");
+        status = -1;
     }
-    PQclear(res); 
 
     run_server();
+
+    sem_close(sem_lock_isender.var); // unlink lock used for communication
     PQfinish(connection);
 
     return 0;

@@ -1,11 +1,4 @@
-#include <sys/socket.h> // contains important fucntionality and api used to create sockets
-#include <sys/types.h>  // contains various types required to create a socket   
-#include <sys/stat.h>
-#include <netinet/in.h> // contains structures to store address information
-#include <sys/time.h>
 #include "sender.h"
-#include "partition.h"
-#include "shared_memory.h"
 
 semlocks sem_lock_datas;
 semlocks sem_lock_comms;

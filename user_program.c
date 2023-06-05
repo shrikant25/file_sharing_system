@@ -1,7 +1,4 @@
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "user_program.h"
-#include "partition.h"
 
 PGconn *connection;
 

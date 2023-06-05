@@ -1,8 +1,5 @@
-#include <sys/types.h>
-#include <sys/shm.h>
 #include "shared_memory.h"
 #include "partition.h"
-
 
 int get_key(char *filename, int project_id) 
 {

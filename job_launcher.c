@@ -2,7 +2,6 @@
 #include <aio.h>
 #include "partition.h"
 
-int epoll_fd;
 PGconn *connection;
 
 void storelog(char * fmt, ...);
@@ -48,6 +47,15 @@ int initnotif(char *confg_filename)
         return -1;
     }
 
+    res = PQprepare(connection, "store_log", "INSERT INTO logs (log) VALUES ($1);", 1, NULL);
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
+        PQclear(res);
+        PQfinish(connection);
+        return -1;
+    }
+    PQclear(res);
+
     res = PQprepare(connection, "run_jobs", func_command, 0, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s", "preparation of statement run jobs failed : ", PQerrorMessage(connection));
@@ -61,27 +69,17 @@ int initnotif(char *confg_filename)
     return 0;
 }
 
-void do_run_jobs() {
-
-    PGresult *res;
-    res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
-    if (PQresultStatus(res) != PGRES_TUPLES_OK){
-        storelog("%s%s", "failed to run jobs function : ", PQerrorMessage(connection));
-    }
-    PQclear(res);
-}
-
 
 int main(int argc, char *argv[]) 
 {
     int num_events = 0;
-    int turn = 0;
+    int hasfailed = 0;
     PGnotify *notify;
-
-    const struct timespec tm = {
-        3, 
-        0L
-    };
+    PGresult *res;
+    struct timespec tm;
+    
+    tm.tv_sec = 5;
+    tm.tv_sec = 0L;
 
     if (argc != 2) {
         syslog(LOG_NOTICE, "invlaid arguments");
@@ -90,8 +88,17 @@ int main(int argc, char *argv[])
     if(initnotif(argv[1]) == -1) {return -1;}
     
     while (1) {
-        nanosleep(&tm, NULL);
-        do_run_jobs();         
+
+        hasfailed = 0;
+        nanosleep((const struct timespec *)&tm, NULL);
+        
+        res = PQexecPrepared(connection, "run_jobs", 0, NULL, NULL, NULL, 0);
+        if (PQresultStatus(res) != PGRES_TUPLES_OK){
+            hasfailed = 1;
+        }
+        PQclear(res);        
+
+        tm.tv_sec = hasfailed ? 10 : 5; 
     }
     
     PQfinish(connection);

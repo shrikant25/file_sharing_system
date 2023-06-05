@@ -1,13 +1,4 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <sys/epoll.h>
-#include <stdint.h>
-#include <netinet/in.h>
 #include "receiver.h"
-#include "shared_memory.h"
-#include "partition.h"
-#include "hashtable.h"
 
 server_info s_info;
 PGconn *connection;

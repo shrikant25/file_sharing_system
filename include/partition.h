@@ -9,6 +9,10 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <semaphore.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/shm.h>
 
 #define MESSAGE_SIZE (1024 * 128)
 
@@ -79,6 +83,11 @@ typedef struct message_status {
     int status;
     unsigned char uuid[37];
 }message_status;
+
+typedef struct semlocks {
+  char key[20];
+  sem_t *var;
+}semlocks;
 
 
 int get_subblock(char *, int, int);

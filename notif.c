@@ -1,11 +1,9 @@
-#include <semaphore.h>
 #include <sys/epoll.h>
 #include "shared_memory.h"
 #include "partition.h"
 
 int dbsocket;
 int epoll_fd;
-char error[100];
 char noti_channel[30];
 struct epoll_event event;
 PGconn *connection;
@@ -14,7 +12,6 @@ void storelog(char * fmt, ...);
 
 int initnotif(char *confg_filename) 
 {
-    
     int conffd = -1;
     char buf[500];
     char username[30];
@@ -28,7 +25,6 @@ int initnotif(char *confg_filename)
         return -1;
     }
 
-    memset(error, 0, sizeof(error));
     memset(buf, 0, sizeof(buf));
     memset(noti_channel, 0 , sizeof(noti_channel));
     memset(db_conn_command, 0, sizeof(db_conn_command));

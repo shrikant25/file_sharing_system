@@ -1,13 +1,3 @@
-#include <semaphore.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/shm.h>
-#include <aio.h>
-#include <time.h>
-#include "shared_memory.h"
-#include "partition.h"
 #include "processor_r.h"
 
 PGconn *connection;
@@ -185,19 +175,11 @@ void send_msg_to_receiver ()
 
 int run_process () 
 {   
-    const struct timespec tm = {
-        0,
-        100000000L
-    };
-
     while (1) {
-
-        sem_timedwait(sem_lock_sigr.var, &tm);
-        
+        sem_wait(sem_lock_sigr.var);    
         get_message_from_receiver();
         get_data_from_receiver();     
         send_msg_to_receiver();
-               
     }  
 }
 

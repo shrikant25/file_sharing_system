@@ -4,9 +4,11 @@ DROP VIEW IF EXISTS show_files_info;
 DROP TRIGGER IF EXISTS create_msg_receiver ON sysinfo;
 DROP TABLE IF EXISTS logs, receivers_comms, receiving_conns, job_scheduler, sysinfo, 
                         senders_comms, sending_conns, files, selfinfo;
-DROP FUNCTION IF EXISTS send_noti2(), create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
+DROP FUNCTION IF EXISTS send_noti1(), send_noti2(), send_noti3(), create_comms(), run_jobs(), create_message(bytea, text, bytea, bytea, text, text, text, int);
 
-UNLISTEN noti_1initial;
+UNLISTEN noti_1sender;
+UNLISTEN noti_1receiver;
+UNLISTEN noti_1initialsender;
 UNLISTEN noti_jobs;
 
 CREATE TABLE job_scheduler (jobid UUID PRIMARY KEY, 
@@ -199,7 +201,7 @@ CREATE OR REPLACE FUNCTION send_noti2()
 RETURNS TRIGGER AS 
 $$
 BEGIN
-    PERFORM pg_notify('noti_1initial', gen_random_uuid()::TEXT);
+    PERFORM pg_notify('noti_1initialsender', gen_random_uuid()::TEXT);
     RETURN NEW;
 END;
 $$
@@ -218,6 +220,57 @@ EXECUTE FUNCTION
     send_noti2();
 
 
+CREATE OR REPLACE FUNCTION send_noti1()
+RETURNS TRIGGER AS 
+$$
+BEGIN
+    PERFORM pg_notify('noti_1sender', gen_random_uuid()::TEXT);
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE TRIGGER 
+    msg_for_sender1
+AFTER UPDATE OR INSERT ON 
+    job_scheduler
+FOR EACH ROW 
+WHEN 
+    (NEW.jstate = 'S-4')
+EXECUTE FUNCTION 
+    send_noti1();
+
+
+CREATE TRIGGER 
+    msg_for_sender2
+AFTER INSERT ON 
+    senders_comms
+FOR EACH ROW 
+WHEN 
+    (NEW.mtype in ('1','2'))
+EXECUTE FUNCTION 
+    send_noti1();
+
+
+CREATE OR REPLACE FUNCTION send_noti3()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    PERFORM pg_notify('noti_1receiver', gen_random_uuid()::TEXT);
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE TRIGGER
+    msg_for_receiver
+AFTER INSERT ON
+    receivers_comms
+FOR EACH ROW 
+EXECUTE FUNCTION
+    send_noti3();
 
 
 CREATE OR REPLACE FUNCTION run_jobs ()
@@ -600,7 +653,7 @@ BEGIN
     ON CONFLICT ON CONSTRAINT pk_senders_comms 
     DO NOTHING;
 
-    PERFORM pg_notify('noti_jobs', 'get_data');
+    PERFORM pg_notify('noti_jobs', gen_random_uuid()::TEXT);
 
     RETURN;
 

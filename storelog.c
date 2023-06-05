@@ -1,6 +1,5 @@
 #include <stdarg.h>
-#include <partition.h>
-
+#include "partition.h"
 
 void storelog (char *fmt, ...) 
 {

@@ -1,7 +1,14 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/epoll.h>
+#include <stdint.h>
+#include <netinet/in.h>
 #include "partition.h"
+#include "shared_memory.h"
+#include "hashtable.h"
 
 typedef struct server_info{
     unsigned short int port;

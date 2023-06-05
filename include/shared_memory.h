@@ -8,12 +8,6 @@ typedef struct datablocks {
     char *var;
 }datablocks;
 
-
-typedef struct semlocks {
-  char key[20];
-  sem_t *var;
-}semlocks;
-
 #define FILENAME_R "processor_r"
 #define FILENAME_S "processor_s"
 

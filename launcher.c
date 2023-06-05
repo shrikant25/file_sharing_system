@@ -2,7 +2,7 @@
 #include <sys/wait.h>
 #include "partition.h"
 
-#define TOTAL_PROCESSES 7
+#define TOTAL_PROCESSES 10
 
 struct launch_processes
 {
@@ -13,7 +13,7 @@ struct launch_processes
 
 int main(int argc, char *argv[]) {
 	
-    if (argc != 6) {
+    if (argc != 9) {
         syslog(LOG_NOTICE, "invalid arguments");
         return -1;
     }
@@ -60,7 +60,25 @@ int main(int argc, char *argv[]) {
             .args[0] = "job_launcher",
             .args[1] = argv[5],
             .args[2] = NULL,
-        }
+        },
+        {
+            .path = "./notif",
+            .args[0] = "notif",
+            .args[1] = argv[6],
+            .args[2] = NULL,
+        }, 
+        {
+            .path = "./notif",
+            .args[0] = "notif",
+            .args[1] = argv[7],
+            .args[2] = NULL,
+        }, 
+        {
+            .path = "./notif",
+            .args[0] = "notif",
+            .args[1] = argv[8],
+            .args[2] = NULL,
+        }, 
     };
     
     pid_t pid = -1;

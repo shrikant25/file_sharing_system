@@ -2,7 +2,7 @@
 #include <syslog.h>
 #include <string.h>
 #include <errno.h>
-#include "./include/hashtable.h"
+#include "hashtable.h"
 
 int hget_hash (hashtable *htable, char *key) {
 

@@ -2,6 +2,7 @@
 #define PROCESSOR_R_H
 
 #include "partition.h"
+#include "shared_memory.h"
 
 void storelog(char * fmt, ...);
 int run_process ();

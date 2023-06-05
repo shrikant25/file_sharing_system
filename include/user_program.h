@@ -1,6 +1,8 @@
 #ifndef _USR_PRGM_H
 #define _USR_PRGM_H
 
+#include "partition.h"
+
 #define upbufsize 260
 #define db_conn_command_size 100
 #define conn_param_size 30

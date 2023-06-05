@@ -1,10 +1,3 @@
-
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <aio.h>
-#include <time.h>
-#include <sys/shm.h>
-#include "shared_memory.h"
 #include "processor_s.h"
 
 semlocks sem_lock_datas;
@@ -362,19 +355,11 @@ void read_msg_from_sender ()
 
 int run_process () 
 {   
-
-    const struct timespec tm = {
-        0,
-        500000000L
-    };
-
     while (1) {
-
-        sem_timedwait(sem_lock_sigps.var, &tm);
+        sem_wait(sem_lock_sigps.var);
         read_msg_from_sender();
         send_msg_to_sender();
         give_data_to_sender();
-        
     }
 }
 
