@@ -29,7 +29,7 @@ db_statements dbs[statement_count] = {
     { 
       .statement_name = "store_data",  
       .statement = "INSERT INTO job_scheduler(jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)\
-                  VALUES ($2, 'N-1', '0', $1, GEN_RANDOM_UUID(), (SELECT jobid from job_scheduler where jobid = jparent_jobid), 0, 0);",
+                  VALUES ($2, 'N-1', '0', $1, GEN_RANDOM_UUID(), (SELECT jobid from job_scheduler where jobid = jparent_jobid), 0, 5);",
       .param_count = 2
     }
 };

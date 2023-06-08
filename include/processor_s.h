@@ -31,7 +31,7 @@ db_statements dbs[statement_count] = {
       .statement_name = "s_get_info", 
       .statement = "SELECT sc.sfd, js.jobid FROM job_scheduler js JOIN sysinfo si ON js.jdestination = si.system_name \
                     JOIN sending_conns sc ON sc.sipaddr = si.ipaddress WHERE sc.scstatus = 2 AND js.jstate = 'S-4' \
-                    ORDER BY js.jpriority DESC LIMIT 1;",
+                    ORDER BY js.jpriority::INT DESC LIMIT 1;",
       .param_count = 0,
     },
     { 

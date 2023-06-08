@@ -9,19 +9,13 @@ int import_file (char *file_path)
     PGresult *res = NULL;
     
     int pathlen = strlen(file_path);
-    int i = pathlen-1;
-    if (file_path[i] == '\n') {
-        file_path[i] = '\0';
-    }
-
-   // while (i > 0 && file_path[i--] != '/');
-
+    file_path[pathlen-1] = 0;
+    
     memset(file_name, 0, sizeof(upbufsize));
-    //strncpy(file_name, file_path+i+2, pathlen-i-1);
-    strncpy(file_name, file_path, pathlen-1);
+    memcpy(file_name, file_path, pathlen);
 
-    const char *const param_values[] = {file_name, file_path};
-    const int paramLengths[] = {sizeof(file_name), pathlen};
+    const char *const param_values[] = {file_name, file_name};
+    const int paramLengths[] = {pathlen, pathlen};
     const int paramFormats[] = {0, 0};
     int resultFormat = 0;
 
