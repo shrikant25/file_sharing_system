@@ -6,9 +6,10 @@
 #include "initial_sender.h"
 #include "partition.h"
 
-PGconn *connection;
-semlocks sem_lock_isender;
+PGconn *connection; // global variable points at the connection structure that represents connection to db
+semlocks sem_lock_isender; // structure to store semaphore lock information, check partition.h for more info
 
+// rollbacks the transaction
 void rollback() 
 {
     PGresult *res = PQexec(connection, "ROLLBACK");
@@ -19,6 +20,7 @@ void rollback()
 }
 
 
+// commits the transaction
 int commit() 
 {
     int status = 0;
@@ -39,12 +41,14 @@ int read_data_from_database (server_info *servinfo)
 {
     PGresult *res;
 
+    // begin the transaction
     res = PQexec(connection, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s", "BEGIN command in transaction failed in initial sender : ", PQerrorMessage(connection));
     }
     else {
 
+        // try to retrive port, address, uuid of message
         PQclear(res);
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, NULL, NULL, NULL, 0);
         if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
@@ -54,7 +58,7 @@ int read_data_from_database (server_info *servinfo)
             return -1;
         }    
         else {
-
+            // on success, store data in appropriate structure
             servinfo->port = atoi(PQgetvalue(res, 0, 0));
             servinfo->ipaddress = atoi((PQgetvalue(res, 0, 1)));
             memcpy(servinfo->uuid, PQgetvalue(res, 0, 2), PQgetlength(res, 0, 2)); 
@@ -64,6 +68,7 @@ int read_data_from_database (server_info *servinfo)
             const int param_format[] = {0};
             int result_format = 1;  
 
+            // retrive actual data based on uuid
             PQclear(res);
             res = PQexecPrepared(connection, dbs[2].statement_name, dbs[2].param_count, param_values, param_lengths, param_format, result_format);
             if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) <= 0) {
@@ -73,7 +78,7 @@ int read_data_from_database (server_info *servinfo)
                 return -1;
             }
             else {
-
+                // store data in appropriate structure
                 memcpy(servinfo->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
                 PQclear(res);
                 return commit();
@@ -114,12 +119,15 @@ void run_server ()
     server_info servinfo;
     
     while (1) {
-        
+        // wait on semaphore
         sem_wait(sem_lock_isender.var);
             
-        memset(&servinfo, 0, sizeof(servinfo)); 
+        memset(&servinfo, 0, sizeof(servinfo));
+
+        // read data from database 
         if (read_data_from_database(&servinfo) != -1) {
             
+            // create a socket
             servinfo.servsoc_fd = socket(AF_INET, SOCK_STREAM, 0);
             
             if (servinfo.servsoc_fd == -1) {
@@ -128,10 +136,12 @@ void run_server ()
             }
             else {
             
+                // add appropriate values in server structure
                 server.sin_family = AF_INET;
                 server.sin_port = htons(servinfo.port);
                 server.sin_addr.s_addr = htonl(servinfo.ipaddress);
                 
+                // connect to remote host
                 if ((connect(servinfo.servsoc_fd, (struct sockaddr *)&server, sizeof(struct sockaddr_in))) == -1) {
                     storelog("%s%s", "failed to connect form connection with remote host : ", strerror(errno));
                     update_status(servinfo.uuid, -1);
@@ -141,6 +151,7 @@ void run_server ()
                     total_data_sent = 0;
                     data_sent = 0;
 
+                    // send until the full message size(IRMESSAGE_SIZE) is not sent or it fails to send any data (0 bytes)
                     do {
                         
                         data_sent = send(servinfo.servsoc_fd, servinfo.data+total_data_sent, ISMESSAGE_SIZE, 0);
@@ -148,8 +159,9 @@ void run_server ()
                         
                     } while (total_data_sent < ISMESSAGE_SIZE && data_sent > 0);
                             
+
+                    // update status of message
                     if (total_data_sent != ISMESSAGE_SIZE) {
-                        
                         update_status(servinfo.uuid, -1);
                     }
                     else {
@@ -164,6 +176,8 @@ void run_server ()
 }
 
 
+
+// creates connection to database
 int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
@@ -176,6 +190,7 @@ int connect_to_database (char *conninfo)
 }
 
 
+// sql statements, these statements will be executed by various fucnction to interact with db
 int prepare_statements () 
 {    
     int i, status = 0;
@@ -214,6 +229,7 @@ int main (int argc, char *argv[])
         return -1;
     }
    
+    // open config file
     if ((conffd = open(argv[1], O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
@@ -224,6 +240,7 @@ int main (int argc, char *argv[])
     memset(dbname, 0, sizeof(dbname));
     memset(&sem_lock_isender, 0, sizeof(semlocks));
 
+    // read config file
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf, "USERNAME=%s\nDBNAME=%s\nSEM_LOCK_ISENDER=%s", username, dbname, sem_lock_isender.key);
     }
@@ -234,11 +251,14 @@ int main (int argc, char *argv[])
 
     close(conffd);
 
+    // create query to connect to database
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }     
 
+    // open the sempahore using the key
+    // attach the variable to semaphore
     sem_lock_isender.var = sem_open(sem_lock_isender.key, O_CREAT, 0777, 0);
     
     if (sem_lock_isender.var == SEM_FAILED) {
@@ -246,6 +266,7 @@ int main (int argc, char *argv[])
         status = -1;
     }
 
+    // main run loop
     run_server();
 
     sem_close(sem_lock_isender.var); // unlink lock used for communication

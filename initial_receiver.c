@@ -6,8 +6,8 @@
 #include "partition.h"
 #include "initial_receiver.h"
 
-server_info s_info;
-PGconn *connection;
+server_info s_info; // global variable to connection info, see initial_server.h for more info
+PGconn *connection; // global variable points at the connection structure that represents connection to db
 
 int store_data_in_database(int client_socket, char *data) {
 
@@ -15,13 +15,14 @@ int store_data_in_database(int client_socket, char *data) {
 
     char fd[11];
     sprintf(fd, "%d", client_socket);
-   
+    
+    // necessary parameters for PQexecPrepared statment
     const char *const param_values[] = {fd, data};
     const int paramLengths[] = {sizeof(fd), strlen(data)};
     const int paramFormats[] = {0, 1};
     int resultFormat = 0;
     
-    res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s", "Message storing failed in initial receiver : ", PQerrorMessage(connection));
         PQclear(res);
@@ -64,7 +65,7 @@ void run_server() {
 
     while (1) {
         
-
+        // acccept a incoming client connection
         client_socket = accept(s_info.servsoc_fd, (struct  sockaddr *)&client_address, &addr_len);
        
         if (client_socket >= 0) {
@@ -72,6 +73,7 @@ void run_server() {
             memset(data, 0, sizeof(data));
             data_read = total_data_read = 0;
 
+            // read until the full message size(IRMESSAGE_SIZE) is not read or it fails to read any data (0 bytes)
             do {    
 
                 data_read = read(client_socket, data+total_data_read, IRMESSAGE_SIZE);     
@@ -83,6 +85,7 @@ void run_server() {
                 storelog("%s%d%s%d", "data receiving failure size : ", total_data_read, ", fd : ",client_socket);
             }
             else {
+                // try storing data in database, if failed try 3 times
                 attempts = 3;
                 do {
                     status = store_data_in_database(client_socket, data);
@@ -101,6 +104,7 @@ void run_server() {
 }
 
 
+// creates connection to database
 int connect_to_database(char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
@@ -112,7 +116,7 @@ int connect_to_database(char *conninfo)
     return 0;
 }
 
-
+// sql statements, these statements will be executed by various fucnction to interact with db
 int prepare_statements() 
 {    
     int i, status = 0;
@@ -148,11 +152,13 @@ int main(int argc, char *argv[])
         return -1;
     }
    
+    // open the config file
     if ((conffd = open(argv[1], O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
+    // read the data from config file
     memset(buf, 0, sizeof(buf));
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
@@ -166,11 +172,14 @@ int main(int argc, char *argv[])
     close(conffd);
 
     memset(db_conn_command, 0, sizeof(db_conn_command));
+    
+    // create query to connect to database
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }     
 
+    // main run loop
     run_server();
     PQfinish(connection);
 

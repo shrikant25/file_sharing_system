@@ -11,6 +11,8 @@ struct launch_processes
 };
 
 
+// just fork and launch various processes
+
 int main(int argc, char *argv[]) {
 	
     if (argc != 9) {

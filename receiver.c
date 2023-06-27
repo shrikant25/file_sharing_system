@@ -158,9 +158,9 @@ int end_connection (int fd, struct sockaddr_in addr)
     getsockname(fd, (struct sockaddr *) &addr, &addrlen);
     sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
     
-    if (hdel(&htable, key) < 0) {
-        storelog("%s%s", "failed to delete key from table : ", key);
-    }
+    // if (hdel(&htable, key) < 0) {
+    //     storelog("%s%s", "failed to delete key from table : ", key);
+    // }
     close(fd);
 
     memset(&rcvm, 0, sizeof(rcvm));
