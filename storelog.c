@@ -14,6 +14,14 @@ void storelog (char *fmt, ...)
 
     memset(log, 0, sizeof(log));
 
+        // based on input type, perform operation
+        // %c represents character
+        // %s represents string (array of characters)
+        // %d represents integer
+        // %f represents float
+        // all values are evaluated based on the basis of alphabetic character
+        // '%' symbol is not evaluated so no need to use it
+        
     while (*fmt) {
 
         switch (*fmt++) {
@@ -56,6 +64,8 @@ void storelog (char *fmt, ...)
     const int paramFormats[] = {0};
     int resultFormat = 0;
     
+    // execute the insert log query
+    // the query will be prepared by the process that will use this function
     res = PQexecPrepared(connection, "storelog", 1, param_values, paramLengths, paramFormats, 0);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);

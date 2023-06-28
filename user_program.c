@@ -306,12 +306,14 @@ int main (int argc, char *argv[])
         return -1;
     }
 
+    // open conf file
     if((conffd = open(argv[1], O_RDONLY)) == -1) {
         printf("failed to open config file\n");
         return -1;
     }
 
     memset(buf1, 0, upbufsize);
+    // read conf file
     if(read(conffd, buf1, upbufsize) > 0){
         sscanf(buf1, "USERNAME=%s\nDBNAME=%s", username, dbname);
     }
@@ -322,6 +324,7 @@ int main (int argc, char *argv[])
 
     close(conffd);
 
+    // create command to connect to db
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
     if (connect_to_database(db_conn_command) == -1) { return -1;}
