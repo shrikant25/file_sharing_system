@@ -20,6 +20,8 @@ int initnotif(char *confg_filename)
     char db_conn_command[100];
 
     PGresult *res = NULL;
+
+    // open configuration file
     if ((conffd = open(confg_filename, O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
@@ -31,6 +33,7 @@ int initnotif(char *confg_filename)
     memset(username, 0, sizeof(username));
     memset(dbname, 0, sizeof(dbname));
 
+    // read the configuration file
     if (read(conffd, buf, sizeof(buf)) > 0) {
         sscanf(buf,"SEM_LOCK_SIG=%s\nUSERNAME=%s\nDBNAME=%s\nNOTI_CHANNEL=%s",  sem_lock_sig.key, username, dbname, noti_channel);
     }
@@ -39,15 +42,20 @@ int initnotif(char *confg_filename)
         return -1;
     }
 
+    // create query to listen on socket 
     sprintf(noti_command, "LISTEN %s", noti_channel);
+    
+    // create query to connect to database
     sprintf(db_conn_command, "user=%s dbname=%s", username, dbname);
 
+    // connect to database
     connection = PQconnectdb(db_conn_command);
     if (PQstatus(connection) != CONNECTION_OK) {
         syslog(LOG_NOTICE, "failed to create connection to database user %s dbname %s noti_channel %s error %s", username, dbname, noti_channel, PQerrorMessage(connection));
         return -1;
     }
 
+    // prepare query to store logs
     res = PQprepare(connection, "store_log", "INSERT INTO logs (log) VALUES ($1);", 1, NULL);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
@@ -56,6 +64,7 @@ int initnotif(char *confg_filename)
         return -1;
     }
 
+    // open a socket connection to db
     dbsocket = PQsocket(connection);
     if (dbsocket == -1) {
         storelog("%s%s", "noti channel : ", noti_channel, " error in PQsocket creating a connection to db : ", PQerrorMessage(connection));
@@ -64,6 +73,7 @@ int initnotif(char *confg_filename)
     }
     PQsetnonblocking(connection, 1);
 
+    // create an epoll instance to check activity on socket
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
         storelog("%s%s", "epoll_create1 failed in notifier listening on : ", noti_channel);
@@ -74,6 +84,7 @@ int initnotif(char *confg_filename)
     event.events = EPOLLIN;
     event.data.fd = dbsocket;
 
+    // add the epoll file descriptor into epoll data structure, internally handeled by kernel
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dbsocket, &event) == -1) {
         storelog("%s%s", "epollctl failed in notifier listening on : ", noti_channel);
         PQfinish(connection);
@@ -82,6 +93,8 @@ int initnotif(char *confg_filename)
     }
 
     PQclear(res);
+
+    // execute query to listen on notification channel
     res = PQexec(connection, noti_command);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s%s%s", "noti channel : ", noti_channel, " LISTEN command failed : ", PQerrorMessage(connection));
@@ -92,6 +105,7 @@ int initnotif(char *confg_filename)
     }
     PQclear(res);
     
+    // open semaphore, attach variable to it
     if ((sem_lock_sig.var = sem_open(sem_lock_sig.key, O_CREAT, 0777, 0)) == SEM_FAILED) {
         storelog("%s%s%s%s", "noti channel : ", noti_channel,  " error creating semphore : ", sem_lock_sig.key, PQerrorMessage(connection));
         close(epoll_fd);
@@ -112,24 +126,30 @@ int main(int argc, char *argv[])
         syslog(LOG_NOTICE, "invlaid arguments");
     }
     
+    // intialize required variables 
     if(initnotif(argv[1]) == -1) {return -1;}
     
     while (1) {
 
+        // wait until there is activity on port
         num_events = epoll_wait(epoll_fd, &event, 1, -1);
         if (num_events == -1) {
             storelog("%s%s", "epoll wait failed for notifier listening on channel : ", noti_channel);
             break;
         }
-
-        if (event.data.fd == dbsocket) {
         
+        // if activity is from intended socket then proceed
+        if (event.data.fd == dbsocket) {
+            
+            // check if it can read from socket
             if (PQconsumeInput(connection) == 0) {
                 storelog("%s%s%s%s", "noti channel : ", noti_channel ," Failed to consume input : ", PQerrorMessage(connection));
                 break;
             }
             else {
+                // keep reading notifications untill there are none
                 while ((notify = PQnotifies(connection)) != NULL) {
+                    // incerement the value of semaphore
                     sem_post(sem_lock_sig.var);
                     PQfreemem(notify);
                 }

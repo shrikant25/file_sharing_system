@@ -27,7 +27,7 @@ int store_data_in_database (newmsg_data *nmsg)
     const char *const param_values[] = {fd, nmsg->data};
     
     res = PQexecPrepared(connection, dbs[0].statement_name, 
-                                    dbs[0].param_count, param_values, paramLengths, paramFormats, 0);
+                                    dbs[0].param_count, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s %s", "data storing failed", PQerrorMessage(connection));
         PQclear(res);
@@ -72,6 +72,7 @@ int store_commr_into_database (receivers_message *rcvm)
 }
 
 
+// gets data from receiver and strores in database
 void get_data_from_receiver () 
 {
     int subblock_position = -1;
@@ -80,29 +81,51 @@ void get_data_from_receiver ()
     int status = 0;
     int attempts = 3;
 
-    sem_wait(sem_lock_datar.var);         
+    // wait on semaphore i.e try to decrement it
+    sem_wait(sem_lock_datar.var);
+
+    // get_subblock function checks bitmap to see if there is any bit that set
+    // if a bit is set, it means there is data that needs to be read
+    // get_subblock returns the position number of block         
     subblock_position = get_subblock(datar_block.var, 1, 3);
     
+    // if subblock value > 0, it means got a proper subblock
+    // otherwise values < 0 indicates no subblock available to read
     if (subblock_position >= 0) {
 
         do {
+            // take the pointer to appropriate location
+            // datar_block.var represents the starting position of block
+            // TOTAL_PARTITIONS/8 represents the size of bitmap
+            // since bitmap is present at begining of block, it needs to be ignored
+            // subblock_position represents the position number of subblock
+            // DPARTITION_SIZE represents the size of individual subblock
+
             blkptr = datar_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
             memset(&nmsg, 0, sizeof(nmsg));
             memcpy(&nmsg, blkptr, sizeof(nmsg));
+            
+            // try to store data in databse
             status = store_data_in_database(&nmsg);
             attempts -= 1;
 
+            // if status == -1, which indicates failure and there are attempts remaining
+            // then go to sleep, as there is going to be reattempt to fetch the data 
             if (attempts > 0 && status == -1) {
                 nanosleep(&tm, NULL);
             }
+
+            // based on status and remaining attempts take appropriate action
         } while (attempts > 0 && status == -1);
         
+        // toggle the bit corresponding to that subblock 
         toggle_bit(subblock_position, datar_block.var, 3);
     }
+    // increment semaphore value
     sem_post(sem_lock_datar.var);
 }
 
-
+// gets messages from receiver and stores them in database
 void get_message_from_receiver () 
 {
     int subblock_position = -1;
@@ -135,7 +158,7 @@ void get_message_from_receiver ()
 
 }
 
-
+// retrives necessary messages from database, that are intended for receiver
 int get_comms_from_database (char *blkptr) 
 {
     PGresult *res;
@@ -163,7 +186,7 @@ int get_comms_from_database (char *blkptr)
     return -1;
 }
 
-
+// send necessary messages to receiver
 void send_msg_to_receiver () 
 {
     int subblock_position;
@@ -189,6 +212,11 @@ void send_msg_to_receiver ()
 int run_process () 
 {   
     while (1) {
+        // wait on semaphore
+        // if there is some message for receiver, database will send a notification
+        // the notification will be read by the notif program and it will increment the value of semaphore
+        // or
+        // if receiver wants to send some data or message, then receiver will increment the value of semaphore
         sem_wait(sem_lock_sigr.var);    
         get_message_from_receiver();
         get_data_from_receiver();     
@@ -197,6 +225,7 @@ int run_process ()
 }
 
 
+// connects to database
 int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
@@ -210,6 +239,7 @@ int connect_to_database (char *conninfo)
 }
 
 
+// prepares all the necessary sql queries
 int prepare_statements () 
 {    
     int i, status = 0;
@@ -251,11 +281,13 @@ int main (int argc, char *argv[])
         return -1;
     }
    
+    // open the configuration file
     if ((conffd = open(argv[1], O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
+    // read the configuration file
     if (read(conffd, buf, sizeof(buf)) > 0) {
        
         sscanf(buf, "SEM_LOCK_DATAR=%s\nSEM_LOCK_COMMR=%s\nSEM_LOCK_SIG_R=%s\nPROJECT_ID_DATAR=%d\nPROJECT_ID_COMMR=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datar.key, sem_lock_commr.key, sem_lock_sigr.key, &datar_block.key, &commr_block.key, username, dbname);
@@ -267,11 +299,13 @@ int main (int argc, char *argv[])
     
     close(conffd);
 
+    // create the command that will connect to database
     snprintf(db_conn_command, sizeof(db_conn_command), "user=%s dbname=%s", username, dbname);
     
     if (connect_to_database(db_conn_command) == -1) { return -1; }
     if (prepare_statements() == -1) { return -1; }   
     
+    // open necessary semaphores andd attach them to appropriate variables
     sem_lock_datar.var = sem_open(sem_lock_datar.key, O_CREAT, 0777, 1);
     sem_lock_commr.var = sem_open(sem_lock_commr.key, O_CREAT, 0777, 1);
     sem_lock_sigr.var = sem_open(sem_lock_sigr.key, O_CREAT, 0777, 0);
@@ -281,6 +315,7 @@ int main (int argc, char *argv[])
         return -1;
     }
 
+    // attach varaibles to shared memory blocks
     datar_block.var = attach_memory_block(FILENAME_R, DATA_BLOCK_SIZE, datar_block.key);
     commr_block.var = attach_memory_block(FILENAME_R, COMM_BLOCK_SIZE, commr_block.key);
     if (!(datar_block.var && commr_block.var)) {
@@ -288,10 +323,12 @@ int main (int argc, char *argv[])
         return -1; 
     }
 
+    // unset all bits in bitmaps representing the shared memory blocks
     unset_all_bits(commr_block.var, 2);
     unset_all_bits(commr_block.var, 3);
     unset_all_bits(datar_block.var, 1);
     
+    // call the man run loop
     run_process(); 
     
     PQfinish(connection);    

@@ -46,6 +46,7 @@ int retrive_data_from_database (char *blkptr)
     PGresult *res;
     send_message *sndmsg = (send_message *)blkptr;
     
+    // begin the transaction
     res = PQexec(connection, "BEGIN");
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         storelog("%s%s","BEGIN command to start transaction failed in processor_s : ", PQerrorMessage(connection));
@@ -55,6 +56,7 @@ int retrive_data_from_database (char *blkptr)
     else {
     
         PQclear(res);
+        // retrives file descriptor and message uuid from database
         res = PQexecPrepared(connection, dbs[0].statement_name, dbs[0].param_count, NULL, NULL, NULL, 0);
 
         if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -65,6 +67,7 @@ int retrive_data_from_database (char *blkptr)
         }    
         else if (PQntuples(res) > 0) {
             
+            // store retrived data in appropriate data structure
             sndmsg->fd = atoi(PQgetvalue(res, 0, 0));
             memcpy(sndmsg->uuid, PQgetvalue(res, 0, 1), PQgetlength(res, 0, 1));
             sndmsg->uuid[36] = '\0';
@@ -72,8 +75,13 @@ int retrive_data_from_database (char *blkptr)
             const char *const param_values[] = {sndmsg->uuid};
             const int paramLengths[] = {sizeof(sndmsg->uuid)};
             const int paramFormats[] = {0};
-            int resultFormat = 1;
+            int resultFormat = 1; 
+            // for data of type byte array, result format must be 1 that is binary
+            // in other casses it needs to be 0, 0 represents the character formate
+            // hence, first uuid and fd are retrived with result format set to 0
+            // then based on uuid data is retrived with result format set to 1
             
+            // based on uuid retrive datat
             PQclear(res);
             res = PQexecPrepared(connection, dbs[6].statement_name, dbs[6].param_count, param_values,   
                                             paramLengths, paramFormats, resultFormat);
@@ -86,6 +94,7 @@ int retrive_data_from_database (char *blkptr)
             }
             else if (PQntuples(res) > 0) {
                 
+                // if data is successfully retrived, update status of message from read state to waiting state
                 sndmsg->size = PQgetlength(res, 0, 0);
                 memcpy(sndmsg->data, PQgetvalue(res, 0, 0), PQgetlength(res, 0, 0));
                
@@ -122,7 +131,7 @@ int retrive_data_from_database (char *blkptr)
     return -1;  
 }
 
-
+// stores communication received from sender into database
 int store_comms_into_database (char *blkptr) 
 {
     int resultFormat = 0;
@@ -135,7 +144,8 @@ int store_comms_into_database (char *blkptr)
     PGresult* res;
     memset(id, 0, sizeof(id));
 
-    if(*(int *)blkptr == 3){
+    // if message is of type 3, then it represents a message holding information about connection status
+    if(*(int *)blkptr == 3) {
 
         connection_status *cncsts = (connection_status *)blkptr;
         sprintf(ipaddress, "%d", cncsts->ipaddress);        
@@ -154,7 +164,7 @@ int store_comms_into_database (char *blkptr)
         
         res = PQexecPrepared(connection, dbs[1].statement_name, dbs[1].param_count, param_values, paramLengths, paramFormats, resultFormat);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            storelog("%s%s", "failed to insert senders comms : ", PQerrorMessage(connection));
+            storelog("%s%s", "failed to update connection status : ", PQerrorMessage(connection));
             PQclear(res);
             return -1;
         }
@@ -166,6 +176,13 @@ int store_comms_into_database (char *blkptr)
             const int paramLengths[] = {sizeof(id)};
             const int paramFormats[] = {0};
             
+            // the message that was created by db to modify connection
+            // has been read, sender sent the status of modification
+            // the status has been updated in database
+            // since the connection status is completely updated
+            // the message that was created by db, to modify the connection has served its purpose
+            // now delete this message
+
             PQclear(res);
             res = PQexecPrepared(connection, dbs[8].statement_name, dbs[8].param_count, param_values, paramLengths, paramFormats, resultFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -418,7 +435,6 @@ int main (int argc, char *argv[])
     char dbname[30];
     PGresult *res;
 
-
     memset(buf, 0, sizeof(buf));
     memset(db_conn_command, 0, sizeof(db_conn_command));
     memset(username, 0, sizeof(username));
@@ -429,13 +445,14 @@ int main (int argc, char *argv[])
         return -1;
     }
 
+    // open the configuration file
     if ((conffd = open(argv[1], O_RDONLY)) == -1) {
         syslog(LOG_NOTICE, "failed to open configuration file");
         return -1;
     }
 
+    // read the configuration file
     if (read(conffd, buf, sizeof(buf)) > 0) {
-    
         sscanf(buf, "SEM_LOCK_DATAS=%s\nSEM_LOCK_COMMS=%s\nSEM_LOCK_SIG_S=%s\nSEM_LOCK_SIG_PS=%s\nPROJECT_ID_DATAS=%d\nPROJECT_ID_COMMS=%d\nUSERNAME=%s\nDBNAME=%s", sem_lock_datas.key, sem_lock_comms.key, sem_lock_sigs.key, sem_lock_sigps.key, &datas_block.key, &comms_block.key, username, dbname);
     }
     else {
@@ -445,6 +462,7 @@ int main (int argc, char *argv[])
 
     close(conffd);
 
+    // create command that will connect to database
     snprintf(db_conn_command, sizeof(db_conn_command), "user=%s dbname=%s", username, dbname);
     
     if (connect_to_database(db_conn_command) == -1) { return -1; }
