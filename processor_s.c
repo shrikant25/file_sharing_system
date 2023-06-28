@@ -195,6 +195,8 @@ int store_comms_into_database (char *blkptr)
     }
     else if(*(int *)blkptr == 4) {
         
+        // this type of message indicates, stauts of message that was suppose to be sent
+
         message_status *msgsts = (message_status *)blkptr;
         
         sprintf(mstatus, "%hhu", msgsts->status);
@@ -223,6 +225,7 @@ int store_comms_into_database (char *blkptr)
 }
 
 
+// retirives comms for sender from database
 int retrive_comms_from_database (char *blkptr) 
 {
     PGresult *res;
@@ -230,6 +233,7 @@ int retrive_comms_from_database (char *blkptr)
     int type;
     char scommid[30];
 
+    // read the message from database
     res = PQexecPrepared(connection, dbs[3].statement_name, dbs[3].param_count, NULL, NULL, NULL, 0);
 
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
@@ -244,6 +248,8 @@ int retrive_comms_from_database (char *blkptr)
 
         if (type == 1) {
             
+            // this type of message for opening a new connection
+
             open_connection *opncn = (open_connection *)blkptr;
             opncn->type = atoi(PQgetvalue(res, 0, 0));
             opncn->ipaddress = atoi(PQgetvalue(res, 0, 1)); 
@@ -256,6 +262,7 @@ int retrive_comms_from_database (char *blkptr)
             const int paramFormats[] = {0};
             int resutlFormat = 0;
 
+            // if message is read succesfully then update its status to waiting state 
             PQclear(res);
             res = PQexecPrepared(connection, dbs[7].statement_name, dbs[7].param_count, param_values, paramLengths, paramFormats, resutlFormat);
             if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -266,6 +273,8 @@ int retrive_comms_from_database (char *blkptr)
         }
         else if(type == 2) {
             
+            // this type of message if for closing a connection
+
             close_connection *clscn = (close_connection *)blkptr;
             clscn->type = atoi(PQgetvalue(res, 0, 0));
             clscn->ipaddress = atoi(PQgetvalue(res, 0, 1));
@@ -304,6 +313,7 @@ int retrive_comms_from_database (char *blkptr)
 }
 
 
+// gives data to sender
 void give_data_to_sender () 
 {
     int subblock_position = -1;
@@ -328,6 +338,7 @@ void give_data_to_sender ()
 }
 
 
+// gives message to sender
 void send_msg_to_sender () 
 {
     int subblock_position = -1;
@@ -352,6 +363,7 @@ void send_msg_to_sender ()
 }
 
 
+// read message from sender
 void read_msg_from_sender () 
 {
     int subblock_position = -1;
@@ -383,7 +395,13 @@ void read_msg_from_sender ()
 
 int run_process () 
 {   
+    // main run loop
     while (1) {
+        // wait on semaphore
+        // if there is some message for sender, database will send a notification
+        // the notification will be read by the notif program and it will increment the value of semaphore
+        // or
+        // if sender wants to send some message, then sender will increment the value of semaphore
         sem_wait(sem_lock_sigps.var);
         read_msg_from_sender();
         send_msg_to_sender();
@@ -392,35 +410,31 @@ int run_process ()
 }
 
 
+// connects to database
 int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
-
     if (PQstatus(connection) != CONNECTION_OK) {
         syslog(LOG_NOTICE, "Connection to database failed: %s\n", PQerrorMessage(connection));
         return -1;
     }
-
     return 0;
 }
 
 
+// prepare sql queries
 int prepare_statements () 
 {    
     int i, status = 0;
-
     for (i = 0; i<statement_count; i++){
-
         PGresult* res = PQprepare(connection, dbs[i].statement_name, dbs[i].statement, dbs[i].param_count, NULL);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
             syslog(LOG_NOTICE, "Preparation of statement failed: %s\n", PQerrorMessage(connection));
             status = -1;
             break;
         }
-
         PQclear(res);
     }
-    
     return status;
 }
 

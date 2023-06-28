@@ -7,14 +7,14 @@
 
 
 /* 
-* create an array of pointers of type datanode
-* as there is a chance of collison in hashtable, there will be chaining of node
-*
-* create a linkedlist(a nodepool) of nodes of type datanode 
-* when a node is required, remove first element from nodepool and attach it to appropriate pointer in array
-* if node/s are already present at the position, then attach the new node at the end of chain 
-*
-* to remove a node, get hash, find the node in chain, remove it, add it to the begining of the nodepool 
+  create an array of pointers of type datanode
+  as there is a chance of collison in hashtable, there will be chaining of node
+ 
+  create a linkedlist(a nodepool) of nodes of type datanode 
+  when a node is required, remove first element from nodepool and attach it to appropriate pointer in array
+  if node/s are already present at the position, then attach the new node at the end of chain 
+ 
+  to remove a node, get hash, find the node in chain, remove it, add it to the begining of the nodepool 
 */
 
 // a somewhat good hash function

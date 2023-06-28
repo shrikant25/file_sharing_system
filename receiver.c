@@ -113,6 +113,7 @@ int accept_connection ()
     
         client_addr_len = sizeof(client_addr);
         
+        // accept the client connection
         client_fd = accept(s_info.servsoc_fd, (struct sockaddr *)&client_addr, &client_addr_len);
         
         if (client_fd < 0) {
@@ -126,12 +127,16 @@ int accept_connection ()
         }
         else {
 
+            // make it file descriptor non blocking
             if (make_nonblocking(client_fd) == -1) return -1;
+            
+            // add to epoll's list, the list is internally maintained by kernel
             if (add_to_list(client_fd) == -1) {
                 close(client_fd);
                 return -1;
             } 
             
+            // prepare the message, telling the processor about new connection
             memset(&rcvm, 0, sizeof(rcvm));
             rcvm.fd = client_fd;
             rcvm.ipaddr = htonl(client_addr.sin_addr.s_addr);
@@ -151,23 +156,24 @@ int end_connection (int fd, struct sockaddr_in addr)
     receivers_message rcvm;
     socklen_t addrlen = sizeof(addr);
     
+    // remove the file descriptor from epoll data structure
     if (remove_from_list(fd) == -1)
         return -1;
         
     memset(key, 0, sizeof(key));
+    
+    // get ip address using file descriptor
     getsockname(fd, (struct sockaddr *) &addr, &addrlen);
     sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
-    
-    // if (hdel(&htable, key) < 0) {
-    //     storelog("%s%s", "failed to delete key from table : ", key);
-    // }
     close(fd);
 
+    // prepare the message
     memset(&rcvm, 0, sizeof(rcvm));
     rcvm.fd = fd;
     rcvm.ipaddr = 0;
     rcvm.status = 1;
 
+    // tell the processor about closure of connection
     send_message_to_processor(&rcvm);
     return 0;
 }
@@ -186,8 +192,13 @@ int run_receiver ()
 
     while (1) {
         
+        // wait till there is activity on any of the descriptors that are under watch
+        // timeout is set 1000 ms (= 1 second), as the loop needs to check for any messages from processor
+        // for that the loop needs to get out of wait and check the shared memory 
         act_events_cnt = epoll_wait(s_info.epoll_fd, events, s_info.maxevents, 1000);
 
+        // only message the receiver gets from processor is of making a entry in hashtable
+        // key is ip address and value is message size that will arrive on that ip
         if (get_message_from_processor(&cpif) != -1) {
             
             if ((status = hput(&htable, cpif.ipaddress, cpif.capacity)) != 0) {
@@ -203,23 +214,28 @@ int run_receiver ()
 
         for (i = 0; i<act_events_cnt; i++) {
             
-            // error or hangup
+            // if the descripotr show any error or it hang's up then end the connection
             if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) || (!(events[i].events & EPOLLIN))) { 
                 if (end_connection(events[i].data.fd, addr) == -1) { return -1; }  
                 continue;
             
             }
             else if (events[i].data.fd == s_info.servsoc_fd && (events[i].events & EPOLLIN)) {
+                // receiver is listening for new_connections on s_info.servsoc_fd
+                // EPOLLIN refers to incoming connection
                 accept_connection();
             }
-            
             else if (events[i].events & EPOLLIN) {
-                
+            
+                // get ip address using file descriptor
                 getsockname(events[i].data.fd, (struct sockaddr *) &addr, &addrlen);
                 memset(key, 0, sizeof(key));
                 sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
+                
+                // using ipaddress as key get the size of message that will arrive on this descriptor
                 message_size = hget(&htable, key);
                 
+                // proceed if size is greater than zero
                 if (message_size >= 0) {
     
                     memset(&nmsg, 0, message_size);
@@ -229,6 +245,7 @@ int run_receiver ()
                     
                     while (1) { 
 
+                        // keep reading the message in a buffer until entire message is received
                         bytes_read = read(nmsg.data1, nmsg.data+total_bytes_read, message_size-total_bytes_read);
                         if (bytes_read <= 0) {
                             break;    
@@ -239,6 +256,7 @@ int run_receiver ()
                         
                             if (total_bytes_read == message_size) {
                                 
+                                // once entire message is received store it in database
                                 nmsg.data2 = total_bytes_read;
                                 send_to_processor(&nmsg);
                                 
@@ -251,6 +269,7 @@ int run_receiver ()
                     }
                 }
                 else {
+                    // in case failure to retrive size of message, close the connection
                     storelog("%s%d%s%d%s%s", "invalid size : ", message_size,  " for fd : ", events[i].data.fd,  " ip : ", key);
                     if (end_connection(events[i].data.fd, addr) == -1) { return -1; }
                 }
@@ -262,7 +281,8 @@ int run_receiver ()
     return 0;
 }
  
- 
+
+// sends the newly received data to processor
 void send_to_processor (newmsg_data *nmsg)
 {
     int subblock_position = -1;
@@ -296,6 +316,7 @@ void send_to_processor (newmsg_data *nmsg)
 }
 
 
+// receives messages from processor
 int get_message_from_processor (capacity_info *cpif) 
 {
     int subblock_position = -1;
@@ -318,7 +339,7 @@ int get_message_from_processor (capacity_info *cpif)
     return subblock_position;
 }
 
-
+// sends status related messages to processor
 void send_message_to_processor (receivers_message *rcvm)
 {
     int subblock_position = -1;
@@ -348,9 +369,10 @@ void send_message_to_processor (receivers_message *rcvm)
         
     } while (attempts > 0 && subblock_position == -1);  
     sem_post(sem_lock_commr.var);
-  }
+}
 
 
+// makes a connection to database
 int connect_to_database (char *conninfo) 
 {   
     connection = PQconnectdb(conninfo);
@@ -364,6 +386,7 @@ int connect_to_database (char *conninfo)
 }
 
 
+// prepare sql queries 
 int prepare_statements () 
 {    
     int i, status = 0;
