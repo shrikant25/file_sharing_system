@@ -493,7 +493,7 @@ BEGIN
             FROM files f 
             JOIN sysinfo si 
             ON jdestination = si.system_name 
-            AND LENGTH(lo_get(f.file_data)) > (si.system_capacity-168)
+            AND LENGTH(lo_get(f.file_data)) > (si.system_capacity-172)
             AND si.system_capacity != 0
         
         )
@@ -508,7 +508,7 @@ BEGIN
             FROM files 
             JOIN sysinfo si 
             ON jdestination = si.system_name 
-            AND LENGTH(lo_get(file_data)) <= (si.system_capacity-168)
+            AND LENGTH(lo_get(file_data)) <= (si.system_capacity-172)
             AND si.system_capacity != 0
         )
     AND jstate = 'S-1';
@@ -555,8 +555,8 @@ BEGIN
 
         SELECT idx, gen_random_uuid()::text::bytea AS uuid_data, 
             parent_jobid, jdestination, jsource, jpriority, system_capacity,  
-            lo_get(file_data, (idx*(system_capacity-168))::BIGINT, system_capacity::INTEGER - 168) chunk_data 
-        FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
+            lo_get(file_data, (idx*(system_capacity-172))::BIGINT, system_capacity::INTEGER - 172) chunk_data 
+        FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 172))-1) idx
 
     )
     INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
@@ -578,7 +578,7 @@ BEGIN
                 gen_random_uuid()::text::bytea, '3'::text,
                 js.jobid::text::bytea || 
                 lpad(length((lo_get(file_data)))::text, 12, ' ')::bytea || 
-                lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
+                lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -172)))::text, 10, ' ')::bytea,
                 ''::bytea, 
                 btrim(jsource, ' '), 
                 btrim(jdestination, ' '), 
@@ -658,3 +658,86 @@ BEGIN
 END;
 $$
 LANGUAGE 'plpgsql';
+
+
+
+-- create table temp_data_info(tmsgid uuid PRIMARY KEY, 
+--                             datasize int NOT NULL, 
+--                             chunk_count int NOT NULL, 
+--                             source_name text NOT NULL);
+
+-- create table temp_chunks(tmsgid uuid REFERENCES temp_data_info(tmsgid) ON UPDATE CASCADE ON DELETE CASCADE, 
+--                         tdata bytea NOT NULL, 
+--                         tchunk_number int NOT NULL);
+
+-- with cte_arrnewmsg as (
+--     select distinct encode(substr(js1.jobdata, 115, 36), 'escape')::uuid msgid,
+--     encode(substr(js1.jobdata, 151, 12), 'escape')::int msg_size,
+--     encode(substr(js1.jobdata, 163, 10), 'escape')::int chunk_count,
+--     encode(substr(js1.jobdata, 74, 5), 'escape') source
+--     from job_scheduler js1
+--     where encode(substr(js1.jobdata, 69, 5), 'escape')::int = 3
+--     and js1.jstate = 'N-4'
+--     and encode(substr(js1.jobdata, 163, 10), 'escape')::int = (
+--         select count(js2.jobdata) 
+--         from job_scheduler js2
+--         where js2.jstate = 'N-4'
+--         and encode(substr(js2.jobdata, 69, 5), 'escape')::int = 2
+--         and encode(substr(js2.jobdata, 123, 36), 'escape') = encode(substr(js1.jobdata, 115, 36), 'escape')
+--     )
+-- )
+-- Insert into temp_data_info select msgid, msg_size, chunk_count, source from cte_arrnewmsg;
+
+
+-- with cte_arrnewmsg as (
+--     select distinct encode(substr(js1.jobdata, 115, 36), 'escape') msgid
+--     from job_scheduler js1
+--     where encode(substr(js1.jobdata, 69, 5), 'escape')::int = 3
+--     and js1.jstate = 'N-4'
+--     and encode(substr(js1.jobdata, 163, 10), 'escape')::int = (
+--         select count(js2.jobdata) 
+--         from job_scheduler js2
+--         where js2.jstate = 'N-4'
+--         and encode(substr(js2.jobdata, 69, 5), 'escape')::int = 2
+--         and encode(substr(js2.jobdata, 123, 36), 'escape') = encode(substr(js1.jobdata, 115, 36), 'escape')
+--     )
+-- ),
+-- cte_msgdata as (
+--     select substr(js.jobdata, 169,  encode(substr(js.jobdata, 159, 10), 'escape')::integer) msgdata,
+--     cte_arrnewmsg.msgid,
+--     encode(substr(js.jobdata, 115, 8), 'escape')::integer chunk_num 
+--     from job_scheduler js
+--     join cte_arrnewmsg 
+--     on encode(substr(js.jobdata, 123, 36), 'escape') = cte_arrnewmsg.msgid
+--     where js.jstate = 'N-4' 
+--     and encode(substr(js.jobdata, 69, 5), 'escape')::integer = 2
+--     GROUP by js.jobdata, cte_arrnewmsg.msgid
+--     order by encode(substr(js.jobdata, 115, 8), 'escape')::integer
+-- )
+-- INSERT INTO temp_chunks 
+-- SELECT msgid::uuid, msgdata, chunk_num  
+-- FROM cte_msgdata;
+
+
+-- with cte_arrnewmsg as (
+--     select distinct encode(substr(js1.jobdata, 115, 36), 'escape') msgid
+--     from job_scheduler js1
+--     where encode(substr(js1.jobdata, 69, 5), 'escape')::int = 3
+--     and js1.jstate = 'N-4'
+--     and encode(substr(js1.jobdata, 163, 10), 'escape')::int = (
+--         select count(js2.jobdata) 
+--         from job_scheduler js2
+--         where js2.jstate = 'N-4'
+--         and encode(substr(js2.jobdata, 69, 5), 'escape')::int = 2
+--         and encode(substr(js2.jobdata, 123, 36), 'escape') = encode(substr(js1.jobdata, 115, 36), 'escape')
+--     )
+-- )
+-- update job_scheduler 
+-- set jstate = 'C'
+-- where encode(substr(jobdata, 123, 36), 'escape') = (select msgid from cte_arrnewmsg)
+-- or encode(substr(jobdata, 115, 36), 'escape') = (select msgid from cte_arrnewmsg);
+
+
+
+
+

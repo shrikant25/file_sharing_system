@@ -497,7 +497,7 @@ BEGIN
             FROM files f 
             JOIN sysinfo si 
             ON jdestination = si.system_name 
-            AND LENGTH(lo_get(f.file_data)) > (si.system_capacity-168)
+            AND LENGTH(lo_get(f.file_data)) > (si.system_capacity-172)
             AND si.system_capacity != 0
         
         )
@@ -512,7 +512,7 @@ BEGIN
             FROM files 
             JOIN sysinfo si 
             ON jdestination = si.system_name 
-            AND LENGTH(lo_get(file_data)) <= (si.system_capacity-168)
+            AND LENGTH(lo_get(file_data)) <= (si.system_capacity-172)
             AND si.system_capacity != 0
         )
     AND jstate = 'S-1';
@@ -559,8 +559,8 @@ BEGIN
 
         SELECT idx, gen_random_uuid()::text::bytea AS uuid_data, 
             parent_jobid, jdestination, jsource, jpriority, system_capacity,  
-            lo_get(file_data, (idx*(system_capacity-168))::BIGINT, system_capacity::INTEGER - 168) chunk_data 
-        FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 168))-1) idx
+            lo_get(file_data, (idx*(system_capacity-172))::BIGINT, system_capacity::INTEGER - 172) chunk_data 
+        FROM par_job, generate_series(0, ceil((datal)::decimal/(system_capacity - 172))-1) idx
 
     )
     INSERT INTO job_scheduler (jobdata, jstate, jtype, jsource, jobid, jparent_jobid, jdestination, jpriority)
@@ -582,7 +582,7 @@ BEGIN
                 gen_random_uuid()::text::bytea, '3'::text,
                 js.jobid::text::bytea || 
                 lpad(length((lo_get(file_data)))::text, 12, ' ')::bytea || 
-                lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -168)))::text, 10, ' ')::bytea,
+                lpad((ceil(length(lo_get(file_data))::decimal/ (system_capacity -172)))::text, 10, ' ')::bytea,
                 ''::bytea, 
                 btrim(jsource, ' '), 
                 btrim(jdestination, ' '), 
