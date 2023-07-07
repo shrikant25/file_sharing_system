@@ -31,7 +31,7 @@ int get_subblock(char *block, int state, int type)
 // 1 = bitmap present at start representing TOTAL_PARTITIONS blocks 
 // 2 = bitmap present at start representing TOTAL_PARTITIONS/2 blocks
 // 3 = bitmap present at start but take next TOTAL_PARTITIONS/2 blocks
-void toggle_bit(int idx, char *block, int type) 
+void toggle_bit(int idx, char *block) 
 {    
     int bmap_size = TOTAL_PARTITIONS/8;
     char bmap[bmap_size];

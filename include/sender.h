@@ -8,7 +8,7 @@
 #include "shared_memory.h"
 
 
-int create_connection(unsigned short int, unsigned int); 
+int create_connection(unsigned short int, int); 
 int get_message_from_processor(char *); 
 int get_data_from_processor(send_message *);
 void send_message_to_processor(int, void *); 

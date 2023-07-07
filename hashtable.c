@@ -20,10 +20,10 @@
 // a somewhat good hash function
 int hget_hash (hashtable *htable, char *key) {
 
-    int i;
-    unsigned int hash = hash_seed;
+    size_t i;
+    int hash = hash_seed;
     
-    for (int i = 0; i < strlen(key); i++) {
+    for (i = 0; i < strlen(key); i++) {
         hash = ((hash << 5) + hash) + key[i];
     }
 
@@ -38,7 +38,6 @@ int hput (hashtable *htable, char *key, int value) {
     }
 
     datanode **temp = NULL;
-    datanode *newnode = NULL;
 
     int hash = hget_hash(htable, key);
     if (hash == -1) { return -2; }
@@ -132,7 +131,7 @@ int hdel (hashtable *htable, char *key) {
 
 int hcreate_table(hashtable *htable, int size) {
 
-    int i = 0;
+    size_t i = 0;
     datanode *temp;
     datanode *newnode;
 

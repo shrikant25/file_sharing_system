@@ -36,7 +36,7 @@ int store_data_in_database(int client_socket, char *data) {
 
 void run_server() {
     
-    int client_socket, data_read, total_data_read, network_status;
+    int client_socket, data_read, total_data_read;
     char data[IRMESSAGE_SIZE+1];
     int attempts = 3;
     int status = 0;
@@ -95,7 +95,7 @@ void run_server() {
             close(client_socket);
         }
         else {
-            sprintf("%s%s", "inital receiver failed to accept client connection : ", strerror(errno));
+            storelog("%s%s", "inital receiver failed to accept client connection : ", strerror(errno));
         }
     }
     
@@ -140,7 +140,6 @@ int prepare_statements()
 
 int main(int argc, char *argv[]) 
 {
-    int status = -1;
     int conffd = -1;
     char buf[100];
     char db_conn_command[100];

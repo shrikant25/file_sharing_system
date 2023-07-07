@@ -3,7 +3,7 @@ FS_DIR = $(shell pwd)
 LOCAL_INCLUDE_DIR = $(FS_DIR)/include
 PSQL_INCLUDE_DIR = /usr/include/postgresql
 
-CFLAGS = -I$(LOCAL_INCLUDE_DIR) -I$(PSQL_INCLUDE_DIR) -lpq -g  -lpthread -mcmodel=large 
+CFLAGS = -I$(LOCAL_INCLUDE_DIR) -I$(PSQL_INCLUDE_DIR) -lpq -g  -Wall -Wextra -lpthread -mcmodel=large 
 
 processor_r_target = processor_r
 processor_r_files := processor_r.c shared_memory.c partition.c storelog.c
@@ -48,4 +48,4 @@ launcher:
 	$(CC) $(job_launcher_files) -o $(job_launcher_target) $(CFLAGS)
 
 clean:
-	rm processor_r processor_s receiver sender notif launcher user_program initial_receiver initial_sender job_launcher
+	rm processor_r processor_s receiver sender notif launcher user_program initial_receiver initial_sender job_launcher storelog

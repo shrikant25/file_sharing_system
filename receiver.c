@@ -104,7 +104,6 @@ int remove_from_list (int active_fd)
 int accept_connection () 
 {   
     int client_fd = -1;
-    int optval;
     struct sockaddr_in client_addr;
     socklen_t client_addr_len;
     receivers_message rcvm;
@@ -164,7 +163,7 @@ int end_connection (int fd, struct sockaddr_in addr)
     
     // get ip address using file descriptor
     getsockname(fd, (struct sockaddr *) &addr, &addrlen);
-    sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
+    sprintf(key, "%d", htonl(addr.sin_addr.s_addr));
     close(fd);
 
     // prepare the message
@@ -230,7 +229,7 @@ int run_receiver ()
                 // get ip address using file descriptor
                 getsockname(events[i].data.fd, (struct sockaddr *) &addr, &addrlen);
                 memset(key, 0, sizeof(key));
-                sprintf(key, "%ld", htonl(addr.sin_addr.s_addr));
+                sprintf(key, "%d", htonl(addr.sin_addr.s_addr));
                 
                 // using ipaddress as key get the size of message that will arrive on this descriptor
                 message_size = hget(&htable, key);
@@ -287,7 +286,7 @@ void send_to_processor (newmsg_data *nmsg)
 {
     int subblock_position = -1;
     int attempts = 3;
-    unsigned char *blkptr = NULL;
+    char *blkptr = NULL;
     
     sem_wait(sem_lock_datar.var);
     do {         
@@ -301,7 +300,7 @@ void send_to_processor (newmsg_data *nmsg)
             memcpy(blkptr, nmsg, sizeof(newmsg_data));
             
             blkptr = NULL;
-            toggle_bit(subblock_position, datar_block.var, 3);
+            toggle_bit(subblock_position, datar_block.var);
             sem_post(sem_lock_sigr.var);
         } 
         
@@ -332,7 +331,7 @@ int get_message_from_processor (capacity_info *cpif)
         blkptr = commr_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memcpy(cpif, blkptr, sizeof(capacity_info));
         memcpy(blkptr, &cpif, sizeof(capacity_info));
-        toggle_bit(subblock_position, commr_block.var, 1);
+        toggle_bit(subblock_position, commr_block.var);
     } 
 
     sem_post(sem_lock_commr.var);
@@ -344,7 +343,6 @@ void send_message_to_processor (receivers_message *rcvm)
 {
     int subblock_position = -1;
     char *blkptr = NULL;
-    char msg_type;
     int attempts = 3;
     
     sem_wait(sem_lock_commr.var);         
@@ -358,7 +356,7 @@ void send_message_to_processor (receivers_message *rcvm)
             memset(blkptr, 0, CPARTITION_SIZE);
             memcpy(blkptr, rcvm, sizeof(receivers_message));
 
-            toggle_bit(subblock_position, commr_block.var, 2);
+            toggle_bit(subblock_position, commr_block.var);
             sem_post(sem_lock_sigr.var);
         }
 
@@ -410,8 +408,6 @@ int prepare_statements ()
 
 int main (int argc, char *argv[]) 
 {
-
-    int status = -1;
     int conffd = -1;
     char buf[500];
     char db_conn_command[100];
@@ -455,7 +451,7 @@ int main (int argc, char *argv[])
     
     if (sem_lock_sigr.var == SEM_FAILED || sem_lock_datar.var == SEM_FAILED || sem_lock_commr.var == SEM_FAILED) {
         storelog("%s", "receiver failed to intialize locks");
-        status = -1;
+        return -1;
     }
 
     // attach memroy block for data sharing

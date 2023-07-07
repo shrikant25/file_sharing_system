@@ -29,7 +29,7 @@ void storelog (char *fmt, ...)
             case 'c':
                     memset(temp, 0, sizeof(temp));
                     c = (char )va_arg(args, int);
-                    snprintf(temp, sizeof(c),"%c", c);
+                    snprintf(temp, sizeof(temp),"%c", c);
                     strncat(log, temp, sizeof(temp));
                     break;
             
@@ -66,7 +66,7 @@ void storelog (char *fmt, ...)
     
     // execute the insert log query
     // the query will be prepared by the process that will use this function
-    res = PQexecPrepared(connection, "storelog", 1, param_values, paramLengths, paramFormats, 0);
+    res = PQexecPrepared(connection, "storelog", 1, param_values, paramLengths, paramFormats, resultFormat);
     if (PQresultStatus(res) != PGRES_COMMAND_OK) {
         syslog(LOG_NOTICE, "logging failed %s , log %s\n", PQerrorMessage(connection), log);
     }

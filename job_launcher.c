@@ -81,9 +81,7 @@ int initnotif(char *confg_filename)
 
 int main(int argc, char *argv[]) 
 {
-    int num_events = 0;
     int hasfailed = 0;
-    PGnotify *notify;
     PGresult *res;
     struct timespec tm;
     

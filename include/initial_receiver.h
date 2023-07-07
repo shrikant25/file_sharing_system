@@ -5,8 +5,8 @@
 
 
 typedef struct server_info{
-    unsigned short int port;
-    unsigned int servsoc_fd;
+    int port;
+    int servsoc_fd;
     unsigned long ipaddress;
     
 }server_info;

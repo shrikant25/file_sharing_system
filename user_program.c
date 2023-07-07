@@ -4,7 +4,6 @@ PGconn *connection;
 
 int import_file (char *file_path) 
 {
-    int fd = 0;
     char file_name[upbufsize];
     PGresult *res = NULL;
     
@@ -35,7 +34,6 @@ int import_file (char *file_path)
 
 int send_file (char *file_name, char *destination)
 {
-    int fd = 0;
     int len = 0;
     PGresult *res = NULL;
 
@@ -86,7 +84,8 @@ int send_file (char *file_name, char *destination)
 
 int export_file (char *path) 
 {
-    printf("not implemented\n");
+    printf("not implemented %s\n", path);
+    return 0;
 } 
 
 

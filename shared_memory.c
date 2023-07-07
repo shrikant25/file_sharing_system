@@ -8,7 +8,7 @@ int get_key(char *filename, int project_id)
     return ftok(filename, project_id);
 }
 
-int get_shared_block(char *filename, int size, unsigned char project_id) 
+int get_shared_block(char *filename, int size, char project_id) 
 {
     // get the key
     key_t key = get_key(filename, project_id);
@@ -26,7 +26,7 @@ int get_shared_block(char *filename, int size, unsigned char project_id)
 }
 
 
-char *attach_memory_block(char *filename, int size, unsigned char project_id) 
+char *attach_memory_block(char *filename, int size, char project_id) 
 {   
     char *result;
     // get id of shared memory segment
@@ -52,7 +52,7 @@ int detach_memory_block(char *block)
 }
 
 
-int destroy_memory_block(char *filename, unsigned char project_id)
+int destroy_memory_block(char *filename, char project_id)
 {
     // get the id of shared memory block
     int shared_block_id = get_shared_block(filename, 0, project_id);

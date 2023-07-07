@@ -11,10 +11,10 @@
 #include "hashtable.h"
 
 typedef struct server_info{
-    unsigned short int port;
-    unsigned int maxevents;
-    unsigned int servsoc_fd;
-    unsigned int epoll_fd;
+    int port;
+    int maxevents;
+    int servsoc_fd;
+    int epoll_fd;
     unsigned long ipaddress;
 }server_info;
 

@@ -14,7 +14,7 @@ const struct timespec tm = {
 };
 
 
-int create_connection(unsigned short int port_number, unsigned int ip_address) 
+int create_connection(unsigned short int port_number, int ip_address) 
 {    
     int network_socket; // to hold socket file descriptor
     int connection_status; // to show wether a connection was established or not
@@ -83,7 +83,7 @@ int get_message_from_processor(char *data)
         blkptr = comms_block.var + (TOTAL_PARTITIONS/8) + subblock_position * CPARTITION_SIZE;
         memset(data, 0, CPARTITION_SIZE);
         memcpy(data, blkptr, CPARTITION_SIZE);
-        toggle_bit(subblock_position, comms_block.var, 1);
+        toggle_bit(subblock_position, comms_block.var);
 
     }
     sem_post(sem_lock_comms.var);
@@ -94,7 +94,7 @@ int get_message_from_processor(char *data)
 int get_data_from_processor(send_message *sndmsg)
 {
     int subblock_position = -1;
-    unsigned char *blkptr;
+    char *blkptr;
     
     sem_wait(sem_lock_datas.var);         
     subblock_position = get_subblock(datas_block.var, 1, 3);
@@ -103,7 +103,7 @@ int get_data_from_processor(send_message *sndmsg)
 
         blkptr = datas_block.var + (TOTAL_PARTITIONS/8) + subblock_position * DPARTITION_SIZE;
         memcpy(sndmsg, blkptr, sizeof(send_message));
-        toggle_bit(subblock_position, datas_block.var, 3);
+        toggle_bit(subblock_position, datas_block.var);
     
     }
 
@@ -137,7 +137,7 @@ void send_message_to_processor(int type, void *msg)
                 // type 4 represents communication related to message status
                 memcpy(blkptr, (message_status *)msg, sizeof(message_status));
             }
-            toggle_bit(subblock_position, comms_block.var, 2);
+            toggle_bit(subblock_position, comms_block.var);
             sem_post(sem_lock_sigps.var);
         }
         attempts -= 1;
@@ -256,7 +256,6 @@ int prepare_statements()
 
 int main(int argc, char *argv[]) 
 {
-    int status = -1;
     int conffd = -1;
     char buf[500];
     char db_conn_command[100];

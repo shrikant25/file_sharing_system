@@ -4,8 +4,8 @@
 #define ISMESSAGE_SIZE 147
 
 typedef struct server_info {
-  unsigned int port;
-  unsigned int servsoc_fd;
+  int port;
+  int servsoc_fd;
   unsigned long ipaddress;
   char uuid[37];
   char data[ISMESSAGE_SIZE];

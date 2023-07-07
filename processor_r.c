@@ -76,7 +76,7 @@ int store_commr_into_database (receivers_message *rcvm)
 void get_data_from_receiver () 
 {
     int subblock_position = -1;
-    unsigned char *blkptr = NULL;
+    char *blkptr = NULL;
     newmsg_data nmsg;
     int status = 0;
     int attempts = 3;
@@ -119,7 +119,7 @@ void get_data_from_receiver ()
         } while (attempts > 0 && status == -1);
         
         // toggle the bit corresponding to that subblock 
-        toggle_bit(subblock_position, datar_block.var, 3);
+        toggle_bit(subblock_position, datar_block.var);
     }
     // increment semaphore value
     sem_post(sem_lock_datar.var);
@@ -152,7 +152,7 @@ void get_message_from_receiver ()
             
         } while (attempts > 0 && status == -1);
             
-        toggle_bit(subblock_position, commr_block.var, 2);
+        toggle_bit(subblock_position, commr_block.var);
     }
     sem_post(sem_lock_commr.var);
 
@@ -201,7 +201,7 @@ void send_msg_to_receiver ()
         memset(blkptr, 0, CPARTITION_SIZE);
    
         if (get_comms_from_database(blkptr) == 0) {
-            toggle_bit(subblock_position, commr_block.var, 1);
+            toggle_bit(subblock_position, commr_block.var);
         }
     }   
 
@@ -263,13 +263,11 @@ int prepare_statements ()
 
 int main (int argc, char *argv[]) 
 {
-    int status = -1;
     int conffd = -1;
     char buf[500];
     char db_conn_command[100];
     char username[30];
     char dbname[30];
-    PGresult *res;
 
     memset(buf, 0, sizeof(buf));
     memset(db_conn_command, 0, sizeof(db_conn_command));

@@ -42,7 +42,6 @@ int commit()
 
 int retrive_data_from_database (char *blkptr) 
 {
-    int row_count;
     PGresult *res;
     send_message *sndmsg = (send_message *)blkptr;
     
@@ -139,7 +138,6 @@ int store_comms_into_database (char *blkptr)
     char fd[11];
     char mstatus[11];
     char id[37];
-    int status = -1;
 
     PGresult* res;
     memset(id, 0, sizeof(id));
@@ -216,7 +214,6 @@ int store_comms_into_database (char *blkptr)
     }
     else {
         storelog("%s", "invalid type of message received in processors store comms into database");
-        PQclear(res);
         return -1;
     }
 
@@ -229,7 +226,6 @@ int store_comms_into_database (char *blkptr)
 int retrive_comms_from_database (char *blkptr) 
 {
     PGresult *res;
-    int status = -1;
     int type;
     char scommid[30];
 
@@ -241,7 +237,6 @@ int retrive_comms_from_database (char *blkptr)
         PQclear(res);
         return -1;
     }    
-   
     if (PQntuples(res) > 0) {
        
         type = atoi(PQgetvalue(res, 0, 0));
@@ -328,7 +323,7 @@ void give_data_to_sender ()
         memset(blkptr, 0, DPARTITION_SIZE);
         
         if (retrive_data_from_database(blkptr) == 0) { 
-            toggle_bit(subblock_position, datas_block.var, 3);
+            toggle_bit(subblock_position, datas_block.var);
             sem_post(sem_lock_sigs.var);
         }
     }
@@ -353,7 +348,7 @@ void send_msg_to_sender ()
         memset(blkptr, 0, CPARTITION_SIZE);
         
         if (retrive_comms_from_database(blkptr) == 0) {
-            toggle_bit(subblock_position, comms_block.var, 1);
+            toggle_bit(subblock_position, comms_block.var);
             sem_post(sem_lock_sigs.var);
         }
         
@@ -387,7 +382,7 @@ void read_msg_from_sender ()
 
         } while (attempts > 0 && status == -1);
         
-        toggle_bit(subblock_position, comms_block.var, 2);
+        toggle_bit(subblock_position, comms_block.var);
     }
     sem_post(sem_lock_comms.var);   
 }
@@ -441,13 +436,11 @@ int prepare_statements ()
 
 int main (int argc, char *argv[]) 
 {
-    int status = -1;
     int conffd = -1;
     char buf[500];
     char db_conn_command[100];
     char username[30];
     char dbname[30];
-    PGresult *res;
 
     memset(buf, 0, sizeof(buf));
     memset(db_conn_command, 0, sizeof(db_conn_command));
@@ -492,8 +485,8 @@ int main (int argc, char *argv[])
         return -1;
     }
         
-    datas_block.var = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (unsigned char)datas_block.key);
-    comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (unsigned char)comms_block.key);
+    datas_block.var = attach_memory_block(FILENAME_S, DATA_BLOCK_SIZE, (char)datas_block.key);
+    comms_block.var = attach_memory_block(FILENAME_S, COMM_BLOCK_SIZE, (char)comms_block.key);
 
     if (!( datas_block.var && comms_block.var)) {
         storelog("%s", "processor s failed to get shared memory");

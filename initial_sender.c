@@ -113,8 +113,7 @@ void update_status (char *uuid, int status) {
 void run_server () 
 {
     
-    int hSocket, data_sent, total_data_sent, idx, fd;
-    unsigned int ipaddress;
+    int data_sent, total_data_sent;
     struct sockaddr_in server;
     server_info servinfo;
     
@@ -214,15 +213,12 @@ int prepare_statements ()
 
 int main (int argc, char *argv[])
 {
-    int status = -1;
+
     int conffd = -1;
     char buf[100];
     char db_conn_command[100];
     char username[30];
     char dbname[30];
-    char noti_channel[30];
-    char noti_command[100];
-    PGresult *res;
 
     if (argc != 2) {
         syslog(LOG_NOTICE,"invalid arguments");
@@ -263,7 +259,7 @@ int main (int argc, char *argv[])
     
     if (sem_lock_isender.var == SEM_FAILED) {
         storelog("%s", "initial sender failed to intialize locks");
-        status = -1;
+        return -1;
     }
 
     // main run loop

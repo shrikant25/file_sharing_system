@@ -27,48 +27,48 @@
 extern PGconn *connection; 
 
 typedef struct capacity_info {
-    unsigned int capacity;
-    unsigned char ipaddress[17];
+    int capacity;
+    char ipaddress[17];
 }capacity_info;
 
 typedef struct receivers_message {
-    unsigned int fd;
-    unsigned int ipaddr;
-    unsigned int status;
+    int fd;
+    int ipaddr;
+    int status;
 }receivers_message;
 
 typedef struct newmsg_data {
-    unsigned int data1;
-    unsigned int data2;
-    unsigned char data[MESSAGE_SIZE];
+    int data1;
+    int data2;
+    char data[MESSAGE_SIZE];
 }newmsg_data;
 
 typedef struct open_connection {
     int type;
-    unsigned int port;
-    unsigned int ipaddress;
+    int port;
+    int ipaddress;
     int scommid;
 }open_connection;
 
 typedef struct close_connection {
     int type;
-    unsigned int fd;
-    unsigned int ipaddress;
+    int fd;
+    int ipaddress;
     int scommid;
 }close_connection;
 
 typedef struct connection_status {
     int type;
     int fd;
-    unsigned int ipaddress; 
+    int ipaddress; 
     int scommid;
 }connection_status;
 
 typedef struct send_message {
-    unsigned int size;
-    unsigned int fd;
-    unsigned char uuid[37];
-    unsigned char data[MESSAGE_SIZE];
+    int size;
+    int fd;
+    char uuid[37];
+    char data[MESSAGE_SIZE];
 }send_message;
 
 typedef struct message_status {
@@ -85,7 +85,7 @@ typedef struct semlocks {
 
 int get_subblock(char *, int, int);
 int get_subblock2(char *, int, int);
-void toggle_bit(int, char *, int);
+void toggle_bit(int, char *);
 void set_all_bits(char *, int); 
 void unset_all_bits(char *, int); 
 
