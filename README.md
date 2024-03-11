@@ -1,3 +1,5 @@
+**The readme is incomplete**
+
 This system comprised of different processes is used to send data over network.
 System consists 8 different user processes and a database.
 Processing of data occurs inside database and user processes are used for sending and receiving data over network.
