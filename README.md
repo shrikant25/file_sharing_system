@@ -1,4 +1,4 @@
-**The readme is incomplete**
+**The readme is incomplete, still under construction**
 
 This system comprised of different processes is used to send data over network.
 System consists 8 different user processes and a database.
