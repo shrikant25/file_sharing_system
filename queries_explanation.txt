@@ -559,7 +559,7 @@ before reading below queries, check for syntax of cte, lpad, encode, substr, gro
 
 there are many groupby clauses which might feel redundant, but without them query will not work, they may look counter intuitive but when tested with actual data they play important role.
 
-Complete code for below function in present in /db/schema.sql.
+Complete code for below function in present in /db/build_schema.sql.
 
 CREATE OR REPLACE FUNCTION run_jobs ()
 RETURNS VOID AS
