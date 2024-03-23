@@ -48,7 +48,7 @@ this job is parent of itself.
 
 Table has follwing columns:
 jobid: UUID is universally unique value, so a good choice for primary key.
-jobdata: Data for a job is store in this column as bytea (binary format). 
+jobdata: Data for a job is stored in this column as bytea (binary format). 
 
     NOTICE: when reading binary data using libpq read it in binary format(flag = 1) which will treat it as 1 byte, if read in char format(flag = 0) then libpq will treat it has 2 byte value.
     See line 78 in processesor_r.c. 
