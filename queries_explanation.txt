@@ -77,7 +77,7 @@ jstate: Denotes the state of job
             1: N-2 to S-1: If the job is in N-2 state and it is meant for some other system (identified based   on its destination value) then is it promoted from N-2 to S-1 state.
             
             NOTICE: Next steps for above scenario are not implemented, currently all the checks for S-1 state are looking for a file present in files table, but for this scenario there is no file in files table, as the message is arrived from somewhere else, it contains the data with itself.
-            So, how to proceed, maybe keep it some other state and then write  queries to establish connection with the intended system and then move it to S-4 state.
+            So, how to proceed, maybe keep it in some other state and then write  queries to establish connection with the intended system and then move it to S-4 state.
 
             2: S to S-1: If the destination name for job is present in sysinfo table then it is promoted from S to S-1.
         
@@ -86,7 +86,7 @@ jstate: Denotes the state of job
             Then file is read based on agreed packet size and child job(rows) containing actual chunk of data are created and are kept in S-4 state and have type = 2.
             One more job containing metadata of chunks is created and is kept in S-4 state with type = 3.
 
-        S-2W: Job waiting for its children to jobs to be completed is promoted from S-2 to S-2W state.
+        S-2W: Job waiting for its children jobs to be completed is promoted from S-2 to S-2W state.
 
         S-3: If the file size is less than or equal to our systems capacity then it is promoted from S-1 to S-3 state.
             After this consensus for packet size is formed with destination system, if not already formed.
@@ -95,7 +95,7 @@ jstate: Denotes the state of job
         S-4: A child job containing actual data who has parents in S-2W or S-3W state, it will be read by processor_r.c and has type = 6.
 
         S-5: A job created for consensus forming, it is read by intial_sender.c.
-             Suppose system 'A' wants form consensus with system 'B' then it will create a job with S-5 state and type = 4. Upon receiving this message, system B in order to reply, will create a message with S-5 state and type = 5.
+             Suppose system 'A' wants to form consensus with system 'B' then it will create a job with S-5 state and type = 4. Upon receiving this message, system B in order to reply, will create a message with S-5 state and type = 5.
 	
 	C:  A job is promoted to this state when its completed, if it has any child jobs then it will be promoted to 'C' when all its children are promoted to 'C'.
 
@@ -109,7 +109,7 @@ jtype: Indicates type of job.
        Type 6: Job to be sent to other system.
 
        For jobs in N-3 state:
-        Type 1, 2, 3, 4, 5 are read from jobdata when job then the jtype column is populated with the data and job moves to N-4 state.
+        Type 1, 2, 3, 4, 5 are read from jobdata of job then the jtype column is populated with the data and job moves to N-4 state.
 
        For jobs in S-4 state:
         System populates the type column while creating the job, so for system this job has type = 6.
@@ -176,7 +176,7 @@ CREATE TABLE senders_comms (scommid SERIAL,
                             CONSTRAINT pk_senders_comms PRIMARY KEY (mdata1, mdata2));
 
 Explanation:
-If database want to send some message to receiver program then it is stored in this table.
+If database want to send some message to sender program then it is stored in this table.
 ************************************
 
 ************************************
@@ -313,7 +313,7 @@ LANGUAGE 'plpgsql';
 Explanation: 
   This function is used by other queries to create a message,
   1: pass parameters,
-  2: declare some variabels for local user,
+  2: declare some variabels for local use,
   3: assign those variabels values with appropriate padding,
   4: create message
   5: if message size is less than capacity add padding
@@ -423,7 +423,7 @@ EXECUTE FUNCTION
     create_comms();
 
 Explanation:
-This  trigger is  fired after  Insert or UPDATE on sysinfo table and then it calls a function create_comms().
+This  trigger is  fired after  Insert or UPDATE on sysinfo table and then it calls function create_comms().
 ************************************
 
 
@@ -442,7 +442,7 @@ LANGUAGE plpgsql;
 Explanation:
 This function is called when trigger "msg_for_initial_sender" is fired after Insert in job_scheduler for every row that has jstate = 'S-5', it will send a notification on noti_1initialsender listener, 
 intial_sender.c will be listening on this listener. Every notification must be unique so that intial_sender.c
-can diffrentiate between them so the use go gen_random_uuid() it generated a random uuid.
+can diffrentiate between them, so the use of gen_random_uuid(), it generates a random uuid.
 ************************************
 
 
@@ -479,7 +479,7 @@ LANGUAGE plpgsql;
 Explanation:
 This function is called when trigger "msg_for_sender1" or "message_for_sencer2" is fired after update or insert in job_scheduler for every row that has jstate = 'S-4', it will send a notification on noti_1sender listener, 
 processor_s.c will be listening on this listener. Every notification must be unique so that processor_s.c
-can diffrentiate between them so the use go gen_random_uuid() it generated a random uuid.
+can diffrentiate between them, so the use of gen_random_uuid(), it generates a random uuid.
 ************************************
 
 
@@ -533,7 +533,7 @@ LANGUAGE plpgsql;
 Explanation:
 This function is called when trigger "msg_for_receiver" is fired after  insert in recevers_comss for every row that has jstate = 'S-4', it will send a notification on noti_1Receiver listener, 
 processor_rs.c will be listening on this listener. Every notification must be unique so that processor_r.c
-can diffrentiate between them so the use go gen_random_uuid() it generated a random uuid.
+can diffrentiate between them, so the use of gen_random_uuid(), it generates a random uuid.
 ************************************
 
 
@@ -553,9 +553,9 @@ This  trigger is fired after insert on recevers_comss for each row and then it c
 
 
 Explanation: Below function is called by launcher program after some interval
-see launcher.c for more info (check lin3 112)
-Understanding queries in below function are left as an exercise for reader, if you are clear with all the explanation up till this point then below queries will explain themselves.
-before reading below queries, check for syntax of cte, lpad, encode, substr, groupby, '||' (append), '::' (typecastin datatype) in postgresql docs.
+see launcher.c for more info (check line 112)
+Understanding queries in below function is left as an exercise for reader, if you are clear with all the explanation up till this point then below queries will explain themselves.
+before reading below queries, check for syntax of cte, lpad, encode, substr, groupby, '||' (append), '::' (typecasting of datatype) in postgresql docs.
 
 there are many groupby clauses which might feel redundant, but without them query will not work, they may look counter intuitive but when tested with actual data they play important role.
 
