@@ -1,58 +1,27 @@
+This system, composed of various processes, is used to transmit data over a network. It includes eight different user processes and a database. Data processing occurs within the database, while the user processes handle sending and receiving data over the network.
 
+Terms like "message" and "job" fundamentally represent individual rows in tables.
 
-This system comprised of different processes is used to send data over network.
-System consists 8 different user processes and a database.
-Processing of data occurs inside database and user processes are used for sending and receiving data over network.
+Every system listens on two ports: a fixed port for consensus forming (commsport) and a variable port for data communication (dataport). The IP address of the system remains constant in both cases. This data is stored in the selfinfo table within the database. The reason for keeping the dataport variable is to support future modifications, allowing one system to listen on multiple ports.
 
-Words like message, job at its core just represent individual row/s in tables.
+To send data, two systems form a consensus using the commsport regarding the message size and the port for communication. Since the commsport is a fixed port, it is assumed that all systems are listening on this port for consensus-related messages. Only the IP address of the system is required.
 
-Every system listens over two different ports, one fixed port for consensus forming (commsport), another variable port for data communication (dataport), ipaddress of the system remains common in both cases. This data is stored in selfinfo table inside database.
-Reason for keeping data port variable is to support future modification where one system could be listening on multiple ports.
+Suppose there are two systems, S1 and S2. If S1 intends to send data to S2, it first checks its database for the required information about S2. If the information is available, S1 proceeds with sending the message. If not, S1's database creates a fixed-size message containing its IP address, dataport, and sending capacity. The initial_sender process of S1 reads this message and sends it to S2's commsport, given that S1 knows S2's IP address. The message is received by the initial_receiver process of S2 and stored in its database. The databases of S1 and S2 compare their message capacities, and S2 finalizes the message size based on the smaller capacity. S2 then updates its sysinfo table with S1's dataport, the finalized message size, and S1's IP address and commsport. S2 prepares a message for S1 with its own IP address, dataport, and the finalized message size, which is sent back to S1. Upon receipt, S1 updates its sysinfo table with S2's information. Both systems' processor_r processes receive a message from their respective databases after updating the sysinfo table. The processor_r process sends this message to the receiver process via shared memory. The message includes the IP address and message size for the process with the updated sysinfo table entry. The receiver process then creates an entry in a hashtable where the key is the IP address and the value is the message size. This allows the receiver to instantly access the message size and read messages of that size from the incoming port when a connection is opened.
 
-In order to send data, two systems form a concensus using the commsport about the size of message and port over which communication will occur. As commsport port is a fixed port, it is taken for granted that all systems must be listening on this port for consensus related
-messages. Only ipaddress of the system is required.
+To send a message from S1 to S2, first import the file into S1's files table, then create a job to send the specified file to S2. These steps can be performed using a user program.
 
-Lets suppose there are two systems S1, S2. 
-S1 intends to send some data to S2.
-To form initial consensus, database of S1 first checks if it has required information realted to the S2. 
-If it does, then it will procced with sending the message, if it doesn't then S1's database creates a fixed size message consisting of its ipaddress, dataport and sending capacity. The message is read by intial_sender process of S1 and sends the message over network to S2's commsport, considering the fact that the S1 knows in advance the ipaddress of S2. Message is received by intial_receiver process of S2 and stored in its database. Inside database message capacity of S1 and S2 is compared. 
-S2 finalizes the message size based on whichever is smaller among two, S2 stores the information of S1 in sysinfo table. This information is consists of S1's dataport, the size that is finalized by S2 along with the ipaddress and commsport of S1. 
-Then S2 prepares a message for S1 consist of its ipaddress, dataport and message size that has been finalized. This message is again sent to S1 via inital_sender process of S2 and received by initial_receiver process of S1. 
-Once received S1 updates the information related to S2 in its sysinfo table. Processor_r process of both S1 and S2 will receive a message from their respective databases after insertion of message size in sysinfo table. 
-Processor_r process will send that message to receiver process via shared memory. The message is consists of ipadress and message size of the process for whom the message_size has been updated in sysinfo table. Using info from this message receiver process will create a entry in hashtable where key is ipaddress and value is size of message. 
-So, whenever a connection is opened on receiver by said ipaddress the receiver can access the message_size instantly and can read the messages of said size from the incoming port where connection has been opened
+Once the job is created, and there is already a consensus between S1 and S2 on the message size, S1's database checks the file size and splits it into chunks of ceil(file_size/message_size). Each chunk gets its own header indicating its serial number and parent ID. A separate message with information about the chunks, such as chunk count and original message size, is also created. The parent ID identifies chunks belonging to the same original message. The database sends a message to the processor_s process, which then sends the message to the sender, including the IP address and port. The sender attempts to open a connection to the given IP address and port. If successful, the sender sends a connection status message to processor_s, which stores it in the database. If successful, the message includes the file descriptor and IP address of the socket; otherwise, it includes -1 and the IP address.
 
-In order to send message from S1 to S2. First import the file in S1's files table. Then create a job to send the specified file to S2. Both these steps can be done using user program.
+If a connection is open and there are messages to be sent, processor_s reads these messages along with the file descriptor for the connection socket. The message is sent to the sender via shared memory. The sender attempts to send the message and updates the database with the message status. On the receiving system's side, the receiver process reads the data. Once data equal to the message_size is read, the message is passed to processor_r, which stores it in the database.
 
-Once the job to send the message is created, given there is already a consensus between S1 and S2 on message size, database of S1 will check the file size and split it into ceil(file_size/Message_size) chunks. Then each chunk will gets its own header indicating its serial number and to which message it belongs i.e parent id. 
-Along with these chunks a separete message consisting of info related to chunks such has chunk count and original message size is created. Parent id is use to identify chunks belonging to same original message.
-After that database will send a message to processor_s process, processor_s will send that message to sender, the message is consist of ip address and port. Sender will try to open a connection on said ipaddress and port. If successfull sender will send a message about status of connection to processor_s which in turn will be stored in database. If connection is successfull the message will consist of file descriptor and ipaddress belonging to that socket or it will consist of -1 and ipaddress. 
+Messages in the database go through various states. A parent message persists throughout the system's lifetime, always in the N-O state. Any newly arrived message is in the N-1 state. If the message hash matches, it is promoted to the N-2 state; otherwise, it moves to the dead state (D). If the message is intended for another system, it is promoted to the S-1 state; if for the same system, it is promoted to the N-3 state. In N-3, the message type is identified and promoted to N-4. Actions in N-4 depend on the message type.
 
-If a connection is open to a systme and there are messages that are needed to be sent, then processor_s will read those messages along with file descriptor for that connection socket. The message will be sent to sender via shared memory between the two processes. Sender will try to send the message and send an update about status of message to database. On receveing system's side receiver process will receive the message and read the data, once data equal to the size of message_size is read, then the message is passed to processor_r, processor_r stores the message in database.
+Type 1: Single-piece message (no chunks).
+Type 2: Chunk of a larger message.
+Type 3: Information about chunks of a larger message.
+Type 4: Initial message to create consensus.
+Type 5: Reply to a Type 4 message.
+Type 6: Job created to send data from one system to another.
+For messages in the S-1 state, the sysinfo table is checked for the destination system's message size capacity. If unavailable, a job is created to form a consensus on message size. If available, and the message needs to be divided into chunks, it is promoted to the S-2 state. In S-2, chunks are created and kept in S-4, while the main message moves to S-2W until all chunks are successfully sent. If chunk sending fails, the message moves to the dead state (D). Messages that fit the message size are directly promoted to S-4. Processor_r picks up messages from S-4 for destinations with an open connection. Consensus-forming messages move to S-5 and are picked up by the initial_sender.
 
-Messages inside database goes through various states.
-There is a parent message that is present througout the lifetime of system its state always remains in N-O state.
-Any newly arrived message is kept in N-1 state.
-Hash of message in N-1 state is checked if message matches with hash, then message is promoted to N-2 state.
-If message fails to match the hash then it is moved to dead state D.
-Destination of message in N-2 state is checked, if the message is intended for some other system, then the message is promoted to S-1 state. If message is intended for same system then it is promoted to N-3 state.
-In N-3 state type of message is checked. After identification of type the message is promoted to N-4 state. 
-For messages in N-4 state, action is performed on the basis of their type.
-
-Type 1 represents message that has no chunks, means its a single piece message.
-Type 2 represents message which is a chunk of some other bigger message.
-Type 3 represents message which consist info of chunks of some other bigger message.
-Type 4 represents message which is initialy sent to create consensus.
-Type 5 represents message which is sent in reply of message of type 4.
-Type 6 represents job created to send data from one system to another.
-
-For messages in S-1 state, sysinfo table is checked for message size capacity of destination system. 
-If message_size is not available then a job for formation of consensus for message_size is created. 
-If the message_size of destination system is available, then size of message is checked if there is need to divided the message in chunks, then the message is promoted to S-2 state. 
-For message is S-2 state, chunks are created, all chunks are kept in S-4 state and the main message is sent form S-2 state to S-2W state untill all the chunks are successfully sent, in case of failure in sending chunks, message moves fromm S-2W state to D state i.e dead state. 
-Message that fits the message size have no need to split and are directly promoted to S-4 state. 
-Processor_r picks up message from S-4 state for whom there is connection open to their destination.
-Messages for consensus formig are sent to S-5 state and are picked up by intial_sender.
-
-For any errors that occur in any of the processes, logs entries are directly made in logs table by that process.
-Any errors that occur before making connection to database are stored in syslog.
+For any errors in any processes, log entries are made in the logs table. Errors occurring before database connection are stored in syslog.
