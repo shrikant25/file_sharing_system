@@ -1,3 +1,5 @@
+Check queries_explanation.txt for detailed info.
+
 This system, composed of various processes, is used to transmit data over a network. It includes eight different user processes and a database. Data processing occurs within the database, while the user processes handle sending and receiving data over the network.
 
 Terms like "message" and "job" fundamentally represent individual rows in tables.
